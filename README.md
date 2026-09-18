@@ -8,6 +8,11 @@ for every screen, a model that passes Mendix's own checks, microflows a colleagu
 read, screens that aren't glued together. mx-codr adds exactly that — one installer,
 and one command that answers **DONE** or **NOT DONE**.
 
+It sits on top of [mxcli](https://github.com/mendixlabs/mxcli):
+- **mxcli** opens command-line access to a Mendix model
+- **mx-codr** adds a **harness** — skills, rules and hooks — to turn it into a
+  delivery workflow.
+
 ## What you get
 
 - **Test-first, automatically.** The agent writes a failing browser test before each
@@ -54,15 +59,15 @@ fetches what is missing, and tells you plainly about anything it could not do.
 |---|---|
 | **Your Mendix app** | Creates one with `mxcli new` if the folder has none (Mendix 11.12.1 unless you set `MX_VERSION`) |
 | **mxcli** | Uses the newest mxcli on the machine, offers the latest release when it is newer, and verifies the download's checksum |
-| **Docker** | Installs it when it is missing |
+| **Docker** | Installs it when it is missing. It is optional: see [Running without Docker](mxcodr/README.md#running-without-docker) |
 | **Python, Node, Playwright and its browser** | Installs them with `--with-deps` — the checkers and browser tests run on them |
 | **MxBuild** | Downloads the one for your Mendix version with `--with-deps`, so `mx check` runs |
 | **PostgreSQL** | Sets it up when you work without Docker, with `--with-deps` |
 | **Skills, lint rules, checkers, hooks** | Puts them where each of the four agents looks for them |
 | **Windows** | Applies the junctions and ARM64 fixes that Studio Pro's mxbuild needs |
 
-What cannot be installed unattended — a JDK, a Docker daemon that has to be started —
-is listed at the end with the command to run.
+What cannot be installed unattended — a JDK, a Docker daemon that has to be started
+if you use one — is listed at the end with the command to run.
 
 ## How a feature gets built
 
@@ -148,7 +153,7 @@ and then working with your agent as usual.
 | **Python 3** | for the two checkers the agent calls; you never invoke it |
 | **Node + playwright-cli** | the browser tests |
 | **A JDK** | matching the Mendix version; Studio Pro installs one |
-| **Docker** | installed as a prerequisite |
+| **Docker** | installed by default; optional: see [Running without Docker](mxcodr/README.md#running-without-docker) |
 
 `--with-deps` installs the ones that can be installed unattended. It never installs
 a JDK — that wants a licence click.

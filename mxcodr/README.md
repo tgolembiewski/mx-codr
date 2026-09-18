@@ -236,7 +236,7 @@ running and a Mendix installation is present, and records the answer in
 MDL_NO_DOCKER=1
 MDL_MXBUILD_PATH="C:/Program Files/Mendix/9.24.37.77045"
 MDL_DB_HOST="127.0.0.1"
-MDL_DB_NAME="mendfixerinstall"
+MDL_DB_NAME="invoicedesk"
 MDL_DB_USER="mendix"
 MDL_DB_PASSWORD="mendix"
 MDL_PSQL="/c/Program Files/PostgreSQL/17/bin/psql.exe"
@@ -589,7 +589,7 @@ Three Unix-only niceties degrade instead of failing: the stale-model warning nee
 and the sub-second sleep in `--boot-if-needed` falls back to `sleep 1`.
 
 **Verified on Windows 11** (build 10.0.26200, ARM64, Parallels VM), installing into
-`C:\Mendix\MendfixerInstall` with `bootstrap.ps1`: Git and Node detected and
+`C:\Mendix\TestApp` with `bootstrap.ps1`: Git and Node detected and
 skipped, Python found where winget had left it *off* the PATH, `playwright-cli`
 and its Chromium headless shell installed, `mxcli.exe` downloaded for
 windows/amd64, a Mendix app created at 9.24.37.77045 — the newest Studio Pro on
