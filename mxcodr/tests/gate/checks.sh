@@ -274,7 +274,67 @@ start_model_checks() {
   ( run_cached coverage check_coverage "${cache_inputs[@]}" tests tools/mdl-checks/check_test_coverage.py ) &
   ( run_cached naming   check_naming   "${cache_inputs[@]}" tools/mdl-checks/check_mdl.py ) &
   ( run_cached layout   check_layout   "${cache_inputs[@]}" tools/mdl-checks/check_layout.py ) &
-  echo "== mx check, lint, coverage, naming and layout started (they need no app; running while the suite does)"
+  ( run_cached security check_security "${cache_inputs[@]}" "env:MDL_REQUIRE_PRODUCTION=${MDL_REQUIRE_PRODUCTION:-}" ) &
+  echo "== mx check, lint, coverage, naming, layout and security started (they need no app; running while the suite does)"
+}
+
+# An app with sign-in is only as safe as its security level: at PROTOTYPE Mendix checks page and
+# microflow access and the read/write rights, but IGNORES the XPath constraint on an access rule --
+# the row-level rule is stored, passes mx check and lint, and lets every row through. Two sessions
+# built customer isolation on rules that did nothing. Production is therefore the level the gate
+# requires; MDL_REQUIRE_PRODUCTION=0 in tests/harness.env is for an app that deliberately has no
+# users at all.
+# Qualified entity names of the project's own modules, one per line. SHOW ENTITIES names its
+# column "Entity", not "Qualified Name", so this does not go through qualified_names.
+entity_names() {
+  local module
+  for module in $USER_MODULES; do
+    "$MXCLI" -p "$MPR" --json -c "SHOW ENTITIES IN $module" 2>/dev/null | "$PY" -c 'import json, sys
+try:
+    rows = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+for row in rows if isinstance(rows, list) else []:
+    name = row.get("Entity") or row.get("Qualified Name") or row.get("QualifiedName")
+    if name:
+        print(name)' 2>/dev/null
+  done
+}
+
+check_security() {
+  local level rules entity
+  [ "${MDL_REQUIRE_PRODUCTION:-1}" = "0" ] && { echo "security: not checked (MDL_REQUIRE_PRODUCTION=0)" > "$WORK/security.summary"; return 0; }
+  level="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | sed -n 's/^Security Level:[[:space:]]*//p' | head -1)"
+  if [ -z "$level" ]; then
+    echo "security: could not run -- SHOW PROJECT SECURITY printed no level" > "$WORK/security.summary"
+    return 2
+  fi
+  case "$level" in
+    Production*) echo "security: level Production" > "$WORK/security.summary"; return 0 ;;
+  esac
+  echo "security: level $level, and the gate requires Production" > "$WORK/security.summary"
+  : > "$WORK/security.detail"
+  # Name the rules that are silently doing nothing, so the cost is concrete.
+  rules=0
+  for entity in $(entity_names); do
+    "$MXCLI" -p "$MPR" -c "DESCRIBE ENTITY $entity" 2>/dev/null | grep -q "where '" || continue
+    rules=$((rules + 1))
+    [ "$rules" -le 5 ] && echo "   $entity has an access rule with an XPath constraint" >> "$WORK/security.detail"
+  done
+  {
+    [ "$rules" = "0" ] || echo "   at $level those $rules XPath constraint(s) are NOT enforced: every signed-in user sees every row."
+    echo "   Fix: alter project security level PRODUCTION;   (demo users keep working, and the rules start to bite)"
+    echo "   Row isolation, the shape that works, in order:"
+    echo "     1. link your own entity to the login account and let it go when the account goes:"
+    echo "        create or modify association Mod.Customer_Account from Mod.Customer to Administration.Account type Reference on delete set null;"
+    echo "     2. constrain the customer role on EVERY entity it may read, walking the association path back to the account:"
+    echo "        grant Mod.CustomerRole on Mod.Invoice (read *) where '[Mod.Invoice_Order/Mod.Order/Mod.Order_Customer/Mod.Customer/Mod.Customer_Account = ''[%CurrentUser%]'']';"
+    echo "        (the path alternates association/entity; comparing the last association to the token is what scopes the row)"
+    echo "     3. Production needs a rule for every entity a page reads, not only the scoped ones -- an entity with no rule for that role reads as no access, and the page comes up empty."
+    echo "     4. prove both directions in one test: the signed-in customer sees their own rows, and a row of another customer is absent (oql_count ... = 0), not merely off-screen."
+    echo "   Skills: manage-security, xpath-constraints."
+  } >> "$WORK/security.detail"
+  return 1
 }
 
 # Reads one background check's files into summary, failures or cannot_run, and details.
@@ -310,4 +370,5 @@ collect_model_checks() {
   collect coverage "coverage"
   collect naming "naming"
   collect layout "layout"
+  collect security "security"
 }

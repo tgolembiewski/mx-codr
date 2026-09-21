@@ -68,7 +68,7 @@ mdl_load_harness_env() {
     key="${key%"${key##*[![:space:]]}"}"
     case "$key" in
       MDL_NO_DOCKER|MDL_MXBUILD_PATH|MDL_DB_HOST|MDL_DB_NAME|MDL_DB_USER|MDL_DB_PASSWORD| \
-      MDL_PSQL|MDL_BOOT_COMMAND|JAVA_HOME|MX_VERSION) ;;
+      MDL_PSQL|MDL_BOOT_COMMAND|MDL_PRECHECK|MDL_ALLOW_GREEN_FIRST|JAVA_HOME|MX_VERSION) ;;
       *) continue ;;
     esac
     case "$value" in

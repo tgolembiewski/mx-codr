@@ -91,6 +91,12 @@ that break the build, jar files unpacked in search of an API:
 
 - **Security on is the whole login.** At `PROTOTYPE` or `PRODUCTION` level the
   runtime serves its own sign-in page (`login.html`); anonymous visitors land there.
+- **Build at `PRODUCTION` from the first script** -- `alter project security level PRODUCTION;`.
+  At `PROTOTYPE` Mendix checks page and microflow access and the read/write rights but
+  **ignores the XPath constraint** on an access rule: row-level isolation is stored, passes
+  `mx check` and lint, and lets every row through, so a test can go green on an app that
+  leaks. The gate's `security` check fails below Production. Production costs one thing:
+  every entity a page reads needs a rule for that role, or the page comes up empty.
 - **A user is an `Administration.Account`** (it extends `System.User`) with a user
   role. Give each kind of user its own user role, and include `Administration.User`
   in it so the person can change their own password:
@@ -117,12 +123,33 @@ that break the build, jar files unpacked in search of an API:
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 
+Reserved words bite at build time, not at `check`. Quoting an identifier (`"Status"`,
+`"Order"`) escapes the ~38 MDL parser keywords, but three names are reserved by the
+Mendix platform itself and quoting does not help: **`Owner`, `Type`, `Default`** --
+rename them (`Staff`, `ResourceType`, `Standard`). Three sessions in a row lost a boot
+to a module role named `Owner` (CE7247); an attribute named `Type` fails MDL021, and
+`CreatedDate`/`ChangedDate`/`ChangedBy` are the audit pseudo-types
+(`owner: autoowner`), not ordinary attributes. Full list: `./mxcli syntax keywords`,
+the detail in the `check-syntax` skill.
+
 Never run `mx check` (or `./mxcli docker check`) straight at the project while the
 app is up: it re-saves the `.mpr`, the `--watch` runtime rebuilds underneath the
 suite, and a green feature turns red for no reason. `bash tests/gate.sh` runs the
 same check against a scratch copy of the model, which is why the check belongs in
 the gate and not in a command of its own. CLAUDE.md's `docker check` line is for a
-project with nothing running.
+project with nothing running. The one check to run *before* an exec is
+`bash tests/precheck.sh <script>.mdl`: it applies the script to a scratch copy and runs
+`mx check` there (~6s), so the CE errors `mxcli check` cannot see -- a reserved name,
+an enumeration in a text box, a broken XPath or expression, a missing member -- come
+out before the runtime stops for a rebuild that fails. It also catches a script that
+would stop half-way (a demo user whose password the policy rejects, say), which on the
+real model leaves it half-applied. Under Claude, Cursor and OpenCode a hook runs it
+before every `mxcli exec` and blocks a failing one -- do not call it by hand there;
+under Codex call it yourself. `MDL_PRECHECK=0` in tests/harness.env turns it off.
+It sees what `mx check` sees. A Marketplace module whose version does not match the
+project's Mendix version passes the precheck and fails the deployment build (CE4271);
+the boot is the backstop for that one class, and a full build before every exec would
+cost more than it saves.
 
 Keep every `mdlsource/*.mdl` re-runnable -- `create or modify`, `create entity if not
 exists` -- because `mxcli exec` stops at the first failing statement: a script that
@@ -141,7 +168,7 @@ suite is a test-isolation bug (sign-in identity, or data left behind) and is fix
 `tests/lib.sh`.
 
 "Done" for a feature is one command, reported as command output — it runs the suite,
-`mx check`, lint, coverage, naming and layout, and ends in `DONE` or `NOT DONE`:
+`mx check`, lint, coverage, naming, layout and security, and ends in `DONE` or `NOT DONE`:
 
 ```bash
 bash tests/gate.sh
@@ -150,6 +177,11 @@ bash tests/gate.sh
 `mxcli init` regenerates `CLAUDE.md`, `AGENTS.md` and `.claude/settings.json`; it
 does not touch this file, `.claude/skills/` or `.claude/settings.local.json`, which
 is why the project's own rules live here.
+
+When you record a decision in the project brain, carry what proved it -- the error
+message, the command, the measurement. A captured "why" is read as settled fact by
+every later session, and a wrong one stops the next person from looking; if the cause
+is a guess, write it as one.
 
 On Windows the harness runs under Git Bash or WSL2 and the binary is
 `./mxcli.exe`; everything else here is unchanged.

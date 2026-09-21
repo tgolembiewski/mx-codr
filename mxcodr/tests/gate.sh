@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/gate.sh -- the done gate: everything "finished" means, in one command.
 #
-#   bash tests/gate.sh                    # suite + mx check + lint + coverage + naming + layout
+#   bash tests/gate.sh                    # suite + mx check + lint + coverage + naming + layout + security
 #   bash tests/gate.sh --only crud        # one script by name fragment, warm browser
 #   bash tests/gate.sh --tests-only       # the suite alone
 #   bash tests/gate.sh --boot-if-needed   # start the app first if nothing answers
@@ -10,7 +10,7 @@
 #   bash tests/gate.sh --no-cache         # re-run the five model checks even if nothing changed
 #
 # Six verdicts: the browser suite (tests/verify-*.test.sh) and five model checks that
-# need no app -- mx check, lint, coverage, naming, layout. Every step runs even if
+# need no app -- mx check, lint, coverage, naming, layout, security. Every step runs even if
 # another fails; a passing model check is replayed while its inputs are unchanged.
 #   DONE — every check passed               exit 0
 #   NOT DONE — failed: <checks>             exit 1
@@ -107,7 +107,7 @@ print_verdict_and_exit() {
   echo
   echo "== gate"
   for line in "${summary[@]}"; do echo "   $line"; done
-  for name in tests mx lint coverage naming layout; do
+  for name in tests mx lint coverage naming layout security; do
     [ -f "$WORK/$name.secs" ] && timing="$timing $name $(cat "$WORK/$name.secs")s,"
   done
   echo "   timing:${timing} wall $((SECONDS - GATE_START))s"
@@ -186,6 +186,7 @@ main() {
   preflight_stale_model
   step_tests
   add_red_first_notes
+  note_never_red_tests
   # 4. Wait for the model checks and collect their verdicts.
   if [ "$TESTS_ONLY" = "0" ] && [ -z "$ONLY" ]; then
     wait

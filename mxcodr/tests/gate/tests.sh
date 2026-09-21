@@ -34,6 +34,31 @@ record_red_first() {   # record_red_first <runner output> <environment cause or 
   done
 }
 
+# A full run names every test with no recorded red run: `--only` records them, the suite does not,
+# so this is the one place a code-first test shows up. A warning, never a failure -- the escape is
+# MDL_ALLOW_GREEN_FIRST (tests/harness.env), a space or comma list of test names that are green by
+# nature (a seeding reset, say).
+note_never_red_tests() {
+  [ -z "$ONLY" ] && [ "$TESTS_ONLY" = "0" ] || return 0
+  local dir="$APP_DIR/.mxcli/red-first" script name allowed unproven=""
+  for script in tests/verify-*.test.sh; do
+    [ -f "$script" ] || continue
+    name="$(basename "$script" .test.sh)"
+    [ -f "$dir/$name" ] && continue
+    allowed=0
+    for allow in ${MDL_ALLOW_GREEN_FIRST:-}; do
+      [ "${allow%,}" = "$name" ] && allowed=1
+    done
+    [ "$allowed" = "1" ] && continue
+    unproven="$unproven $name"
+  done
+  [ -n "$unproven" ] || return 0
+  summary+=("red-first: no red run recorded for$unproven -- a test that has never failed may assert")
+  summary+=("   nothing. Break what it checks once (an mxcli exec that changes the message, then undo")
+  summary+=("   it) and watch that one test go red, or list it in MDL_ALLOW_GREEN_FIRST if it is green")
+  summary+=("   by nature. This is a warning; it does not fail the gate.")
+}
+
 # A MODULE set by the caller goes to every test. Otherwise each test takes the module on its own
 # `# covers:` line (lib.sh), and only a test without one falls back to MDL_DEFAULT_MODULE.
 export_test_module() {

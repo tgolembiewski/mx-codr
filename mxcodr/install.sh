@@ -1504,6 +1504,8 @@ except json.JSONDecodeError as exc:
 hooks = settings.setdefault("hooks", {})
 wanted = {
     "UserPromptSubmit": {"hooks": [{"type": "command", "command": "bash tools/mdl-checks/hooks/remind-skills.sh"}]},
+    # 180s: the precheck copies the model and runs mx check on it (~6s on a small app).
+    "PreToolUse": {"matcher": "Bash", "hooks": [{"type": "command", "command": "bash tools/mdl-checks/hooks/before-mxcli-exec.sh", "timeout": 180}]},
     "PostToolUse": {"matcher": "Bash", "hooks": [{"type": "command", "command": "bash tools/mdl-checks/hooks/after-mxcli-exec.sh"}]},
 }
 for event, entry in wanted.items():
@@ -1512,7 +1514,7 @@ for event, entry in wanted.items():
         existing.append(entry)
 json.dump(settings, open(path, "w"), indent=2)
 PY_MERGE
-ui_done "Claude hooks" "2 $I_ARROW .claude/settings.local.json"
+ui_done "Claude hooks" "3 $I_ARROW .claude/settings.local.json"
 ignore_credential_files
 
 # Codex: PostToolUse ignores plain stdout, so it gets an adapter.
@@ -1637,6 +1639,8 @@ hooks = settings.setdefault("hooks", {})
 root = "tools/mdl-checks/hooks"
 wanted = {
     "sessionStart": {"command": "bash %s/remind-skills-cursor.sh" % root, "timeout": 30},
+    # Before an `mxcli exec`: mx check on a copy of the model, denying an exec that would break the build.
+    "beforeShellExecution": {"command": "bash %s/before-mxcli-exec-cursor.sh" % root, "timeout": 180},
     "postToolUse": {"command": "bash %s/after-mxcli-exec-cursor.sh" % root, "timeout": 120},
     # loop_limit caps the auto-submitted follow-ups; the marker is cleared on green,
     # so a session that fixes its failures stops looping before reaching it.
@@ -1658,7 +1662,7 @@ with open(path, "w") as handle:
     json.dump(settings, handle, indent=2)
     handle.write("\n")
 PY_CURSOR_MERGE
-ui_done "Cursor hooks" "3 $I_ARROW .cursor/hooks.json, 1 rule $I_ARROW .cursor/rules/"
+ui_done "Cursor hooks" "4 $I_ARROW .cursor/hooks.json, 1 rule $I_ARROW .cursor/rules/"
 
 # OpenCode: one plugin (mutable payloads, no exit codes); rules via opencode.json "instructions".
 ui_begin "installing the OpenCode plugin"
@@ -1699,7 +1703,7 @@ for source_file in "$SRC"/tests/*; do
   name="$(basename "$source_file")"
   target="$APP/tests/$name"
   case "$name" in
-    gate.sh|orient.sh|diagnose.sh|lib.sh|portable.sh|scenario-helpers.js|gate) ;;
+    gate.sh|orient.sh|diagnose.sh|precheck.sh|peek.sh|lib.sh|portable.sh|scenario-helpers.js|gate) ;;
     *) if [ -e "$target" ]; then continue; fi ;;
   esac
   if [ -d "$source_file" ]; then
@@ -1832,9 +1836,9 @@ ui_row "skills"   "$installed_skills" ".claude/skills  .agents/skills  .ai-conte
 ui_row "lint"     "$rules"            ".claude/lint-rules/"
 ui_row "checkers" "$checks"           "tools/mdl-checks/  ${C_GREY}(VERSION $version)${C_RESET}"
 ui_row "rule"     "1"                 ".claude/rules/mdl-skills.md  ${C_GREY}(every session)${C_RESET}"
-ui_row "hooks"    "2"                 ".claude/settings.local.json  ${C_GREY}(Claude)${C_RESET}"
+ui_row "hooks"    "3"                 ".claude/settings.local.json  ${C_GREY}(Claude)${C_RESET}"
 ui_row "hooks"    "3"                 ".codex/hooks.json  ${C_GREY}(Codex)${C_RESET}"
-ui_row "hooks"    "3"                 ".cursor/hooks.json  ${C_GREY}(Cursor, + .cursor/rules/)${C_RESET}"
+ui_row "hooks"    "4"                 ".cursor/hooks.json  ${C_GREY}(Cursor, + .cursor/rules/)${C_RESET}"
 ui_row "plugin"   "1"                 ".opencode/plugin/  ${C_GREY}(OpenCode, + opencode.json)${C_RESET}"
 if [ "$codex_reminder" = "added" ]; then
   ui_row "reminder" "1"               ".codex/config.toml  ${C_GREY}(after the first prompt)${C_RESET}"

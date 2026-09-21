@@ -44,10 +44,16 @@ build_error_hints() {
       CE1613) echo "   hint CE1613: a page or microflow names an attribute, association or document that does not exist (not created yet, or renamed) -- DESCRIBE the entity it points at" ;;
       CE0007) echo "   hint CE0007: an access rule names module roles of another module -- grant only this module's roles; for Administration.* give the user role Administration.User instead" ;;
       CE0642) echo "   hint CE0642: a required widget property is missing (a combo box or input needs a Caption/Label)" ;;
+      CE7247) echo "   hint CE7247: that name is reserved by the Mendix platform and quoting does not rescue it -- Owner, Type and Default have to be renamed (Staff, ResourceType, Standard); other keywords only need quotes. Full list: ./mxcli syntax keywords" ;;
     esac
   done
   # Builds, then the runtime dies on start with no element named: seen twice from an association to
   # another module whose delete rule carries an (empty) error message that mxcli did not store.
+  # The runtime refuses to come up while the after-startup microflow throws or returns false,
+  # so every boot dies the same way until that flow is fixed (seen: five in a row).
+  if grep -q 'after-startup-action failed' "$1" 2>/dev/null; then
+    echo "   hint after-startup: the app will not start until the AfterStartupMicroflow returns true. A seed wired there must be re-runnable (check whether the data is already there) and must never return false -- or take it out of startup (ALTER SETTINGS MODEL AfterStartupMicroflow = '') and call it from a test instead"
+  fi
   if grep -q 'NoSuchElementException: None.get' "$1" 2>/dev/null; then
     echo "   hint None.get at startup: usually an association to another module's entity (e.g. to Administration.Account) with a PREVENT/RESTRICT delete rule -- recreate it with ON DELETE SET NULL, exec, then --restart. Do not repair mprcontents by hand"
   fi
@@ -208,6 +214,13 @@ MSG
   exit 2
 }
 
+# The boot log is emptied for each boot (see boot_with_command); the previous one is kept, so a
+# failure that a later boot overwrote can still be read: .mxcli/gate-boot.prev.log.
+mdl_rotate_boot_log() {
+  [ -s .mxcli/gate-boot.log ] && cp .mxcli/gate-boot.log .mxcli/gate-boot.prev.log 2>/dev/null
+  : > .mxcli/gate-boot.log
+}
+
 boot_with_command() {
   echo "== no app answering; booting with MDL_BOOT_COMMAND"
   ensure_database || true
@@ -216,7 +229,7 @@ boot_with_command() {
   # redirect truncates the log only once that subshell runs, so empty it here: for the first
   # second the wait loop would otherwise read the PREVIOUS boot's errors and report this boot
   # as failed after 1s, with the old failure as its reason.
-  mkdir -p .mxcli && : > .mxcli/gate-boot.log
+  mkdir -p .mxcli && mdl_rotate_boot_log
   ( bash -c "$MDL_BOOT_COMMAND" > .mxcli/gate-boot.log 2>&1 & )
   BASE_URL="http://localhost:$APP_PORT"
   wait_for_boot .mxcli/gate-boot.log
@@ -240,7 +253,7 @@ boot_with_mxcli_run() {
     boot_args+=(--ensure-db)
   fi
   # Empty the log first; see boot_with_command for why.
-  mkdir -p .mxcli && : > .mxcli/gate-boot.log
+  mkdir -p .mxcli && mdl_rotate_boot_log
   ( "$MXCLI" "${boot_args[@]}" > .mxcli/gate-boot.log 2>&1 & )
   BASE_URL="http://localhost:$APP_PORT"
   wait_for_boot .mxcli/gate-boot.log
