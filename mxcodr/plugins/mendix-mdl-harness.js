@@ -1,6 +1,7 @@
 /**
  * OpenCode plugin mirroring the Claude/Codex/Cursor hooks; inactive without tests/gate.sh.
  *   chat.message        appends RULES to each user message
+ *   tool.execute.before before `mxcli exec <script>.mdl`: tests/precheck.sh (mx check on a copy); errors abort the call
  *   tool.execute.after  after `mxcli exec`: marks the session, appends after-mxcli-exec.sh output to the tool result
  *   event session.idle  runs tests/gate.sh; unless DONE, sends the output back as a message (max MAX_GATE_ROUNDS)
  * State: <tmpdir>/mendix-mdl-opencode-hooks/<session>.gate-required | .running | .rounds
@@ -43,11 +44,11 @@ const RULES = [
   "`module-structure`; before a page: `spacing-and-layout` (side-by-side widgets need",
   "`DesignProperties` Spacing, never CSS); before a microflow: `naming-and-captions` (a business",
   "`@caption` on every decision AND action). Read exactly those four skill files up front and",
-  "nothing else, one file per command -- a combined `cat` of several crosses the output limit and",
-  "costs a second read from a saved file. 4. Syntax is a lookup when needed: `./mxcli syntax",
-  "<topic>`, then `./mxcli check <script>.mdl -p <app>.mpr --references` before every exec; do not",
-  "sweep SKILL.md files. 5. Done = `bash tests/gate.sh` (suite + mx check + lint +",
-  "coverage + naming + layout) ends in `DONE`.",
+  "nothing else, one file per command (never one combined `cat`). 4. Syntax: `./mxcli syntax",
+  "<topic>`, then `./mxcli check <script>.mdl -p <app>.mpr --references` before every exec (a hook",
+  "runs `tests/precheck.sh` for you -- mx check on a copy; do not call it by hand); do not sweep",
+  "SKILL.md files. 5. Done = `bash tests/gate.sh` (suite + mx check + lint +",
+  "coverage + naming + layout + security) ends in `DONE`.",
 ].join(" ")
 
 // Per-session state on disk, so it survives reloads.
@@ -91,6 +92,15 @@ function clearState(sessionID, suffix) {
 
 function isMxcliExec(command) {
   return typeof command === "string" && /mxcli(\.exe)? exec/.test(command)
+}
+
+// The .mdl words of a bash command, quotes stripped; a glob passes through unchecked.
+function mdlScripts(command) {
+  const words = command.match(/"[^"]*"|'[^']*'|\S+/g) || []
+  const scripts = words
+    .map((word) => word.replace(/^["']|["']$/g, ""))
+    .filter((word) => word.endsWith(".mdl"))
+  return [...new Set(scripts)]
 }
 
 function gatePassed({ status, out }) {
@@ -141,6 +151,26 @@ export const MendixMdlHarness = async ({ client, directory, worktree }) => {
       const text = (output.parts || []).find((part) => part.type === "text" && typeof part.text === "string")
       if (!text || text.text.includes("bash tests/orient.sh")) return
       text.text = `${text.text}\n\n${RULES}`
+    },
+
+    // Before an `mxcli exec <script>.mdl`: tests/precheck.sh applies the scripts to a scratch copy
+    // of the model and runs mx check there. Errors abort the call; the thrown message is what the
+    // model reads instead of the tool output. Inline MDL, or no precheck.sh, passes through.
+    "tool.execute.before": async (input, output) => {
+      if (!installed) return
+      if (input.tool !== "bash") return
+      const command = output.args?.command
+      if (!isMxcliExec(command)) return
+      const precheck = join(root, "tests", "precheck.sh")
+      if (!existsSync(precheck)) return
+      const scripts = mdlScripts(command)
+      if (scripts.length === 0) return
+      const { status, out } = run([precheck.replace(/\\/g, "/"), ...scripts], root, 180000)
+      if (status === 0 || out.includes("precheck: could not run")) return
+      throw new Error(
+        "Blocked: that exec would break the build (mx check on a copy of the model, nothing changed). " +
+        "Fix the script and exec again:\n" + out.slice(-GATE_OUTPUT_LIMIT),
+      )
     },
 
     "tool.execute.after": async (input, output) => {

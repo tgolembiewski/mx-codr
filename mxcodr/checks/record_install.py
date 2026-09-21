@@ -14,7 +14,7 @@ import time
 
 # Files are listed from the bundle, not globbed in the app, so mxcli's own skills and rules are not tracked.
 SKILL_DIRS = (".claude/skills", ".agents/skills", ".ai-context/skills")
-HARNESS_SCRIPTS = ("gate.sh", "orient.sh", "diagnose.sh", "lib.sh", "portable.sh", "scenario-helpers.js")
+HARNESS_SCRIPTS = ("gate.sh", "orient.sh", "diagnose.sh", "precheck.sh", "peek.sh", "lib.sh", "portable.sh", "scenario-helpers.js")
 
 
 def listdir(path, suffix):

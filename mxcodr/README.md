@@ -117,13 +117,54 @@ The hooks are the part that does not depend on the model choosing to comply:
 |---|---|---|
 | `remind-skills.sh` | every Claude user prompt | adds one line of context naming the skills and what "done" means |
 | `remind-skills-codex.sh` | every Codex user prompt | gives the same rule using Codex's `$skill-name` invocation syntax |
+| `before-mxcli-exec.sh` | before a Claude Bash call containing `mxcli exec <script>.mdl` | runs `tests/precheck.sh` (the scripts applied to a scratch copy of the model, then `mx check` there, ~6s) and blocks the exec with the `[error]` lines when it would break the build -- the CE errors `mxcli check` cannot see |
 | `after-mxcli-exec.sh` | after a Claude Bash call containing `mxcli exec` | runs coverage and reports only a failure on stdout |
 | `after-mxcli-exec-codex.sh` | after a Codex Bash call containing `mxcli exec` | adapts coverage failures to Codex's exit-2 feedback contract and marks the session as requiring the full gate |
 | `stop-gate-codex.sh` | when that Codex session tries to finish | runs `bash tests/gate.sh`; exit 2 continues the turn until the positive `DONE — every check passed` line appears |
 | `remind-skills-cursor.sh` | Cursor `sessionStart` | returns `additional_context` — Cursor's `beforeSubmitPrompt` can only allow or block a prompt, it cannot inject |
+| `before-mxcli-exec-cursor.sh` | Cursor `beforeShellExecution` | the same precheck; answers `permission: deny` with the errors as `agentMessage` |
 | `after-mxcli-exec-cursor.sh` | Cursor `postToolUse` | returns coverage failures as `additional_context` — `afterShellExecution` sees the command but cannot answer the agent — and writes the marker |
 | `stop-gate-cursor.sh` | Cursor `stop` | runs the gate and returns its output as `followup_message`, auto-submitted as the next user message; `loop_limit` caps the retries |
-| `plugins/mendix-mdl-harness.js` | OpenCode `chat.message`, `tool.execute.after`, `event(session.idle)` | one plugin doing all three: appends the rules to each user message, appends coverage failures to the tool output the model reads, and on idle runs the gate and submits its output through `client.session.prompt` (capped at 3 rounds) |
+| `plugins/mendix-mdl-harness.js` | OpenCode `chat.message`, `tool.execute.before`, `tool.execute.after`, `event(session.idle)` | one plugin doing all four: runs the precheck before an exec and throws to abort a failing one, appends the rules to each user message, appends coverage failures to the tool output the model reads, and on idle runs the gate and submits its output through `client.session.prompt` (capped at 3 rounds) |
+
+### What the gate says about tests that never failed
+
+A full `bash tests/gate.sh` lists every `verify-*.test.sh` with no recorded red run in
+`.mxcli/red-first/`: a test written after the code it checks has never been seen to fail, and may
+assert nothing. It is a warning under the verdict, not a failure. Either break what the test checks
+once and watch that one test go red (`bash tests/gate.sh --only <feature>` records it), or list the
+test in `MDL_ALLOW_GREEN_FIRST` in `tests/harness.env` when it is green by nature, such as a
+seeding reset.
+
+Each boot empties `.mxcli/gate-boot.log` and keeps the one before it as
+`.mxcli/gate-boot.prev.log`, so a failure that a later boot overwrote can still be read.
+
+### Looking at a page without writing a test
+
+`bash tests/peek.sh 'Invoices' [widget]` signs in, opens that menu item and prints the page's
+visible text and console errors. It writes no test file, claims no coverage and records no
+red-first run -- the scratch `verify-zz-*.test.sh` two sessions wrote for this left a
+"went green without ever being red" record behind every time.
+
+### What `tests/precheck.sh` does and does not catch
+
+Before every `mxcli exec` a hook applies the scripts to a scratch copy of the model and runs
+`mx check` there (~6s), so a reserved name, an enumeration in a text box, a broken XPath or a
+missing member surfaces before the runtime stops for a rebuild that fails -- and so does a script
+that would stop half-way and leave the model half-applied. It does **not** see what only the
+deployment build sees: a Marketplace module whose version does not match the project's Mendix
+version passes the precheck and fails the build (CE4271). `MDL_PRECHECK=0` in `tests/harness.env`
+turns the whole thing off.
+
+### The gate requires Production security
+
+The `security` check fails the gate at any level below Production. At Prototype Mendix checks page
+and microflow access and the read/write rights but **ignores an access rule's XPath constraint**, so
+row-level isolation is stored, passes `mx check` and lint, and lets every row through. The failure
+names the entities whose constraints are doing nothing and prints the shape that works (link to
+`Administration.Account`, constrain every entity the role reads, give every entity a rule, prove
+both directions in a test). `MDL_REQUIRE_PRODUCTION=0` in `tests/harness.env` is for an app that
+deliberately has no users at all.
 
 ## Rebuilding after a source change
 

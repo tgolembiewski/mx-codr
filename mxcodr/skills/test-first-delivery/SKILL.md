@@ -31,7 +31,7 @@ bash tests/gate.sh --only <feature> --boot-if-needed
 #    never `bash tests/verify-x.test.sh`: the gate keeps the browser and the session
 #    warm and it is where the timeout and the facts-on-failure live
 bash tests/gate.sh --only <feature>
-# 5. the whole gate: suite + mx check + lint + coverage + naming + layout, ends in DONE or NOT DONE
+# 5. the whole gate: suite + mx check + lint + coverage + naming + layout + security, ends DONE / NOT DONE
 bash tests/gate.sh
 ```
 
@@ -52,6 +52,7 @@ source "$(dirname "$0")/lib.sh"      # after the `# covers:` header
 #         fill('txtName', 'x')  pick_combo('cmbCustomer', 'Northwind')
 #         row_action('invoiceGrid', 'INV-1', 'btnSend')  await_message(/sent/i)
 #         dismiss_dialog()  page_text()  reopen_app()   -- plus Playwright's `page`
+# just looking, not asserting: bash tests/peek.sh 'Invoices' [widget] (no test file, no record)
 # every helper, with its arguments: the header of tests/scenario-helpers.js (JS) and
 #         tests/lib.sh (shell) -- the header only, the bodies add nothing a test needs
 ```
@@ -129,6 +130,9 @@ a test the gate flags as `went green without ever being red here`.
 
 **3. Implement.** The smallest MDL that satisfies the criterion:
 `./mxcli check mdlsource/<script>.mdl -p <app>.mpr --references`, then `./mxcli exec`.
+A hook runs `bash tests/precheck.sh <script>.mdl` first (the build's own `mx check` on a
+scratch copy, ~6s) and blocks an exec that would break the build or stop half-way -- do not
+call it by hand; under Codex, where there is no such hook, call it yourself.
 
 **4. Run that one test until it is green.** `bash tests/gate.sh --only <feature>` —
 one script, warm browser, signed-in session, ~2-3s. Never the suite while iterating:
