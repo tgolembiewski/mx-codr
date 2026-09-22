@@ -189,6 +189,12 @@ access and nothing else.
 3. Create one module role per level of access, and map each to a single user role.
 4. Put the entities the module owns in its own domain model; reach into another
    module's entities only through that module's microflows.
+5. Write the whole domain model in **one script, before any page or microflow**:
+   entities, associations, enumerations, module roles and their access rules. Under
+   `mxcli run --watch` a change to any of those restarts the runtime (about 10 s),
+   while a page or microflow hot-applies in about 2 s. Measured on a 43-exec session,
+   that restart was most of the 13 s every test run waited for. Schema once, up front;
+   screens and logic as often as you like.
 
 ## Check it
 
@@ -205,6 +211,7 @@ cycles and cross-module coupling that no single rule catches.
 ## Validation checklist
 
 - [ ] Every new module answers yes to domain, reuse, or integration boundary
+- [ ] The domain model, roles and access rules went in first, in one script; pages and microflows after
 - [ ] No document sits at module root
 - [ ] No folder is named after a document type
 - [ ] Shared documents live in `_Shared/`, not duplicated

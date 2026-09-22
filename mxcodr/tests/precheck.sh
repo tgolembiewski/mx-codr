@@ -100,9 +100,17 @@ for script in "$@"; do
   }
 done
 
+# `mxcli docker check` runs `mx update-widgets` before `mx check` to prevent one false error,
+# CE0463 (a widget definition out of step with its .mpk). That step is 2.9s of every check
+# here -- 5.2s against 2.3s, measured on a 41-microflow app -- and nothing in a script
+# changes widgets/. So the check runs without it, and only a CE0463 in the result buys the
+# slow run: a real one is still reported, a false one still prevented.
 mx_args=(docker check -p "$scratch/$MPR")
 [ -n "${MDL_MXBUILD_PATH:-}" ] && mx_args+=(--mxbuild-path "$MDL_MXBUILD_PATH")
-out="$("$MXCLI" "${mx_args[@]}" 2>&1)"
+out="$("$MXCLI" "${mx_args[@]}" --no-update-widgets 2>&1)"
+if printf '%s\n' "$out" | grep -q 'CE0463'; then
+  out="$("$MXCLI" "${mx_args[@]}" 2>&1)"
+fi
 # mx check exits 0 even with model errors, so read the count it prints.
 errors="$(printf '%s\n' "$out" | grep -oE 'contains: [0-9]+ errors' | grep -oE '[0-9]+' | tail -1)"
 seconds=$(( $(date +%s) - started ))

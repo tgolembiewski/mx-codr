@@ -161,6 +161,38 @@ mdl_check_local_database() {
 # --- 7. Install freshness ---
 # Warns (prints only) when harness files differ from tools/mdl-checks/INSTALL.json checksums,
 # or a newer bundle (mxcodr/, or dist/ in older copies) sits in the project.
+# mdl_check_mxcli_freshness -- the app's mxcli against the build this harness was validated
+# with (tools/mdl-checks/MXCLI_TESTED, "<version> <build-date>", written by install.sh).
+#
+# Measured on one session: an app left on v0.22.0 spent 8 minutes probing a page build
+# error that the newer check refuses outright, by name (MDL-WIDGET25). The installer
+# offers the newer binary only while it runs; nothing said so at the start of a later
+# session. This prints one line, and what to run -- the session must not swap the binary.
+mdl_check_mxcli_freshness() {
+  local app="${APP_DIR:-.}"
+  local tested="$app/tools/mdl-checks/MXCLI_TESTED"
+  local out have_ver have_date want_ver want_date bundle="" candidate
+  [ -f "$tested" ] || return 0
+  read -r want_ver want_date < "$tested" || return 0
+  [ -n "$want_date" ] || return 0
+  out="$("${MXCLI:-./mxcli}" --version 2>/dev/null | head -1)" || out=""
+  have_ver="$(printf '%s' "$out" | sed -n 's/^mxcli version \([^ ]*\).*/\1/p')"
+  have_date="$(printf '%s' "$out" | sed -n 's/.*(\([0-9][0-9-]*T[0-9:]*Z\)).*/\1/p')"
+  if [ -z "$have_date" ]; then
+    echo "   mxcli: could not read ./mxcli --version; this harness was validated with $want_ver"
+    return 0
+  fi
+  echo "   mxcli $have_ver (built ${have_date%%T*})"
+  # ISO build dates compare correctly as strings.
+  [[ "$have_date" < "$want_date" ]] || return 0
+  for candidate in mxcodr dist; do
+    if [ -f "$app/$candidate/install.sh" ]; then bundle="$candidate"; break; fi
+  done
+  echo "   !! ./mxcli is older than the build this harness was validated with ($want_ver, ${want_date%%T*})."
+  echo "      An older check misses errors the newer one names at check time, so they surface at the build instead."
+  echo "      Swap it before building:  bash ${bundle:-mxcodr}/install.sh .   (it offers the newer binary it finds)"
+}
+
 mdl_check_install_freshness() {
   local app="${APP_DIR:-.}"
   local manifest="$app/tools/mdl-checks/INSTALL.json"
