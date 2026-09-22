@@ -370,37 +370,43 @@ now says this in its closing notes, and the per-prompt reminder hook carries the
 fallback: if the Skill tool does not list them, read exactly the three named files
 and look syntax up on demand rather than sweeping the directory.
 
-## Two more things the naming verdict reads out of positions
+## Canvas geometry is mxcli's job, not ours
 
 A screenshot of a reset flow in Studio Pro: one row of 17 activities running 2400px
 off the right of the screen, and two loops drawn as enormous empty rectangles with
 their delete activity adrift below them. mxcli had authored it correctly -- `mx check`
-0 errors -- so the question was where the defect lived.
+0 errors -- so `check_mdl.py --skill naming` grew three geometry rules: `flow-width`
+(over 1600px), `loop-box-empty` (under 8% of the box filled) and
+`overlapping-position` (two activities at one point). Each told the session to write
+better `@position` values by hand.
 
-Dumping the stored model answered it. Mendix keeps geometry as `RelativeMiddlePoint`,
-**relative to the parent**, and an activity inside a loop is therefore placed relative
-to the loop:
+**All three are gone** (2026-09-22). mxcli now lays a microflow out itself
+([mendixlabs/mxcli#1154](https://github.com/mendixlabs/mxcli/issues/1154)): the main
+line wraps onto rows past two canvas widths, a guard's branch drops into the lane
+below, a wide `case` sends its lines out in three groups, a note sits above its
+element. A session that writes no `@position` gets that layout, and the skill now says
+to write none -- a hand-placed statement is never moved and is not measured against
+what the builder puts around it, so a few of them are exactly what produces
+overlapping boxes.
+
+Measured on a generated app of 41 microflows laid out by the new mxcli, the old rules
+failed **9 flows for width** (1755px to 3100px, against a wrapping point of 2880) and
+flagged **5 false overlaps** -- loop children, whose coordinates are offsets from the
+loop and not canvas points, so two loops with a child at the same offset looked like
+one hiding the other. A rule that fights the generator is worse than no rule.
+
+The loop-coordinate finding behind the old `loop-box-empty` rule is still true and
+worth keeping here: Mendix stores geometry as `RelativeMiddlePoint`, relative to the
+parent, so an activity inside a loop is placed relative to the loop --
 
 ```
 LoopedActivity            560;200   Size 670;440    <- box grew to hold its child
   delete (inside loop)    560;360                   <- 560px right OF THE LOOP
 ```
 
-Confirmed by experiment: the same body at `@position(40, 100)` yields a loop of
-`200;180`, and a real loop holding eight children came out `590;660`. The first rule
-written here keyed on the coordinates themselves, and it flagged that eight-child loop
-— a pattern from one screenshot, not a defect. What actually distinguishes them is
-**density**: 2.4% of the box filled against 13% and 20%. A big body makes a big box
-and fills it. So `check_mdl.py --skill naming` gained two checks, both read from the
-same `describe` dump it already uses:
-
-| | Fails when |
-|---|---|
-`flow-width` | a flow wider than 1600px on one or two rows — wrap it, ~8 activities per row, `y += 160` |
-`loop-box-empty` | a loop box under 8% filled by its body |
-
-Neither is an mxcli fix: the tool wrote what it was told. What was missing was a rule
-saying a flow has to be readable, and one saying where an in-loop position lives.
+-- which is why a body written with canvas coordinates drew a huge empty box. mxcli
+handles this now; it is written down because anything that reads positions back out of
+a `describe` dump has to know it.
 
 ## The verdict that catches what looks wrong
 

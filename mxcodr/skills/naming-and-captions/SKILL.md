@@ -221,55 +221,23 @@ python3 tools/mdl-checks/check_mdl.py /tmp/flow.mdl --skill naming
 Exit 0 is clean. It reports placeholder names, type-echo names, a caption that
 restates its expression or is not a question, a retrieve/create/change/commit/
 delete/call/show-page/`set` without a business-operation `@caption` or with a
-Mendix default caption, `@caption` on a loop, a loop without `@annotation`, and
-two activities at one `@position`. (In this repo the checker is
+Mendix default caption, `@caption` on a loop and a loop without `@annotation`.
+Canvas geometry is not checked — mxcli draws it. (In this repo the checker is
 `tests/skills/check_mdl.py`; `tools/mdl-checks/` is where `install.sh` puts it in an
 installed project.)
 
 ## Where the activities go
 
-Positions are part of whether a flow can be read, and two of them are checked.
+**Nowhere you have to decide.** Leave `@position` out and mxcli lays the flow out: the
+main line wraps onto rows past two canvas widths, a guard's branch drops into the lane
+below while the main line carries on above it, a `case` of four or more branches leaves
+the decision in three groups so its lines do not cross, and a note sits above the
+element it documents (mendixlabs/mxcli#1154).
 
-**Wrap a long flow.** Studio Pro shows roughly 1600px at a readable zoom. A flow
-written as one long row runs off the screen: measured, a 17-activity reset flow spanned
-2400px and had to be read at 75% and scrolled sideways. About eight activities to a
-row, then `y += 160` and back to the left margin.
-
-```
-@position(200, 200)  ... first row ...  @position(1400, 200)
-@position(200, 360)  ... second row ... @position(1400, 360)
-```
-
-**A position inside a loop is an offset from the loop, not a canvas coordinate.**
-Mendix stores every position as `RelativeMiddlePoint`, relative to its parent, and
-sizes the loop's box to hold whatever is inside it. Measured on three real loops:
-
-| body positions | box Mendix drew | children | filled |
-|---|---|---|---|
-| one child at `(560, 360)` | 670 × 440 | 1 | **2.4%** |
-| one child at `(40, 100)` | 200 × 180 | 1 | 20% |
-| eight children, `(150, 330)`…`(320, 580)` | 590 × 660 | 8 | 13% |
-
-The check is on that last column, not on any coordinate: **a loop box should not be
-mostly empty.** A body with eight activities makes a big box and fills it; one
-activity given a canvas coordinate makes an equally big box with nothing in it, which
-is what renders as a huge empty rectangle.
-
-```
-@position(560, 200)
-@annotation 'Delete every invoice'
-loop $Invoice in $AllInvoices
-begin
-  @position(40, 100)        -- an offset inside the loop, not 560 again
-  @caption 'Delete the invoice'
-  delete $Invoice;
-end loop;
-```
-
-| Check | Fails when |
-|---|---|
-| `flow-width` | a flow wider than 1600px laid out on one or two rows |
-| `loop-box-empty` | a loop box under 8% filled by its body — whatever the coordinates |
+A statement that carries `@position` is **never moved**, and it is not measured against
+what the builder places around it — so a few hand-placed statements in an otherwise
+automatic flow are what produces overlapping boxes and lines through activities. Place
+everything or nothing, and prefer nothing.
 
 ## Validation checklist
 
@@ -278,5 +246,4 @@ end loop;
 - [ ] Every `if` and `while` caption is a question — not the expression Mendix fills in by default
 - [ ] Every retrieve, create, change, commit, delete, call, show-page and `set` has a business-operation `@caption` — none read as Retrieve/Change/Commit/Call/Show page + type
 - [ ] Loops labelled with `@annotation`, never `@caption`; splits left unlabelled (mxcli drops both)
-- [ ] No two activities share the same `@position`
 - [ ] `./mxcli check script.mdl` reports no MDL042

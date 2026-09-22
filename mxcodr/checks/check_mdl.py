@@ -18,9 +18,6 @@ Exit: 0 no failures (warnings allowed), 1 failures or no MDL found, 2 bad argume
 #   action-caption-is-default    FAIL  caption is the Mendix default ("Retrieve Invoice", "Commit object")
 #   placeholder-variable         FAIL  $Int1, $List2, $tmp, $x ...
 #   type-echo-variable           FAIL  name ends in _List, _Object or _Obj
-#   overlapping-position         FAIL  two activities at the same @position in one flow
-#   loop-box-empty               FAIL  loop body fills under 8% of its box (FLOW02)
-#   flow-width                   FAIL  @position x values span more than 1600px (FLOW01)
 
 from __future__ import annotations
 
@@ -61,11 +58,7 @@ DEFAULT_ACTION_CAPTION_RE = re.compile(
     r")$",
     re.IGNORECASE,
 )
-POSITION_RE = re.compile(r"^\s*@position\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)", re.IGNORECASE)
 # `create [or modify|replace] microflow|nanoflow Mod.Name`; group 1 is the name.
-MICROFLOW_START_RE = re.compile(
-    r"^\s*create (?:or (?:modify|replace) )?(?:microflow|nanoflow)\s+([\w.]+)", re.IGNORECASE
-)
 # Type word plus digits: $Int1, $List2, $Var10.
 PLACEHOLDER_VAR_RE = re.compile(
     r"\$(?:int|bool|boolean|str|string|dec|decimal|date|datetime|list|obj|object|var|num|item)\d+\b",
@@ -82,17 +75,6 @@ VARIABLE_RULES = (
     (THROWAWAY_VAR_RE, "placeholder-variable", "throwaway variable name"),
     (TYPE_ECHO_VAR_RE, "type-echo-variable", "variable name only restates its type"),
 )
-
-# FLOW01: Studio Pro shows about 1600px at a readable zoom.
-MAX_FLOW_WIDTH = 1600
-
-# FLOW02: loop box estimate, in px.
-ACTIVITY_AREA = 120 * 60        # one activity
-EMPTY_LOOP_WIDTH = 200          # an empty loop box
-EMPTY_LOOP_HEIGHT = 180
-LOOP_PADDING_RIGHT = 150        # furthest child + one activity
-LOOP_PADDING_BOTTOM = 80
-MIN_LOOP_FILL = 0.08            # under 8% filled reads as empty
 
 
 class Failure(dict):
@@ -144,22 +126,6 @@ def caption_text(annotation_lines: list[tuple[str, str]]) -> str:
 
 def annotation_kinds(annotations: list[tuple[str, str]]) -> list[str]:
     return [kind for kind, _ in annotations]
-
-
-def position_findings(point: tuple[int, int], line_number: int, flow: str,
-                      seen_positions: dict[tuple[int, int], int]) -> list[Failure]:
-    """overlapping-position; records the point in seen_positions when it is new."""
-    if point in seen_positions:
-        return [
-            Failure(
-                "overlapping-position",
-                f"two activities in {flow} sit at @position{point} "
-                f"(also line {seen_positions[point]}); one hides the other",
-                line_number,
-            )
-        ]
-    seen_positions[point] = line_number
-    return []
 
 
 def decision_findings(lines: list[str], index: int) -> tuple[list[Failure], list[Warning_], bool]:
@@ -262,97 +228,14 @@ def variable_findings(line: str, line_number: int) -> list[Failure]:
     return failures
 
 
-def loop_box_findings(finished_loops: list[dict]) -> list[Failure]:
-    """FLOW02: body positions are offsets from the loop and Mendix sizes the box to fit them,
-    so judge fill density, not coordinates."""
-    failures = []
-    for frame in finished_loops:
-        children = frame["children"]
-        if not children:
-            continue
-        box_width = max(EMPTY_LOOP_WIDTH, max(x for x, _y, _l in children) + LOOP_PADDING_RIGHT)
-        box_height = max(EMPTY_LOOP_HEIGHT, max(y for _x, y, _l in children) + LOOP_PADDING_BOTTOM)
-        filled = len(children) * ACTIVITY_AREA / (box_width * box_height)
-        if filled >= MIN_LOOP_FILL:
-            continue
-        widest = max(children, key=lambda c: c[0] * c[1])
-        failures.append(
-            Failure(
-                "loop-box-empty",
-                f"the loop at line {frame['line']} in {frame['flow']} draws a box about "
-                f"{box_width}x{box_height}px around {len(children)} activit"
-                f"{'y' if len(children) == 1 else 'ies'} -- {filled * 100:.0f}% of it filled, so it "
-                f"reads as an empty rectangle. A position inside a loop is an offset FROM the "
-                f"loop, not a canvas coordinate: @position({widest[0]}, {widest[1]}) puts that "
-                f"activity {widest[0]}px right of the loop. Use small offsets -- (40, 100) for "
-                f"the first, (200, 100) for the next",
-                widest[2],
-            )
-        )
-    return failures
-
-
-def flow_width_findings(flow_points: dict[str, list[tuple[int, int, int]]]) -> list[Failure]:
-    """FLOW01: a flow wider than MAX_FLOW_WIDTH has to be scrolled."""
-    failures = []
-    for flow, points in flow_points.items():
-        if len(points) < 2:
-            continue
-        xs = [x for x, _y, _line in points]
-        rows = {y for _x, y, _line in points}
-        width = max(xs) - min(xs)
-        if width > MAX_FLOW_WIDTH:
-            widest = max(points, key=lambda p: p[0])
-            failures.append(
-                Failure(
-                    "flow-width",
-                    f"{flow} is {width}px wide across {len(points)} activities on "
-                    f"{len(rows)} row(s) -- it runs off the screen and has to be scrolled. "
-                    f"Wrap it: about eight activities to a row, then y += 160 and back to "
-                    f"the left",
-                    widest[2],
-                )
-            )
-    return failures
-
-
 def check_naming(lines: list[str]) -> tuple[list[Failure], list[Warning_]]:
     """Return (failures, warnings) for all naming rules."""
     failures: list[Failure] = []
     warnings: list[Warning_] = []
 
-    seen_positions: dict[tuple[int, int], int] = {}          # reset per flow
-    current_flow = "(unknown)"
-
-    flow_points: dict[str, list[tuple[int, int, int]]] = {}   # flow -> (x, y, line)
-    loop_stack: list[dict] = []                               # loops currently open
-    finished_loops: list[dict] = []
-
     for index, line in enumerate(lines):
         line_number = index + 1
-        head = MICROFLOW_START_RE.match(line)
-        if head:
-            current_flow = head.group(1)
-            seen_positions = {}
-            loop_stack = []
-
-        position = POSITION_RE.match(line)
-        if position:
-            point = (int(position.group(1)), int(position.group(2)))
-            failures.extend(position_findings(point, line_number, current_flow, seen_positions))
-            flow_points.setdefault(current_flow, []).append((point[0], point[1], line_number))
-            if loop_stack:
-                loop_stack[-1]["children"].append((point[0], point[1], line_number))
-
         stripped = line.strip().lower()
-
-        # `while` is also a decision below.
-        if stripped.startswith("loop ") or stripped.startswith("while "):
-            loop_stack.append({"flow": current_flow, "line": line_number, "children": []})
-        elif stripped.startswith("end loop") or stripped.startswith("end while"):
-            if loop_stack:
-                finished_loops.append(loop_stack.pop())
-
         if stripped.startswith("end ") or stripped == "end":
             continue
 
@@ -369,8 +252,6 @@ def check_naming(lines: list[str]) -> tuple[list[Failure], list[Warning_]]:
 
         failures.extend(variable_findings(line, line_number))
 
-    failures.extend(loop_box_findings(finished_loops))
-    failures.extend(flow_width_findings(flow_points))
     return failures, warnings
 
 
