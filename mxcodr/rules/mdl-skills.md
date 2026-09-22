@@ -79,6 +79,13 @@ DesignProperties: ['Spacing': ['margin-right': 'S', 'margin-bottom': 'S']]
   -- sides margin-|padding- top|right|bottom|left · values None S M L and NOTHING else
   -- two inline widgets side by side (label+button, button+button) collide without it;
   --   the gate's `layout` verdict fails on it. Never a Class: or custom CSS for spacing
+datagrid dg (...) { column colStatus (attribute: "Status") { dropdownfilter fltStatus } }
+  -- a data grid filters itself, one filter inside the column it belongs to: textfilter on a
+  --   String, numberfilter on a number, datefilter on a date (FilterType: between for a
+  --   range), dropdownfilter on an enumeration, and over an association
+  --   dropdownfilter fltCustomer (Association: Mod.Order_Customer,
+  --   datasource: database Mod.Customer, CaptionAttribute: Name). Boolean takes none.
+  --   Never a filter bar of your own over a helper entity: lint rule UI001 fails on it
 show message '{1}' type info|warning|error objects [$Obj/Name + ' saved'];   -- '{1}' is the slot, the
 show message 'Plain text' type info;                                          -- list fills it
 validation feedback $Obj/Attr message 'Name is required';   -- more: ./mxcli -c "HELP" | grep -A6 'show message'
