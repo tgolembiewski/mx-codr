@@ -1474,6 +1474,8 @@ ui_begin "installing checkers"
 mkdir -p "$APP/tools/mdl-checks"
 cp -R "$SRC"/checks/. "$APP/tools/mdl-checks/"
 cp "$SRC/VERSION" "$APP/tools/mdl-checks/VERSION"
+# The mxcli build this bundle was validated with; orient.sh compares ./mxcli against it.
+[ -f "$SRC/MXCLI_TESTED" ] && cp "$SRC/MXCLI_TESTED" "$APP/tools/mdl-checks/MXCLI_TESTED"
 checks=$(ls -1 "$SRC"/checks/*.py | wc -l | tr -d ' ')
 ui_done "checkers" "$checks $I_ARROW tools/mdl-checks/"
 

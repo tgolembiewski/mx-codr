@@ -70,6 +70,7 @@ app_section() {
   [ -f tests/credentials.env ] && echo "   tests/credentials.env present (test sign-in configured)"
   [ -d docs/brain ] && echo "   docs/brain/ present -- read project.md before building"
   [ -f tools/mdl-checks/VERSION ] && echo "   harness $(cat tools/mdl-checks/VERSION)"
+  mdl_check_mxcli_freshness
   mdl_check_install_freshness
 }
 

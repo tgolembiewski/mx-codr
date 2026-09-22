@@ -15,9 +15,14 @@ check_mx() {
     cp -Rc "$item" "$scratch/" 2>/dev/null || cp -R "$item" "$scratch/" 2>/dev/null || {
       echo "mx check: could not run -- could not copy $item to a scratch directory" > "$WORK/mx.summary"; return 2; }
   done
+  # Without `mx update-widgets` (2.9s of a 5.2s check, measured); the one error that
+  # step prevents, CE0463, buys the slow run. Same rule as tests/precheck.sh.
   local -a mx_args=(docker check -p "$scratch/$MPR")
   [ -n "${MDL_MXBUILD_PATH:-}" ] && mx_args+=(--mxbuild-path "$MDL_MXBUILD_PATH")
-  out="$("$MXCLI" "${mx_args[@]}" 2>&1)"
+  out="$("$MXCLI" "${mx_args[@]}" --no-update-widgets 2>&1)"
+  if printf '%s\n' "$out" | grep -q 'CE0463'; then
+    out="$("$MXCLI" "${mx_args[@]}" 2>&1)"
+  fi
   # mx check exits 0 even with model errors, so read the count it prints.
   errors="$(printf '%s\n' "$out" | grep -oE 'contains: [0-9]+ errors' | grep -oE '[0-9]+' | tail -1)"
   if [ -z "$errors" ]; then
