@@ -129,4 +129,13 @@ if [ "$errors" = "0" ]; then
 fi
 echo "precheck: $errors error(s) -- the build would fail. Fix the script, then exec (${seconds}s):"
 printf '%s\n' "$out" | grep -E '^\[error\]' | head -12
+# The same one-line hints the gate prints for a failed boot: a block of 26 identical CE2729
+# errors is one missing pair of grants, and reads as 26 problems without them.
+if [ -f tests/gate/hints.sh ]; then
+  # shellcheck source=gate/hints.sh
+  . tests/gate/hints.sh
+  hint_log="$scratch/precheck-errors.txt"
+  printf '%s\n' "$out" | grep -E '^\[error\]' > "$hint_log" 2>/dev/null
+  mdl_ce_hints "$hint_log"
+fi
 exit 1

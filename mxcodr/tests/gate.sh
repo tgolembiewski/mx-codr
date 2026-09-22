@@ -35,7 +35,7 @@ HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$HARNESS_DIR/.." && pwd)"
 cd "$APP_DIR"
 . "$HARNESS_DIR/portable.sh"
-for part in app checks preflight tests; do
+for part in hints app checks preflight tests; do
   if [ ! -f "$HARNESS_DIR/gate/$part.sh" ]; then
     echo "tests/gate/$part.sh is missing -- re-run the installer" >&2
     exit 2
