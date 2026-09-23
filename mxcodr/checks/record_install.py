@@ -42,8 +42,13 @@ def destinations(src):
     for name in listdir(os.path.join(src, "lint-rules"), ".star"):
         yield os.path.join(src, "lint-rules", name), ".claude/lint-rules/" + name
 
+    # plugins/ holds one file per host that takes a plugin: the OpenCode plugin, and the Pi
+    # extension, which is installed under its host's own name.
     for name in listdir(os.path.join(src, "plugins"), ".js"):
-        yield os.path.join(src, "plugins", name), ".opencode/plugin/" + name
+        if name.endswith(".pi.js"):
+            yield os.path.join(src, "plugins", name), ".pi/extensions/mendix-mdl-harness.js"
+        else:
+            yield os.path.join(src, "plugins", name), ".opencode/plugin/" + name
 
     yield os.path.join(src, "rules", "mdl-skills.md"), ".claude/rules/mdl-skills.md"
     yield os.path.join(src, "rules", "mdl-skills.mdc"), ".cursor/rules/mdl-skills.mdc"
