@@ -1275,7 +1275,7 @@ if [ "$target_inferred" = 1 ] && [ "$mpr_count" = "0" ] && [ "$CREATE_APP" = "1"
 fi
 
 # NOTE: there are 12 ui_done steps (13 with a new app), so these totals are one short.
-if [ "$mpr_count" = "0" ]; then ui_plan 13; else ui_plan 12; fi
+if [ "$mpr_count" = "0" ]; then ui_plan 14; else ui_plan 13; fi
 
 # --- 11. Step: prerequisites (Python, Node, Playwright, mxcli, MxBuild, PostgreSQL, Docker, JDK) ---
 # Missing tools are collected and reported in the summary.
@@ -1669,7 +1669,7 @@ ui_done "Cursor hooks" "4 $I_ARROW .cursor/hooks.json, 1 rule $I_ARROW .cursor/r
 # OpenCode: one plugin (mutable payloads, no exit codes); rules via opencode.json "instructions".
 ui_begin "installing the OpenCode plugin"
 mkdir -p "$APP/.opencode/plugin"
-cp "$SRC"/plugins/*.js "$APP/.opencode/plugin/"
+cp "$SRC/plugins/mendix-mdl-harness.js" "$APP/.opencode/plugin/"
 
 "$PY" - "$APP/opencode.json" <<'PY_OPENCODE'
 import json, os, sys
@@ -1695,6 +1695,24 @@ with open(path, "w") as handle:
     handle.write("\n")
 PY_OPENCODE
 ui_done "OpenCode plugin" "1 $I_ARROW .opencode/plugin/, rules $I_ARROW opencode.json"
+
+# Pi: one extension (tool_call blocks, tool_result appends, agent_before_settle asks for one more
+# turn); rules via .pi/AGENTS.md, which Pi loads by itself. Skills need nothing -- Pi reads the
+# Agent Skills layout this installer already writes to .agents/skills/.
+ui_begin "installing the Pi extension"
+mkdir -p "$APP/.pi/extensions"
+cp "$SRC/plugins/mendix-mdl-harness.pi.js" "$APP/.pi/extensions/mendix-mdl-harness.js"
+{
+  printf '# Project rules\n\n'
+  printf 'The rules for building in this app are in `.claude/rules/mdl-skills.md`. Read that file\n'
+  printf 'before the first command of a session, and follow it for the whole session.\n\n'
+  printf 'Two things it cannot say for itself:\n\n'
+  printf -- '- `tests/precheck.sh` runs for you before every `mxcli exec`, and blocks the call when the\n'
+  printf '  script would break the build. Do not call it by hand.\n'
+  printf -- '- When a turn ends after a model change, `tests/gate.sh` runs and its failures come back as\n'
+  printf '  your next turn. Finish the work rather than reporting it as done.\n'
+} > "$APP/.pi/AGENTS.md"
+ui_done "Pi extension" "1 $I_ARROW .pi/extensions/, rules $I_ARROW .pi/AGENTS.md"
 
 # --- 15. Step: install the test harness ---
 # Core scripts are upgraded in place; other files are copied only when absent. verify-*.test.sh are the app's own.
@@ -1842,6 +1860,7 @@ ui_row "hooks"    "3"                 ".claude/settings.local.json  ${C_GREY}(Cl
 ui_row "hooks"    "3"                 ".codex/hooks.json  ${C_GREY}(Codex)${C_RESET}"
 ui_row "hooks"    "4"                 ".cursor/hooks.json  ${C_GREY}(Cursor, + .cursor/rules/)${C_RESET}"
 ui_row "plugin"   "1"                 ".opencode/plugin/  ${C_GREY}(OpenCode, + opencode.json)${C_RESET}"
+ui_row "extension" "1"                ".pi/extensions/  ${C_GREY}(Pi, + .pi/AGENTS.md)${C_RESET}"
 if [ "$codex_reminder" = "added" ]; then
   ui_row "reminder" "1"               ".codex/config.toml  ${C_GREY}(after the first prompt)${C_RESET}"
 else
@@ -1896,6 +1915,7 @@ printf '     %s\n' "36 commands, 6.5 minutes -- before its first real command. A
 printf '     %s\n' "Codex will not fire its hooks until you open ${C_BOLD}/hooks${C_RESET} once and trust them."
 printf '     %s\n' "Cursor needs hooks enabled for this workspace before ${C_BOLD}.cursor/hooks.json${C_RESET} runs."
 printf '     %s\n' "OpenCode loads ${C_BOLD}.opencode/plugin/${C_RESET} at startup; restart an open session to pick it up."
+printf '     %s\n' "Pi loads ${C_BOLD}.pi/extensions/${C_RESET} once the project is trusted; restart an open session to pick it up."
 printf '     %s\n' "Write your own tests/verify-<feature>.test.sh -- the ${C_BOLD}test-first-delivery${C_RESET} skill has a"
 printf '     %s\n' "complete example, and $SRC/examples/ holds eight from the demo app."
 printf '\n'

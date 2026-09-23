@@ -14,7 +14,8 @@ install.sh        copies the payload into a Mendix project
 VERSION           date-based version, copied to tools/mdl-checks/VERSION in the target
 rules/            mdl-skills.md (Claude) and mdl-skills.mdc (Cursor) — the always-loaded rule
 hooks/            host-specific prompt/PostToolUse adapters plus the Codex and Cursor gates
-plugins/          mendix-mdl-harness.js — the same three jobs as one OpenCode plugin
+plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js (Pi) -- the same
+                  three jobs as the hooks, in each host's own event API
 tests/            lib.sh, scenario-helpers.js, gate.sh + gate/, orient.sh, diagnose.sh, portable.sh — the harness, upgraded in
                   place on every install (gate.sh is the done gate — tests, mx check, lint, coverage
                   and naming; orient.sh and diagnose.sh gather facts in parallel; portable.sh holds
@@ -126,6 +127,7 @@ The hooks are the part that does not depend on the model choosing to comply:
 | `after-mxcli-exec-cursor.sh` | Cursor `postToolUse` | returns coverage failures as `additional_context` — `afterShellExecution` sees the command but cannot answer the agent — and writes the marker |
 | `stop-gate-cursor.sh` | Cursor `stop` | runs the gate and returns its output as `followup_message`, auto-submitted as the next user message; `loop_limit` caps the retries |
 | `plugins/mendix-mdl-harness.js` | OpenCode `chat.message`, `tool.execute.before`, `tool.execute.after`, `event(session.idle)` | one plugin doing all four: runs the precheck before an exec and throws to abort a failing one, appends the rules to each user message, appends coverage failures to the tool output the model reads, and on idle runs the gate and submits its output through `client.session.prompt` (capped at 3 rounds) |
+| `plugins/mendix-mdl-harness.pi.js` | Pi `tool_call`, `tool_result`, `agent_before_settle` | the same three jobs in Pi's own API: `tool_call` returns `block: true` with the precheck output as `reason`, `tool_result` appends the coverage failures to what the model reads, and `agent_before_settle` runs the gate and returns `continue: true` so a red gate becomes the next turn (capped at 3 rounds). The rules are not injected: Pi reads `.pi/AGENTS.md`, and the skills come from `.agents/skills/`, which it discovers on its own |
 
 ### What the gate says about tests that never failed
 
