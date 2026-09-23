@@ -52,6 +52,14 @@ two where one would do:
 ./mxcli syntax microflow.object-operations; ./mxcli syntax page.action; ./mxcli syntax navigation.create
 ```
 
+**Do not probe syntax by writing variant files and running precheck on each.** One session
+generated a dozen versions of the same statement into a temporary file and ran
+`tests/precheck.sh` on every one. That answers the wrong question: precheck runs a full
+`mx check` on a copy of the model and says whether the BUILD would break.
+`./mxcli check <file> -p <app>.mpr --references` is the cheaper answer and a stricter one --
+it also refuses names that do not exist (0.4s against a rebuilt precheck's seconds, measured).
+Keep `tests/precheck.sh` for the script you are about to exec, which a hook runs for you.
+
 Syntax that every session otherwise looks up, one screen (`./mxcli syntax <topic>`
 has the rest):
 
