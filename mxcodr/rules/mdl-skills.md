@@ -185,6 +185,12 @@ bash tests/gate.sh
 does not touch this file, `.claude/skills/` or `.claude/settings.local.json`, which
 is why the project's own rules live here.
 
+**Ask before any git command that writes.** `init`, `add`, `commit`, `checkout`,
+`branch`, `merge`, `reset`, `stash`, `clean`, `push` -- every one of them waits for the
+person to say yes, in this project and in any other folder. A session ran
+`git init && git add -A` here on its own initiative and the folder was never meant to be
+a repository. Reading is free: `git status`, `git log`, `git diff` whenever you need them.
+
 When you record a decision in the project brain, carry what proved it -- the error
 message, the command, the measurement. A captured "why" is read as settled fact by
 every later session, and a wrong one stops the next person from looking; if the cause

@@ -36,17 +36,16 @@ report_boot_failure() {   # report_boot_failure <log> <waited>
 # build_error_hints <log> -- the build says where an error is, rarely what: one line per code
 # seen, naming the usual cause and the skill that has the syntax.
 build_error_hints() {
-  local code
-  for code in $(grep -oE '\[CE[0-9]+\]' "$1" 2>/dev/null | tr -d '[]' | awk '!seen[$0]++'); do
-    case "$code" in
-      CE0161) echo "   hint CE0161 (XPath): tokens are quoted -- '[%CurrentUser%]', '[%CurrentDateTime%]' -- never CurrentUser() or \$currentUser; paths use full names (Module.Assoc/Module.Entity); a token compares only to a value of its type. Skill: xpath-constraints" ;;
-      CE0117) echo "   hint CE0117 (expression): check each operand's type (a reference compares with = empty, a decimal does not fit an integer), function names, and enumeration values written Module.Enum.Value. Skill: write-microflows" ;;
-      CE1613) echo "   hint CE1613: a page or microflow names an attribute, association or document that does not exist (not created yet, or renamed) -- DESCRIBE the entity it points at" ;;
-      CE0007) echo "   hint CE0007: an access rule names module roles of another module -- grant only this module's roles; for Administration.* give the user role Administration.User instead" ;;
-      CE0642) echo "   hint CE0642: a required widget property is missing (a combo box or input needs a Caption/Label)" ;;
-      CE7247) echo "   hint CE7247: that name is reserved by the Mendix platform and quoting does not rescue it -- Owner, Type and Default have to be renamed (Staff, ResourceType, Standard); other keywords only need quotes. Full list: ./mxcli syntax keywords" ;;
-    esac
-  done
+  mdl_ce_hints "$1"
+  # The boot failed because something already holds one of this project's ports. Where it is
+  # this project's own leftover -- a runtime that answers nothing but still holds the admin
+  # API, an mxbuild left behind by a killed `mxcli run` -- one command clears it, and a
+  # session that reads `pgrep`/`kill` first tends to write a wait loop of its own instead.
+  if grep -q 'is already in use' "$1" 2>/dev/null; then
+    echo "   hint port in use: if it belongs to THIS project (admin API, mxbuild serve, or the app port), stop it with one command and boot again:"
+    echo "      bash tests/gate.sh --restart"
+    echo "      only a process of ANOTHER project needs: pgrep -af 'mxbuild|runtimelauncher'   then kill that pid"
+  fi
   # Builds, then the runtime dies on start with no element named: seen twice from an association to
   # another module whose delete rule carries an (empty) error message that mxcli did not store.
   # The runtime refuses to come up while the after-startup microflow throws or returns false,
@@ -76,10 +75,13 @@ wait_for_boot() {   # wait_for_boot <log>
 }
 
 # PIDs of this project's runtime and `mxcli run`, matched on the project path; oldest first.
+# The path is followed by a separator or the end of the argument, because one project's
+# directory is often a prefix of another's: an unanchored match let a --stop in .../InvoiceB2B
+# kill the runtime of .../InvoiceB2BOpus5.5, whose deployment path starts with the same text.
 project_pids() {
   command -v pgrep >/dev/null 2>&1 || return 0
-  { pgrep -f "runtimelauncher.*$(mdl_ere_quote "$APP_DIR")" 2>/dev/null
-    pgrep -f "mxcli(\.exe)? run .*$(mdl_ere_quote "$MPR")" 2>/dev/null; } | sort -un
+  { pgrep -f "runtimelauncher.*$(mdl_ere_quote "$APP_DIR")(/|[[:space:]]|$)" 2>/dev/null
+    pgrep -f "mxcli(\.exe)? run .*$(mdl_ere_quote "$MPR")([[:space:]]|$)" 2>/dev/null; } | sort -un
 }
 descendants() {   # every process under <pid>, deepest first
   local child
@@ -176,7 +178,15 @@ restart_app() {
 ensure_app() {
   find_running_app && return 0
   [ "$BOOT" = "1" ] || explain_no_app
-  # An orphaned `mxbuild --serve` holds port 6543 and makes the boot fail.
+  # Nothing answers, yet this project still has processes: a half-dead run of its own. It can
+  # still hold the admin API or mxbuild's port while the app port is free, and the boot then
+  # dies on "is already in use" with the app left down. Stop them first -- what --restart does.
+  if [ -n "$(project_pids)$(orphan_mxbuild_pids)" ]; then
+    echo "   !! nothing answers, but this project still has processes running -- stopping them first (what --restart does)"
+    stop_project_app
+    sleep 1
+  fi
+  # An orphaned `mxbuild --serve` of ANOTHER project holds port 6543 and makes the boot fail.
   if command -v pgrep >/dev/null 2>&1 && pgrep -f 'mxbuild' >/dev/null 2>&1; then
     echo "   !! an mxbuild process is already running. If this boot fails on"
     echo "      'port 6543 (mxbuild serve) is already in use', it is an orphan:"
