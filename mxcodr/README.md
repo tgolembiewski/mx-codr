@@ -1,4 +1,4 @@
-# dist — the installable bundle
+# mxcodr — the installable bundle
 
 Everything a Mendix project needs to pick up this repo's skills, lint rules and
 checkers. `install.sh` copies it into a project; this file explains how the payload
@@ -11,21 +11,30 @@ both on `mxcli init`, so anything written there is lost on the next tooling upda
 
 ```
 install.sh        copies the payload into a Mendix project
+bootstrap.ps1     Windows only: gets Git Bash, Python and Node, then hands over to install.sh
 VERSION           date-based version, copied to tools/mdl-checks/VERSION in the target
-rules/            mdl-skills.md (Claude) and mdl-skills.mdc (Cursor) — the always-loaded rule
+MXCLI_TESTED      the mxcli build this bundle was verified against; orient.sh warns when the
+                  project's ./mxcli is older
+rules/            mdl-skills.md (Claude, OpenCode, and Pi through .pi/AGENTS.md) and
+                  mdl-skills.mdc (Cursor) — the always-loaded rule
 hooks/            host-specific prompt/PostToolUse adapters plus the Codex and Cursor gates
 plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js (Pi) -- the same
                   three jobs as the hooks, in each host's own event API
-tests/            lib.sh, scenario-helpers.js, gate.sh + gate/, orient.sh, diagnose.sh, portable.sh — the harness, upgraded in
-                  place on every install (gate.sh is the done gate — tests, mx check, lint, coverage
-                  and naming; orient.sh and diagnose.sh gather facts in parallel; portable.sh holds
-                  the three platform differences and nothing else)
+tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), precheck.sh, orient.sh,
+                  diagnose.sh, peek.sh, lib.sh, portable.sh, scenario-helpers.js — the harness,
+                  upgraded in place on every install; run-app.sh, copied only when absent.
+                  gate.sh is the done gate: tests, mx check, lint, coverage, naming, layout and
+                  security. precheck.sh is what the hooks run before an exec; orient.sh and
+                  diagnose.sh gather facts in parallel; peek.sh looks at a page without a test;
+                  portable.sh holds what differs between platforms and the environment checks
+                  every script shares
 .gitattributes    forces LF on *.sh and *.py — copied only if the project has none
 examples/         8 verify-*.test.sh from the demo app — NOT installed; a project's tests
                   are written by whoever builds the feature
-skills/           6 × SKILL.md — the prose
-lint-rules/       *.star — run by `mxcli lint`, no Python needed
-checks/           *.py + fixtures/ — the checks Starlark cannot express, plus
+skills/           6 × SKILL.md — the prose (test-first-delivery with a reference/ of three)
+lint-rules/       3 × *.star — MOD001, REU001, UI001 — run by `mxcli lint`, no Python needed
+checks/           *.py + fixtures/ — the checks Starlark cannot express, gate_helpers.py
+                  for the gate's JSON and digests, plus
                   record_install.py, which writes tools/mdl-checks/INSTALL.json (version,
                   date, sha256 per installed file) so the gate can tell a project running
                   last week's checkers from one running these
@@ -34,12 +43,12 @@ checks/           *.py + fixtures/ — the checks Starlark cannot express, plus
 The payload is a **copy** of files that live elsewhere in this repo. This directory
 is the shipping container, never the place to edit:
 
-| In dist | Source of truth |
+| In `mxcodr/` | Source of truth |
 |---|---|
 | `skills/<name>/SKILL.md` | `.ai-context/skills/<name>/SKILL.md` |
 | `lint-rules/*.star` | `.claude/lint-rules/*.star` |
 | `checks/*.py`, `checks/fixtures/` | `tests/skills/` |
-| `rules/mdl-skills.md`, `hooks/*.sh`, `tests/*` | authored here; no other copy in the repo |
+| `rules/`, `hooks/`, `plugins/`, `tests/`, `skills/spacing-and-layout/` | authored here; no other copy in the repo |
 
 ## Why the suite is written as one scenario per test
 
@@ -56,9 +65,10 @@ against the database with `mxcli oql` (~0.03s per query):
 | Scripts | 10 | 8 (same coverage: 10/10) |
 
 `install.sh` never overwrites a `verify-*.test.sh` or `credentials.env`, so an app
-that already has tests keeps every one of them. The five harness scripts are the
-bundle's own and *are* replaced on each install — a fix in `gate.sh` that never
-reaches an installed project is not a fix.
+that already has tests keeps every one of them. The harness scripts -- `gate.sh` and
+`tests/gate/`, `precheck.sh`, `orient.sh`, `diagnose.sh`, `peek.sh`, `lib.sh`, `portable.sh`
+and `scenario-helpers.js` -- are the bundle's own and *are* replaced on each install: a
+fix in `gate.sh` that never reaches an installed project is not a fix.
 
 ## Why rules and hooks, not generated agent files
 
@@ -75,7 +85,7 @@ So the project's own instructions live where mxcli does not reach:
   and an agent that follows that table never sees these.
 - **`.claude/settings.local.json`** — registers Claude's two hooks.
 - **`.codex/hooks.json`** — registers the Codex equivalents plus a `Stop` gate.
-  Codex discovers the five `.agents/skills/` copies automatically. Project hooks
+  Codex discovers the six `.agents/skills/` copies automatically. Project hooks
   require project trust and one review through `/hooks`; Codex asks again whenever
   a hook definition changes.
 - **`.opencode/plugin/mendix-mdl-harness.js` and `opencode.json`** — OpenCode has no
@@ -89,14 +99,20 @@ So the project's own instructions live where mxcli does not reach:
   own shape: an `alwaysApply` `.mdc` rule, plus three hooks. All three wire formats
   differ from the other hosts, which is why it gets its own adapters rather than
   sharing Codex's.
+- **`.pi/extensions/mendix-mdl-harness.js` and `.pi/AGENTS.md`** — Pi reads project
+  instructions from `.pi/AGENTS.md` and discovers skills from `.agents/skills/` on its
+  own, so only the hooks need code: one extension on `tool_call`, `tool_result` and
+  `agent_before_settle`. Pi asks for project trust before it runs an extension from the
+  project directory (`pi --approve` for one run).
 - **`.codex/config.toml`** — receives a short `developer_instructions` block that
   asks Codex to remind the user about `/hooks` after the first prompt. This has to
   live outside the hook: a hook awaiting trust cannot remind the user to trust it.
   If the project already defines `developer_instructions`, the installer preserves
   it and prints a notice instead of replacing it.
 
-All four hosts are now registered the same way — `bash tools/mdl-checks/hooks/<x>.sh`,
-project-relative. Codex used to get `bash "$(git rev-parse --show-toplevel)/…"`, which
+The three hosts with shell hooks — Claude Code, Codex and Cursor — are registered the
+same way: `bash tools/mdl-checks/hooks/<x>.sh`, project-relative. OpenCode and Pi load a
+plugin instead, which calls the same scripts. Codex used to get `bash "$(git rev-parse --show-toplevel)/…"`, which
 only expands if the host runs hook commands through a POSIX shell; the three Codex
 scripts resolve the repo root themselves, so the registration never needed it. An
 upgrade replaces the old entry rather than adding a second one, and Codex asks for
@@ -107,7 +123,7 @@ Claude settings and project-specific Codex hooks survive installation. The hook
 scripts live together in `tools/mdl-checks/hooks/`; separate PostToolUse adapters
 preserve the hosts' different output contracts.
 
-The five `.agents/skills/` copies are self-contained except for links to standard
+The six `.agents/skills/` copies are self-contained except for links to standard
 mxcli guidance such as `test-app` and `overview-pages`. Those links explicitly
 resolve through `.ai-context/skills/`, where `mxcli init` installs the canonical
 versions, instead of assuming Codex has duplicate sibling skills under `.agents/`.
@@ -118,7 +134,7 @@ The hooks are the part that does not depend on the model choosing to comply:
 |---|---|---|
 | `remind-skills.sh` | every Claude user prompt | adds one line of context naming the skills and what "done" means |
 | `remind-skills-codex.sh` | every Codex user prompt | gives the same rule using Codex's `$skill-name` invocation syntax |
-| `before-mxcli-exec.sh` | before a Claude Bash call containing `mxcli exec <script>.mdl` | runs `tests/precheck.sh` (the scripts applied to a scratch copy of the model, then `mx check` there, ~6s) and blocks the exec with the `[error]` lines when it would break the build -- the CE errors `mxcli check` cannot see |
+| `before-mxcli-exec.sh` | before a Claude Bash call containing `mxcli exec <script>.mdl` | runs `tests/precheck.sh` (the scripts applied to a scratch copy of the model, then `mx check` there, ~3-5s, and nothing at all when the same scripts already passed) and blocks the exec with the `[error]` lines when it would break the build -- the CE errors `mxcli check` cannot see |
 | `after-mxcli-exec.sh` | after a Claude Bash call containing `mxcli exec` | runs coverage and reports only a failure on stdout |
 | `after-mxcli-exec-codex.sh` | after a Codex Bash call containing `mxcli exec` | adapts coverage failures to Codex's exit-2 feedback contract and marks the session as requiring the full gate |
 | `stop-gate-codex.sh` | when that Codex session tries to finish | runs `bash tests/gate.sh`; exit 2 continues the turn until the positive `DONE — every check passed` line appears |
@@ -151,12 +167,28 @@ red-first run -- the scratch `verify-zz-*.test.sh` two sessions wrote for this l
 ### What `tests/precheck.sh` does and does not catch
 
 Before every `mxcli exec` a hook applies the scripts to a scratch copy of the model and runs
-`mx check` there (~6s), so a reserved name, an enumeration in a text box, a broken XPath or a
+`mx check` there (~3-5s; `--no-update-widgets`, retried the slow way only on CE0463), so a reserved name, an enumeration in a text box, a broken XPath or a
 missing member surfaces before the runtime stops for a rebuild that fails -- and so does a script
 that would stop half-way and leave the model half-applied. It does **not** see what only the
 deployment build sees: a Marketplace module whose version does not match the project's Mendix
 version passes the precheck and fails the build (CE4271). `MDL_PRECHECK=0` in `tests/harness.env`
 turns the whole thing off.
+
+Under the errors it prints a one-line hint per error code, from `tests/gate/hints.sh` -- the same
+hints the gate prints for a failed boot. They earn their place by having cost a session time:
+twenty-six `CE2729` lines in one precheck were a single missing pair of grants, and now say so.
+Precheck is for the script about to be exec'd; a syntax question is answered by
+`./mxcli syntax <topic>` or `./mxcli check <file> -p <app>.mpr --references`, not by running
+precheck on variants.
+
+### Booting clears this project's own leftovers
+
+`bash tests/gate.sh --boot-if-needed` stops whatever of this project is still running before
+it boots, when nothing answers on the app port. A half-dead run can hold the admin API (8090)
+or mxbuild's port (6543) while the app port is free, and the boot then dies on
+"is already in use" -- measured once as three and a half minutes and a false NOT DONE.
+Processes are matched on the project path followed by a separator, so a stop in
+`.../InvoiceB2B` leaves `.../InvoiceB2BOpus5.5` alone; an unanchored match once killed it.
 
 ### The gate requires Production security
 
@@ -170,9 +202,10 @@ deliberately has no users at all.
 
 ## Rebuilding after a source change
 
-Twelve files here have a second copy in the repo: five skills in
-`.ai-context/skills/`, two lint rules in `.claude/lint-rules/`, and the naming and
-coverage checkers plus their fixtures in `tests/skills/`. Both copies get edited,
+Fifteen files here have a second copy in the repo: five skills in
+`.ai-context/skills/` and the three reference files of one of them, three lint rules in
+`.claude/lint-rules/`, and the naming and coverage checkers plus their two fixtures in
+`tests/skills/`. Both copies get edited,
 so a plain copy can go either way. One did: on 2026-09-13 four `mxcodr/` files were
 newer than their sources, and the copy block that used to be here would have rolled
 them back without a word.
@@ -191,10 +224,10 @@ When both sides changed, it refuses and asks you to decide. Nothing is copied un
 every pair is safe.
 
 `rules/`, `hooks/`, `plugins/`, `tests/`, `checks/check_layout.py`,
-`checks/record_install.py` and `skills/spacing-and-layout/` have no copy in the
-repo. They are authored here, in `mxcodr/`, and nothing overwrites them.
+`checks/gate_helpers.py`, `checks/record_install.py` and `skills/spacing-and-layout/`
+have no copy in the repo. They are authored here, in `mxcodr/`, and nothing overwrites them.
 
-The harness's own regression tests need no app and run in about four seconds:
+The harness's own regression tests need no app and run in about thirty seconds:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 tests/performance/audit.py
@@ -212,7 +245,8 @@ rsync -a --exclude deployment --exclude .git --exclude .mendix-cache \
       --exclude mxcli --exclude mxcli.linux --exclude tests \
       ~/CloudeCodeProjects/InvoiceDesk/ "$W/"
 ln -s ~/CloudeCodeProjects/InvoiceDesk/mxcli "$W/mxcli"
-rm -rf "$W"/.claude/lint-rules/mod001_*.star "$W"/.claude/lint-rules/reu001_*.star "$W"/tools
+rm -rf "$W"/.claude/lint-rules/mod001_*.star "$W"/.claude/lint-rules/reu001_*.star \
+       "$W"/.claude/lint-rules/ui001_*.star "$W"/tools
 
 bash mxcodr/install.sh "$W"
 ```
@@ -221,11 +255,12 @@ Then confirm the installer claims:
 
 ```bash
 cd "$W"
-ls .claude/skills .agents/skills .ai-context/skills          # 5 in each
+ls .claude/skills .agents/skills .ai-context/skills          # 6 in each
 diff -r .claude/skills/module-structure .agents/skills/module-structure
 python3 -m json.tool .codex/hooks.json >/dev/null             # Codex hooks merged
+ls .pi/AGENTS.md .pi/extensions/                             # Pi rules and extension
 python3 -c 'import tomllib; tomllib.load(open(".codex/config.toml", "rb"))'
-./mxcli lint -p InvoiceDesk.mpr | grep -E 'MOD001|REU001'    # rules load and fire
+./mxcli lint -p InvoiceDesk.mpr | grep -E 'MOD001|REU001|UI001'  # rules load and fire
 python3 tools/mdl-checks/check_test_coverage.py . InvoiceDesk
 ./mxcli init --sync-skills . && ls .agents/skills            # survives an mxcli sync
 ```
@@ -254,7 +289,7 @@ path named it installs into the directory the bundle sits in. The target is
 printed before any work starts, and the run is identical either way.
 
 Two things that inference deliberately will not do. A path named on the command
-line is never second-guessed -- `install.sh dist` still fails, because that is a
+line is never second-guessed -- `install.sh mxcodr` still fails, because that is a
 mistake rather than a shorthand. And an inferred target with no `.mpr` asks
 before creating an app (`[y/N]`), or refuses outright when nothing can answer,
 because `mxcli new` writes a few hundred files into a directory the caller never
@@ -548,8 +583,8 @@ otherwise have done, each of which is easy to miss:
 
 The harness is bash and Python on every host, so on Windows it runs under **Git
 Bash** or WSL2 — there is no PowerShell port, and there is not going to be one:
-the gate, the hooks and every host adapter are the same scripts on all four
-runtimes, and a second implementation is a second thing to keep true.
+the gate, the hooks and every host adapter are the same scripts on every
+platform, and a second implementation is a second thing to keep true.
 
 **Git Bash** is the shell inside Git for Windows: a real `bash.exe` plus `grep`,
 `sed`, `curl`, `mktemp` and the rest, on the MSYS2 compatibility layer. Not a VM
@@ -559,7 +594,7 @@ and not WSL — it runs on the Windows filesystem directly (`C:\Users\you` is
 ### Setting a Windows machine up — one command
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File dist\bootstrap.ps1 C:\Mendix\YourApp
+powershell -ExecutionPolicy Bypass -File mxcodr\bootstrap.ps1 C:\Mendix\YourApp
 ```
 
 `bootstrap.ps1` is the only piece that cannot be bash: `install.sh` needs a shell

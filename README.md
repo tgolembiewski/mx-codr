@@ -2,7 +2,7 @@
 
 **Your AI agent builds the Mendix app. mx-codr makes sure it is actually finished.**
 
-Claude Code, Codex, Cursor and OpenCode can already write Mendix domain models,
+Claude Code, Codex, Cursor, OpenCode and Pi can already write Mendix domain models,
 microflows and pages. What they don't do on their own is *prove* the work: a test
 for every screen, a model that passes Mendix's own checks, microflows a colleague can
 read, screens that aren't glued together. mx-codr adds exactly that — one installer,
@@ -18,12 +18,13 @@ It sits on top of [mxcli](https://github.com/mendixlabs/mxcli):
 - **Test-first, automatically.** The agent writes a failing browser test before each
   feature, and every page and action ends up with one.
 - **One command decides "done".** `bash tests/gate.sh` runs the browser tests,
-  `mx check`, lint, test coverage, naming and layout together, in under half a minute.
+  `mx check`, lint, test coverage, naming, layout and security together, in under half a
+  minute.
 - **Rules the agent keeps following.** Hooks repeat them on every prompt and after
   every model change, so they don't fade by the third feature.
 - **A model people can read.** Business captions on every activity, process folders,
   shared snippets and sub-microflows instead of copies, spacing from the Atlas theme.
-- **Your agent, your OS.** Claude Code, Codex, Cursor and OpenCode, on macOS, Linux
+- **Your agent, your OS.** Claude Code, Codex, Cursor, OpenCode and Pi, on macOS, Linux
   and Windows — Windows on ARM included.
 
 ## Get started
@@ -63,7 +64,7 @@ fetches what is missing, and tells you plainly about anything it could not do.
 | **Python, Node, Playwright and its browser** | Installs them with `--with-deps` — the checkers and browser tests run on them |
 | **MxBuild** | Downloads the one for your Mendix version with `--with-deps`, so `mx check` runs |
 | **PostgreSQL** | Sets it up when you work without Docker, with `--with-deps` |
-| **Skills, lint rules, checkers, hooks** | Puts them where each of the four agents looks for them |
+| **Skills, lint rules, checkers, hooks** | Puts them where each of the five agents looks for them |
 | **Windows** | Applies the junctions and ARM64 fixes that Studio Pro's mxbuild needs |
 
 What cannot be installed unattended — a JDK, a Docker daemon that has to be started
@@ -108,8 +109,8 @@ no checker to remember the arguments of, no order to run things in. After
 | What | How the agent finds it |
 |---|---|
 | The six rules, in prose | `SKILL.md` files in the three directories each host looks in |
-| The always-loaded reminder | `.claude/rules/` and `.cursor/rules/`, loaded on every turn |
-| `MOD001`, `REU001` | `mxcli lint` discovers `.claude/lint-rules/*.star` by itself |
+| The always-loaded reminder | `.claude/rules/`, `.cursor/rules/` and `.pi/AGENTS.md`, loaded on every turn |
+| `MOD001`, `REU001`, `UI001` | `mxcli lint` discovers `.claude/lint-rules/*.star` by itself |
 | `check_mdl.py`, `check_test_coverage.py` | the skills that need them name the exact command; the gate runs them too |
 | The gate | host hooks fire it, and the `test-first-delivery` skill tells the agent to |
 
@@ -205,27 +206,30 @@ If you already have Git Bash, skip `bootstrap.ps1` and run `bash mxcodr/install.
 
 ```
 .claude/skills/<name>/       Claude Code
-.agents/skills/<name>/       Codex, and other tools on the open SKILL.md standard
+.agents/skills/<name>/       Codex, Pi, and other tools on the open SKILL.md standard
 .ai-context/skills/<name>/   mxcli, Cursor, OpenCode, Windsurf, Aider
-.claude/rules/               the always-loaded rule (Cursor's copy in .cursor/rules/)
+.claude/rules/               the always-loaded rule (Cursor's copy in .cursor/rules/,
+                             Pi's pointer in .pi/AGENTS.md)
 .claude/lint-rules/          found by `mxcli lint` with nothing to register
 tools/mdl-checks/            the Python checkers the skills cite
 tests/                       the harness scripts, plus tests/harness.env
-.claude/settings.local.json  the hooks (Cursor, Codex and OpenCode get their own)
+.claude/settings.local.json  the hooks (Cursor and Codex get their own; OpenCode and Pi
+                             a plugin in .opencode/plugin/ and .pi/extensions/)
 ```
 
 Three copies of the same skills, because each tool looks somewhere different. All
 of it is discovered — nothing here needs registering, importing or configuring.
 
-The five harness scripts are replaced on every install: a fix in `gate.sh` that
-never reaches an installed project is not a fix. Your own `verify-*.test.sh` and
+The harness scripts are replaced on every install: a fix in `gate.sh` that never
+reaches an installed project is not a fix. Your own `verify-*.test.sh` and
 `credentials.env` are never overwritten.
 
 ## The gate
 
-One command, five checks, run concurrently — the browser suite, `mx check`, `mxcli
-lint`, test coverage and naming/captions. Every step runs even when another fails,
-so one call reports the whole picture. Exit 0 only when all five pass.
+One command, seven checks, run concurrently — the browser suite, `mx check`, `mxcli
+lint`, test coverage, naming/captions, page layout and the security level. Every step
+runs even when another fails, so one call reports the whole picture. Exit 0 only when
+all seven pass.
 
 ```
 == gate
@@ -234,15 +238,18 @@ so one call reports the whole picture. Exit 0 only when all five pass.
    lint: 59 issues: 0 errors, 24 warnings, 35 info
    coverage InvoiceDesk: PASS  14/14 elements covered by 12 test script(s)
    naming: PASS  0 failure(s) over 246 lines
+   layout: PASS  0 failure(s) over 11 page(s)
+   security: level Production
    DONE — every check passed
 ```
 
-The agent runs this. The installed hooks run it too, and refuse to let Codex or
-Cursor finish a turn while it is red. When you want to look yourself:
+The agent runs this. The installed hooks run it too, and refuse to let Codex,
+Cursor, OpenCode or Pi finish a turn while it is red. When you want to look yourself:
 
 ```bash
 bash tests/gate.sh                    # the done gate
 bash tests/gate.sh --boot-if-needed   # boot the app first if nothing answers
+bash tests/gate.sh --restart          # stop this project's app and boot it again
 bash tests/gate.sh --only <feature>   # one test, warm browser, red loop
 bash tests/orient.sh                  # what is in this project
 bash tests/diagnose.sh                # why is the app not answering
