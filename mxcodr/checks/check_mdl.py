@@ -8,12 +8,12 @@ Exit: 0 no failures (warnings allowed), 1 failures or no MDL found, 2 bad argume
 """
 
 # Rule codes (FAIL counts against the run, WARN does not):
-#   decision-caption             FAIL  if/case/while without @caption
+#   decision-caption             FAIL  if/case without @caption
 #   caption-restates-expression  FAIL  decision caption contains $, <, >, != or " = "
 #   caption-not-a-question       FAIL  decision caption does not end in "?"
 #   case-caption-dropped         WARN  case caption equals its expression (mxcli overwrote it)
-#   caption-on-loop              FAIL  loop with @caption (Mendix drops it, MDL042)
-#   loop-annotation              FAIL  loop without @annotation
+#   caption-on-loop              FAIL  loop/while with @caption (dropped: MDL042 on a loop, silently on a while)
+#   loop-annotation              FAIL  loop/while without @annotation
 #   action-caption               FAIL  retrieve/create/change/commit/delete/set/show page/call without @caption
 #   action-caption-is-default    FAIL  caption is the Mendix default ("Retrieve Invoice", "Commit object")
 #   placeholder-variable         FAIL  $Int1, $List2, $tmp, $x ...
@@ -30,8 +30,12 @@ from pathlib import Path
 # Any `@word rest`; group 1 is the word (caption, annotation, position).
 ANNOTATION_RE = re.compile(r"^\s*@(\w+)\s*(.*)$")
 CAPTION_RE = re.compile(r"^\s*@caption\s+'(.*)'\s*$", re.IGNORECASE)
-DECISION_RE = re.compile(r"^\s*(if|case|while)\b", re.IGNORECASE)
-LOOP_RE = re.compile(r"^\s*loop\b", re.IGNORECASE)
+DECISION_RE = re.compile(r"^\s*(if|case)\b", re.IGNORECASE)
+# A `while` is a loop, not a decision: mxcli writes no caption for it -- `@caption` passes
+# `check` and `exec` and is gone from `describe`, with no MDL042 to say so -- while
+# `@annotation` survives. Treated as a decision, it failed decision-caption with no way to pass:
+# a Pi session spent 45 minutes on three such findings.
+LOOP_RE = re.compile(r"^\s*(loop|while)\b", re.IGNORECASE)
 # Activity lines; `create` needs a qualified entity so `create microflow` is not matched.
 ACTION_RE = re.compile(
     r"^\s*(?:"
@@ -173,7 +177,7 @@ def decision_findings(lines: list[str], index: int) -> tuple[list[Failure], list
 
 
 def loop_findings(lines: list[str], index: int) -> list[Failure]:
-    """A loop needs @annotation and must not carry @caption."""
+    """A loop or while loop needs @annotation and must not carry @caption."""
     line = lines[index]
     kinds = annotation_kinds(preceding_annotations(lines, index))
     failures = []
@@ -181,7 +185,7 @@ def loop_findings(lines: list[str], index: int) -> list[Failure]:
         failures.append(
             Failure(
                 "caption-on-loop",
-                "loop carries @caption; Mendix drops it (MDL042) -- use @annotation",
+                "loop carries @caption, which is dropped (MDL042 on a loop, silently on a while) -- write @annotation '<why it repeats>' above it instead",
                 index + 1,
             )
         )
@@ -189,7 +193,7 @@ def loop_findings(lines: list[str], index: int) -> list[Failure]:
         failures.append(
             Failure(
                 "loop-annotation",
-                f"loop without @annotation: {line.strip()[:70]}",
+                f"loop without @annotation -- put @annotation '<why it repeats>' on the line above: {line.strip()[:70]}",
                 index + 1,
             )
         )

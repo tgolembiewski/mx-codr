@@ -118,10 +118,10 @@ end if;
 This is the guideline [assess-quality](../../../.ai-context/skills/assess-quality/SKILL.md) lists as
 **CONV012**, "all decision points must have captions".
 
-### The two exceptions: `loop` and `case`
+### The two exceptions: `loop` / `while` and `case`
 
-**Loop.** A Mendix for-loop has no caption property, so `@caption` on a `loop` is
-silently dropped and `mxcli check` reports **MDL042** — but a loop does take an
+**Loop and while.** A Mendix loop has no caption property, so `@caption` on a `loop`
+is silently dropped and `mxcli check` reports **MDL042** — but a loop does take an
 `@annotation`, which attaches a note exactly as if you had drawn one in Studio Pro:
 
 ```mdl
@@ -130,6 +130,18 @@ loop $Invoice in $Invoices
 begin
   set $UnpaidCount = $UnpaidCount + 1;
 end loop;
+```
+
+A **`while` loop is the same**, and quieter about it: `@caption` on a `while` passes
+`check` and `exec` with no MDL042 and is simply gone from `describe`. Write the
+reason it repeats as an `@annotation`:
+
+```mdl
+@annotation 'Fill the chart one month at a time, oldest first'
+while $MonthBack >= 0
+begin
+  ...
+end while;
 ```
 
 An annotation is drawn at the **loop's own `@position`**, not beside it, so at the
