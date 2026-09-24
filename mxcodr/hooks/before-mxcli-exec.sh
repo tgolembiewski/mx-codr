@@ -67,6 +67,11 @@ for word in words:
             matches.append(match)
     print("\n".join(matches) if matches else word)' 2>/dev/null)"
 [ -n "$scripts" ] || exit 0
+# `for f in a b; do mxcli exec mdlsource/$f.mdl` hands the hook a literal `$f`: nothing to check.
+if printf '%s\n' "$scripts" | grep -q '[$]'; then
+  echo "Blocked: that exec names its script through a variable (\`$f.mdl\` in a loop), so the precheck cannot see which script runs and the model would change unchecked. Exec each script by its own path, one command per script: ./mxcli exec mdlsource/41_pages.mdl -p App.mpr" >&2
+  exit 2
+fi
 
 args=()
 while IFS= read -r script; do

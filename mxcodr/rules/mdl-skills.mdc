@@ -145,6 +145,9 @@ that break the build, jar files unpacked in search of an API:
 - **Every page another page or a microflow opens starts with Back, top left** --
   `actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: 'Atlas_Core.Atlas_Filled.chevron-left')`
   as its first widget, above the heading; pop-ups excepted (gate `BACK01`).
+- **One layout for every page that is not a pop-up** -- chosen once for the app
+  (`Atlas_Core.Atlas_Default` unless it is a top-bar app); pages on different layouts
+  make the menu change or open and close between pages (gate `LAYOUT01`).
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 
@@ -162,6 +165,14 @@ exists` -- because `mxcli exec` stops at the first failing statement: a script t
 fails on "already exists" never runs the statements after it, and the model is left
 half-applied. After a failed exec, fix the script and exec it again rather than
 patching the model by other means.
+
+Each page, snippet, microflow or entity is **created in one script only** -- change it
+there, or with `alter`, never by a second `create or modify` in a later script: whichever
+of the two runs last wins, and re-running the earlier one silently undoes the later one
+(precheck refuses it: `SCRIPT01`). Exec each script by its own path, one command per
+script -- `for f in …; do mxcli exec mdlsource/$f.mdl` hides the scripts from precheck and
+is blocked. `gate.sh --only <feature>` ends in `PASSED … not DONE`; only the full
+`bash tests/gate.sh` can say DONE.
 
 Never read or edit `mprcontents/` or the `.mpr` by hand (`strings`, `unzip`, a copied
 `.mpr` as backup): the `.mpr` is only an index, and a hand-repaired unit breaks the

@@ -142,7 +142,7 @@ and then working with your agent as usual.
 | `naming-and-captions` | PascalCase, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages, a business caption on every activity |
 | `reuse-and-snippets` | a snippet used on more than one page, a `SUB_` microflow with more than one caller |
 | `organize-project` | nothing orphaned, nothing left at module root |
-| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS; one navigation menu for every role on Atlas_Default, never a menu built from buttons; a Back button top left on every page another page opens |
+| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS; one navigation menu for every role on Atlas_Default, never a menu built from buttons; one layout for every page; a Back button top left on every page another page opens |
 
 ## Requirements
 
@@ -251,7 +251,7 @@ Cursor, OpenCode or Pi finish a turn while it is red. When you want to look your
 bash tests/gate.sh                    # the done gate
 bash tests/gate.sh --boot-if-needed   # boot the app first if nothing answers
 bash tests/gate.sh --restart          # stop this project's app and boot it again
-bash tests/gate.sh --only <feature>   # one test, warm browser, red loop
+bash tests/gate.sh --only <feature>   # one test, warm browser, red loop (ends PASSED, never DONE)
 bash tests/orient.sh                  # what is in this project
 bash tests/diagnose.sh                # why is the app not answering
 ```

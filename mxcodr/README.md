@@ -220,6 +220,15 @@ When a script fails to apply at all, precheck prints the errors themselves -- th
 `Parse error:` or an `Error:` line, at most fifteen -- and then the verdict; a `tail` of mxcli
 0.24's output kept only its six-line summary and showed "33 error(s) above" with nothing above it.
 
+It also refuses a script that creates a document another script in the same folder creates too
+(`SCRIPT01`): whichever of the two runs last decides what the page is, so re-running the earlier
+one undoes the later one without any error. In a Pi session `Order_Detail` was created in two
+scripts, a re-run put back the page without its PDF button, and the model spent 25 steps looking
+in the runtime. An exec that names its script through a variable (`for f in …; do mxcli exec
+mdlsource/$f.mdl`) is blocked by the hooks and plugins, because precheck would receive a literal
+`$f` and check nothing. And `gate.sh --only` / `--tests-only` end in `PASSED — … -- not DONE`:
+a single passing script once printed the same DONE line as the full gate while the suite was red.
+
 Under the errors it prints a one-line hint per error code, from `tests/gate/hints.sh` -- the same
 hints the gate prints for a failed boot. They earn their place by having cost a session time:
 twenty-six `CE2729` lines in one precheck were a single missing pair of grants, and now say so.
@@ -525,6 +534,7 @@ project's own layouts:
 `NAV03` | error | project security is on and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons — a menu built by hand |
 `NAV05` | error | a menu item or sub-menu has no icon; the message suggests an Atlas_Filled icon for its caption |
+`LAYOUT01` | error | the app's pages use more than one layout (pop-ups, the login page and phone/tablet layouts aside), so the menu changes between pages |
 `BACK01` | error | a page another page or a flow opens (`show_page`) does not start with a Back button: `close_page`, icon `chevron-left`, top left. Pop-ups are exempt |
 
 `GRID01` came from the same session: a customer grid showed its date column as formatted

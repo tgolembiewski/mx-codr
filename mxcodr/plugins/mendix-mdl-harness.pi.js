@@ -85,6 +85,10 @@ function isSleepBeforeGate(command) {
   return typeof command === "string" && /\bsleep\s+\d/.test(command) && /tests\/gate\.sh/.test(command)
 }
 
+// `for f in a b; do mxcli exec mdlsource/$f.mdl`: the scripts are a variable, so precheck sees none.
+const EXEC_THROUGH_VARIABLE =
+  "Blocked: that exec names its script through a variable (`$f.mdl` in a loop), so the precheck cannot see which script runs and the model would change unchecked. Exec each script by its own path, one command per script: ./mxcli exec mdlsource/41_pages.mdl -p App.mpr"
+
 function isMxcliExec(command) {
   return typeof command === "string" && /mxcli(\.exe)? exec/.test(command)
 }
@@ -172,6 +176,7 @@ export default function mendixMdlHarness(pi) {
     if (!existsSync(precheck)) return
     const scripts = mdlScripts(command)
     if (scripts.length === 0) return
+    if (scripts.some((script) => script.includes("$"))) return { block: true, reason: EXEC_THROUGH_VARIABLE }
     const { status, out } = run([precheck.replace(/\\/g, "/"), ...scripts], root, PRECHECK_TIMEOUT_MS)
     if (status === 0 || out.includes("precheck: could not run")) return
     return {
