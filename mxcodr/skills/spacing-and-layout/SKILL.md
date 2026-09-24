@@ -233,6 +233,24 @@ Two items with the same icon read as the same screen; pick different ones.
 The gate fails `NAV03` when a role's home page is not in the menu, and `NAV04` when
 one of the project's own layouts opens two or more pages from buttons.
 
+## One layout for every page
+
+Pick the layout once, for the whole app, and give it to every page that is not a pop-up.
+The layout draws the menu: its style, its toggle, and whether it is open or collapsed.
+Two pages on two layouts means the menu changes shape, or opens and closes, as the user
+moves between them.
+
+- Choose one at the start: `Atlas_Core.Atlas_Default` (sidebar menu, hamburger on a phone)
+  unless the app is meant to have a top bar, then `Atlas_Core.Atlas_TopBar`.
+- Every new page gets that `Layout:` — including the template's `Home_Web` if users can
+  reach it.
+- Different on purpose, and left alone by the gate: pop-ups (`Atlas_Core.PopupLayout`, or
+  a layout of type `ModalPopup`/`Popup`), the login page, and phone/tablet layouts.
+- To move pages: `alter pages in <Module> set layout = <main> where layout = <other>;` —
+  and set the same `Layout:` in the scripts that create them, or a re-run moves them back.
+
+The gate fails `LAYOUT01` when the app's pages use more than one layout, and lists them.
+
 ## Back, top left, on every page you navigate to
 
 A page that another page or a microflow opens (`show_page`, `show page`) starts with a
@@ -313,6 +331,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
 `NAV05` | error | a menu item or sub-menu has no icon (the message suggests one for its caption) |
+`LAYOUT01` | error | the app's pages (pop-ups, login and phone/tablet pages aside) use more than one layout |
 `BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups are exempt |
 
 ## What this cannot see
