@@ -1,6 +1,6 @@
 ---
 name: spacing-and-layout
-description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (a Log out item once users can sign in) and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
+description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in) and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
 ---
 
 # Spacing and layout
@@ -175,6 +175,43 @@ first and keep the items already there.
 The gate's layout verdict fails (`NAV01`) while security is on and no menu, page or
 snippet offers a way to log out.
 
+## One menu for every role
+
+The menu is the **navigation profile's** menu, shown by `Atlas_Core.Atlas_Default`:
+a sidebar on a wide screen, a hamburger button that opens it on a phone, the current
+page highlighted. Nothing else gives an app that for free.
+
+Different roles do **not** need different menus. Mendix hides a menu item from a
+user who cannot open its page, so a single menu lists every page and each role sees
+only its own. What a role can open is page access; where it lands is its home page:
+
+```sql
+grant view on page Sales.Order_List to Sales.Employee;
+grant view on page Sales.Cust_MyOrders to Sales.Customer;
+
+create or replace navigation Responsive
+  home page Sales.Order_List
+  home page Sales.Order_List for Employee
+  home page Sales.Cust_MyOrders for CustomerPortal
+  menu (
+    menu item 'Orders' page Sales.Order_List icon Atlas_Core.Atlas_Filled."shopping-cart";
+    menu item 'My orders' page Sales.Cust_MyOrders icon Atlas_Core.Atlas_Filled.document;
+    menu item 'Log out' sign_out icon Atlas_Core.Atlas_Filled.logout;
+  )
+;
+```
+
+An employee sees Orders and Log out; a customer sees My orders and Log out.
+
+Never build the menu yourself — a layout of your own with link buttons to pages, one
+per role. A session did exactly that because MDL menu items take no roles: the links
+ran together into one line of text, a fixed 232 px panel covered half a phone
+screen, and there was no hamburger and no highlighted page. Keep the pages on
+`Atlas_Core.Atlas_Default` (or another stock Atlas layout) and put them in the menu.
+
+The gate fails `NAV03` when a role's home page is not in the menu, and `NAV04` when
+one of the project's own layouts opens two or more pages from buttons.
+
 ## Headings
 
 Stock Atlas layouts render the **app** brand in the top region, not the page title,
@@ -219,6 +256,8 @@ layout: PASS  0 failure(s) over 6 page(s)
 `HEAD01` | warning | the page renders no heading and calls no header snippet |
 `NAV01` | error | project security is on, a navigation menu has no `sign_out` item, and no page or snippet has a sign-out button |
 `NAV02` | warning | the `sign_out` item is not the last item of its menu |
+`NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
+`NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
 
 ## What this cannot see
 

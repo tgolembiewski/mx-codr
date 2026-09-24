@@ -133,6 +133,11 @@ that break the build, jar files unpacked in search of an API:
   (`SHOW PAGES IN Administration`); a change to them goes in `AdministrationExt`
   (skill: `module-structure`). Once users sign in, the menu ends with Log out
   (skill: `spacing-and-layout`).
+- **One navigation menu for every role, on `Atlas_Core.Atlas_Default`** -- Mendix
+  hides a menu item from a user who cannot open its page, so list every page in the
+  profile's menu, `grant view on page` per role, and `home page X for Role`. Never
+  build a menu of your own from link buttons in a layout: no hamburger, no phone view
+  (skill: `spacing-and-layout`; gate `NAV03`, `NAV04`).
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 
