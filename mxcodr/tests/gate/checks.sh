@@ -178,7 +178,7 @@ check_naming() {
   return "$gate"
 }
 
-# Sets nav_args: the menu icons (NAV05) and the snippets' buttons (ICON01) always; the Log out and role-home rules (NAV01-NAV03) only
+# Adds to nav_args (never replaces it: the caller has put --own-modules there already): the menu icons (NAV05) and the snippets' buttons (ICON01) always; the Log out and role-home rules (NAV01-NAV03) only
 # when project security is on, since only then do users sign in. Returns 1, with the summary
 # written, when security is on and the navigation cannot be read.
 layout_sign_out_inputs() {
@@ -188,7 +188,7 @@ layout_sign_out_inputs() {
     *[Oo]ff*|"")
       # Without sign-in only the icons are checked, and a navigation that cannot be read does not block.
       "$MXCLI" -p "$MPR" -c "DESCRIBE NAVIGATION" > "$WORK/navigation.mdl" 2>/dev/null \
-        && nav_args=(--navigation "$WORK/navigation.mdl")
+        && nav_args+=(--navigation "$WORK/navigation.mdl")
       # Snippets carry buttons too (ICON01); unreadable ones do not block.
       describe_all layout-snippets "$WORK/snippets" "SNIPPETS" || true
       nav_args+=(--sign-out-sources "$WORK/snippets")
@@ -200,26 +200,27 @@ layout_sign_out_inputs() {
   fi
   # A sign-out button in a snippet (a shared header, say) also counts; unreadable snippets do not block.
   describe_all layout-snippets "$WORK/snippets" "SNIPPETS" || true
-  nav_args=(--navigation "$WORK/navigation.mdl" --sign-out-sources "$WORK/snippets" --users-sign-in)
-  # ACCOUNT01-03: only when the Administration module is there to link to.
-  if "$MXCLI" -p "$MPR" --json -c "SHOW PAGES IN Administration" 2>/dev/null | grep -q '"Administration.Account_Overview"' \
-     && "$MXCLI" -p "$MPR" --json -c "SHOW MICROFLOWS IN Administration" 2>/dev/null | grep -q '"Administration.ManageMyAccount"'; then
-    nav_args+=(--admin-module)
-    local role guest
-    : > "$WORK/userroles.mdl"
-    while IFS= read -r role; do
-      [ -n "$role" ] && "$MXCLI" -p "$MPR" -c "DESCRIBE USER ROLE $role" >> "$WORK/userroles.mdl" 2>/dev/null
-    done < <("$MXCLI" -p "$MPR" --json -c "SHOW USER ROLES" 2>/dev/null \
-      | "$PY" -c 'import json, sys
+  nav_args+=(--navigation "$WORK/navigation.mdl" --sign-out-sources "$WORK/snippets" --users-sign-in)
+  # Every user role with its module roles: ACCOUNT03, HOME01 and MODULE01 read them.
+  local role guest
+  : > "$WORK/userroles.mdl"
+  while IFS= read -r role; do
+    [ -n "$role" ] && "$MXCLI" -p "$MPR" -c "DESCRIBE USER ROLE $role" >> "$WORK/userroles.mdl" 2>/dev/null
+  done < <("$MXCLI" -p "$MPR" --json -c "SHOW USER ROLES" 2>/dev/null \
+    | "$PY" -c 'import json, sys
 try:
     rows = json.load(sys.stdin)
 except Exception:
     rows = []
 for row in rows if isinstance(rows, list) else []:
     print(row.get("Name", ""))' 2>/dev/null)
-    nav_args+=(--user-roles "$WORK/userroles.mdl")
-    guest="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | grep -iE '^(Guest|Anonymous) (User )?Role:' | head -1 | sed -E 's/^[^:]*:[[:space:]]*//')"
-    if [ -n "$guest" ]; then nav_args+=(--guest-role "$guest"); fi
+  nav_args+=(--user-roles "$WORK/userroles.mdl")
+  guest="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | grep -iE '^(Guest|Anonymous) (User )?Role:' | head -1 | sed -E 's/^[^:]*:[[:space:]]*//')"
+  if [ -n "$guest" ]; then nav_args+=(--guest-role "$guest"); fi
+  # ACCOUNT01-02: only when the Administration module is there to link to.
+  if "$MXCLI" -p "$MPR" --json -c "SHOW PAGES IN Administration" 2>/dev/null | grep -q '"Administration.Account_Overview"' \
+     && "$MXCLI" -p "$MPR" --json -c "SHOW MICROFLOWS IN Administration" 2>/dev/null | grep -q '"Administration.ManageMyAccount"'; then
+    nav_args+=(--admin-module)
   fi
   return 0
 }
@@ -244,8 +245,12 @@ check_layout() {
   if ! ls "$WORK"/pages/*.mdl >/dev/null 2>&1; then
     echo "layout: no page to check" > "$WORK/layout.summary"; return 0
   fi
-  local -a nav_args=()
+  local -a nav_args=(--own-modules "$USER_MODULES")
   layout_sign_out_inputs || return 2
+  # MODULE01: the empty template's module, still in an app that has its own.
+  if "$MXCLI" -p "$MPR" --json -c "SHOW MODULES" 2>/dev/null | grep -q '"MyFirstModule"'; then
+    nav_args+=(--template-module)
+  fi
   # The project's own layouts, for a menu built from buttons (NAV04); unreadable ones do not block.
   describe_all layout-layouts "$WORK/layouts" "LAYOUTS" || true
   ls "$WORK"/layouts/*.mdl >/dev/null 2>&1 && nav_args+=(--layouts "$WORK/layouts")

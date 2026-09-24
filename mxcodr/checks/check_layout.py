@@ -35,6 +35,9 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  account and password; it opens Administration.MyAccount, which needs an account)
 #   ACCOUNT03 FAIL a user role that signs in lacks Administration.User, or no role has
 #                  Administration.Administrator
+#   MODULE01 FAIL  the app has its own module with pages, and the template's MyFirstModule is still
+#                  there; lists everything that still uses it and how to remove it
+#   HOME01   FAIL  the administrators' role does not open on a page of the app's own modules
 #   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
 #   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
 #                  built by hand, with no hamburger, no active item and no phone view
@@ -766,6 +769,93 @@ def account_findings(navigation: str, user_roles: str, guest_role: str) -> list[
     return failures
 
 
+# MODULE01 / HOME01 ---------------------------------------------------------------------------
+TEMPLATE_MODULE = "MyFirstModule"
+TEMPLATE_USE_RE = re.compile(TEMPLATE_MODULE + r"[.][\w.]+")
+HOME_RE = re.compile(r"^\s*home\s+page\s+(?P<page>[\w.]+)(?:\s+for\s+(?P<role>[\w.]+))?", re.IGNORECASE)
+
+
+def admin_roles(user_roles: str) -> list[str]:
+    """User roles that administer the app: Administration.Administrator, or `manage all roles`."""
+    found = []
+    for line in user_roles.splitlines():
+        role = USER_ROLE_RE.match(line)
+        if role and ("Administration.Administrator" in role.group("roles") or "manage all roles" in line.lower()):
+            found.append(role.group("name"))
+    return found
+
+
+def template_module_findings(own_modules: list[str], has_pages: bool, navigation: str, user_roles: str,
+                             own_mdl: str) -> list[dict]:
+    """MODULE01: once the app has a module of its own, the template's MyFirstModule is dead weight."""
+    if not own_modules or not has_pages:
+        return []
+    uses = []
+    for line in navigation.splitlines():
+        if TEMPLATE_MODULE + "." in line and ("home page" in line.lower() or "menu item" in line.lower()):
+            uses.append("navigation: " + line.strip().rstrip(";"))
+    for line in user_roles.splitlines():
+        role = USER_ROLE_RE.match(line)
+        if role and TEMPLATE_MODULE + "." in role.group("roles"):
+            uses.append(f"user role {role.group('name')} has {TEMPLATE_MODULE}.User")
+    document = ""
+    for line in own_mdl.splitlines():
+        head = re.match(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?(?:page|snippet|microflow|nanoflow)\s+([\w.]+)",
+                        line, re.IGNORECASE)
+        if head:
+            document = head.group(1)
+        used = TEMPLATE_USE_RE.search(line)
+        if used and document:
+            uses.append(f"{document} uses {used.group(0)}")
+    uses = list(dict.fromkeys(uses))
+    main = own_modules[0]
+    steps = []
+    if any(use.startswith("navigation:") for use in uses):
+        steps.append(f"point every `home page`/`menu item` at pages of {main} -- the administrators get their own"
+                     f" home page there (e.g. {main}.Admin_Home), and the profile keeps a default `home page"
+                     f" {main}.<Page>` without `for` (without one mx check fails CE0527)")
+    if any(" uses " in use for use in uses):
+        steps.append(f"move what your pages or flows use from {TEMPLATE_MODULE} (an image, a flow) into {main}")
+    if any(use.startswith("user role") for use in uses):
+        steps.append(f"`alter user role <Role> remove module roles ({TEMPLATE_MODULE}.User);` for each role listed")
+    steps.append(f"`drop module {TEMPLATE_MODULE};`, and remove {TEMPLATE_MODULE} from the scripts in mdlsource/"
+                 f" so a re-run does not bring it back")
+    steps = "; ".join(f"{n}. {step}" for n, step in enumerate(steps, 1))
+    found = "; ".join(uses[:8]) + (f"; ... {len(uses) - 8} more" if len(uses) > 8 else "") if uses else "nothing"
+    return [{"check": "MODULE01", "line": 0, "message": (
+        f"{TEMPLATE_MODULE} is the empty template's module and this app has its own ({', '.join(own_modules)})"
+        f" -- remove it. Still using it: {found}. Steps: {steps}")}]
+
+
+def admin_home_findings(navigation: str, user_roles: str, own_modules: list[str]) -> list[dict]:
+    """HOME01: administrators open on a page of the app itself, not the template's Home_Web."""
+    failures = []
+    default, by_role, profile = {}, {}, ""
+    for line in navigation.splitlines():
+        found = PROFILE_RE.match(line)
+        if found:
+            profile = found.group("name")
+            continue
+        home = HOME_RE.match(line)
+        if home and profile:
+            if home.group("role"):
+                by_role.setdefault(profile, {})[home.group("role")] = home.group("page")
+            else:
+                default.setdefault(profile, home.group("page"))
+    main = own_modules[0] if own_modules else "<YourModule>"
+    for role in admin_roles(user_roles):
+        for profile in sorted(set(default) | set(by_role)):
+            page = by_role.get(profile, {}).get(role, default.get(profile, ""))
+            if page and page.split(".")[0] in own_modules:
+                continue
+            failures.append({"check": "HOME01", "line": 0, "message": (
+                f"navigation profile {profile}: role {role} opens on {page or 'no page'}, which is not a page of"
+                f" the app's own modules -- create an administrators' home page in {main} (e.g. {main}.Admin_Home:"
+                f" what an administrator starts the day with, and links to Users) and add"
+                f" `home page {main}.Admin_Home for {role}` to the profile")})
+    return failures
+
+
 LAYOUT_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?layout\s+(?P<name>[\w.]+)", re.IGNORECASE)
 SHOW_PAGE_RE = re.compile(r"\bshow_page\s+(?P<page>[\w.]+)", re.IGNORECASE)
 
@@ -843,6 +933,9 @@ def main() -> int:
                         help="the Administration module (Account_Overview, ManageMyAccount) is in the project")
     parser.add_argument("--user-roles", type=Path, help="DESCRIBE USER ROLE output for every user role")
     parser.add_argument("--guest-role", default="", help="the anonymous user role, which does not sign in")
+    parser.add_argument("--own-modules", default="",
+                        help="the app's own modules, space-separated (not System, Marketplace or MyFirstModule)")
+    parser.add_argument("--template-module", action="store_true", help="MyFirstModule is in the project")
     parser.add_argument("--opened-from", type=Path, action="append", default=[],
                         help="microflow/nanoflow dumps whose `show page` opens pages (BACK01)")
     parser.add_argument("--users-sign-in", action="store_true",
@@ -863,6 +956,15 @@ def main() -> int:
         failures += nav_failures
         warnings += nav_warnings
         failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
+    own_modules = args.own_modules.split()
+    nav_text = args.navigation.read_text(encoding="utf-8", errors="replace") if args.navigation and args.navigation.exists() else ""
+    roles_all = args.user_roles.read_text(encoding="utf-8", errors="replace") if args.user_roles and args.user_roles.exists() else ""
+    if args.template_module:
+        flows_text, _ = collect(args.opened_from) if args.opened_from else ("", [])
+        failures += template_module_findings(own_modules, bool(page_blocks(text.splitlines())), nav_text,
+                                             roles_all, text + "\n" + flows_text)
+    if args.users_sign_in and own_modules and nav_text:
+        failures += admin_home_findings(nav_text, roles_all, own_modules)
     if args.users_sign_in and args.admin_module and args.navigation and args.navigation.exists():
         roles_text = (args.user_roles.read_text(encoding="utf-8", errors="replace")
                       if args.user_roles and args.user_roles.exists() else "")

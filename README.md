@@ -138,7 +138,7 @@ and then working with your agent as usual.
 | Rule | What it asks for |
 |---|---|
 | `test-first-delivery` | a failing test before the feature, and a test naming every page and `ACT_` microflow |
-| `module-structure` | documents in process-named folders, `ACT_`/`SUB_` split, microflows under 15 activities |
+| `module-structure` | documents in process-named folders, `ACT_`/`SUB_` split, microflows under 15 activities; MyFirstModule removed once the app has its own module |
 | `naming-and-captions` | PascalCase, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages, a business caption on every activity |
 | `reuse-and-snippets` | a snippet used on more than one page, a `SUB_` microflow with more than one caller |
 | `organize-project` | nothing orphaned, nothing left at module root |

@@ -155,6 +155,10 @@ that break the build, jar files unpacked in search of an API:
   Administration.Account_Overview` (administrators only) and `menu item 'My account' microflow
   Administration.ManageMyAccount` (own account and password), and every signed-in role includes
   `Administration.User` (gate `ACCOUNT01`-`ACCOUNT03`).
+- **`MyFirstModule` goes once the app has its own module** -- re-point the home pages, take
+  `MyFirstModule.User` out of every user role, `drop module MyFirstModule;`, and give the
+  administrators a home page in your module (`home page Shop.Admin_Home for Administrator`)
+  (skill: `module-structure`; gate `MODULE01`, `HOME01`).
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 
