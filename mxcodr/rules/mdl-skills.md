@@ -23,7 +23,11 @@ runs its lookups in parallel and answers in well under a second:
 ```bash
 bash tests/orient.sh                            # structure, security, navigation, tests + covers, coverage, lint, app state
 bash tests/diagnose.sh <Entity> <user>          # row counts, sessions, access rules, associations, runtime errors
+bash tests/peek.sh '<menu item>' [widget]       # a page's visible text and console errors -- writes no test
 ```
+
+To look at a page, use `tests/peek.sh` -- never a throwaway script or `verify-zz-*` test of your
+own: it signs in, opens the menu item and prints what is on screen, and leaves nothing behind.
 
 While you iterate, keep the app up in another terminal and run one script at a
 time -- the suite is for the end, not the loop:
@@ -42,8 +46,16 @@ and nothing needs recording. Either way the gate is the one command that is righ
 everywhere, and `bash tests/gate.sh --restart` is the one way to restart the app when
 the gate says the model changed after the runtime started. To stop it (before
 `mxcli fix widgets`, say), `bash tests/gate.sh --stop` -- never a hand-written kill loop.
+Never wrap a harness command in `timeout`: macOS has none (`timeout: command not found`), and
+the gate, `--only` runs and the boot carry their own limits.
 
-`./mxcli syntax` with no argument lists every topic. After that, **ask for the leaf
+**Read `tools/mdl-checks/syntax-digest.md` once, before the first script.** `tests/orient.sh`
+writes it from this project's own mxcli: the `Syntax:` blocks of the fourteen topics every
+session otherwise looks up one call at a time (entities, associations, enumerations, module and
+user roles, demo users, entity access, settings, modules, pages, page actions, snippets,
+navigation, object operations) -- 22, 25 and 19 lookups in three measured sessions.
+
+For anything else, `./mxcli syntax` with no argument lists every topic. After that, **ask for the leaf
 topic directly and ask for everything you need in one command** -- each lookup costs
 a whole round trip, and `syntax microflow` followed by `syntax microflow.create` is
 two where one would do:
@@ -60,29 +72,9 @@ generated a dozen versions of the same statement into a temporary file and ran
 it also refuses names that do not exist (0.4s against a rebuilt precheck's seconds, measured).
 Keep `tests/precheck.sh` for the script you are about to exec, which a hook runs for you.
 
-Syntax that every session otherwise looks up, one screen (`./mxcli syntax <topic>`
-has the rest):
+What neither the digest nor `./mxcli syntax` says -- this harness's own rules:
 
 ```
-CREATE [OR MODIFY] ASSOCIATION Mod.Order_Customer FROM Mod.Order TO Mod.Customer
-  TYPE Reference|ReferenceSet [OWNER Default|Both] [DELETE_BEHAVIOR PREVENT|CASCADE];
-  -- FROM holds the foreign key (the many side)          syntax: domain-model.association
-CREATE OR REPLACE NAVIGATION Responsive HOME PAGE Mod.Home [HOME PAGE Mod.X FOR UserRole]
-  MENU ( MENU ITEM 'Label' PAGE Mod.Page ICON Atlas_Core.Atlas."align-center"; );
-  -- FOR takes a bare USER role; ICON is a model reference, hyphens double-quoted
-  -- profiles are Mendix's own kinds only: Responsive, Phone, Tablet (+Offline)
-ACTIONBUTTON btn (Caption: 'Save', Action: SAVE_CHANGES [CLOSE_PAGE], ButtonStyle: Primary,
-  Icon: 'Atlas_Core.Atlas_Filled.pencil')
-  Action: MICROFLOW Mod.MF(Param: $currentObject) | SHOW_PAGE Mod.Page(P: $currentObject)
-        | CREATE_OBJECT Mod.Entity THEN SHOW_PAGE Mod.Page | DELETE | CANCEL_CHANGES | SIGN_OUT
-  -- a SHOW_PAGE argument must be the enclosing widget's object      syntax: page.action
-$O = CREATE Mod.E (A = v) [COMMIT [WITHOUT EVENTS]] [REFRESH];   CHANGE $O (A = v) [COMMIT] [REFRESH];
-COMMIT $O [WITHOUT EVENTS] [REFRESH];  DELETE $O [REFRESH];        syntax: microflow.object-operations
-CREATE [OR MODIFY] MODULE ROLE Mod.Role [DESCRIPTION '...'];          syntax: security.module-role
-@position(x, y) inside a loop is an OFFSET FROM THE LOOP, not a canvas coordinate:
-  loop at (560,200) with its body at (40,100) -- not (560,360), which draws a 670px box
-  around one activity (2% full; the gate fails a loop box under 8% filled).
-  Wrap a flow every ~8 activities: y += 160, x back to the left
 DesignProperties: ['Spacing': ['margin-right': 'S', 'margin-bottom': 'S']]
   -- sides margin-|padding- top|right|bottom|left · values None S M L and NOTHING else
   -- two inline widgets side by side (label+button, button+button) collide without it;

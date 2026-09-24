@@ -109,7 +109,8 @@ no checker to remember the arguments of, no order to run things in. After
 | What | How the agent finds it |
 |---|---|
 | The six rules, in prose | `SKILL.md` files in the three directories each host looks in |
-| The always-loaded reminder | `.claude/rules/`, `.cursor/rules/` and `.pi/AGENTS.md`, loaded on every turn |
+| The always-loaded reminder | `.claude/rules/` and `.cursor/rules/`, and Pi's system prompt through its extension, on every turn |
+| The syntax sessions look up most | `tools/mdl-checks/syntax-digest.md`, written by `tests/orient.sh` from the project's own mxcli |
 | `MOD001`, `REU001`, `UI001` | `mxcli lint` discovers `.claude/lint-rules/*.star` by itself |
 | `check_mdl.py`, `check_test_coverage.py` | the skills that need them name the exact command; the gate runs them too |
 | The gate | host hooks fire it, and the `test-first-delivery` skill tells the agent to |
@@ -209,7 +210,7 @@ If you already have Git Bash, skip `bootstrap.ps1` and run `bash mxcodr/install.
 .agents/skills/<name>/       Codex, Pi, and other tools on the open SKILL.md standard
 .ai-context/skills/<name>/   mxcli, Cursor, OpenCode, Windsurf, Aider
 .claude/rules/               the always-loaded rule (Cursor's copy in .cursor/rules/,
-                             Pi's pointer in .pi/AGENTS.md)
+                             Pi gets it through its extension)
 .claude/lint-rules/          found by `mxcli lint` with nothing to register
 tools/mdl-checks/            the Python checkers the skills cite
 tests/                       the harness scripts, plus tests/harness.env

@@ -1696,23 +1696,18 @@ with open(path, "w") as handle:
 PY_OPENCODE
 ui_done "OpenCode plugin" "1 $I_ARROW .opencode/plugin/, rules $I_ARROW opencode.json"
 
-# Pi: one extension (tool_call blocks, tool_result appends, agent_before_settle asks for one more
-# turn); rules via .pi/AGENTS.md, which Pi loads by itself. Skills need nothing -- Pi reads the
-# Agent Skills layout this installer already writes to .agents/skills/.
+# Pi: one extension -- tool_call blocks a failing exec, tool_result appends the coverage report,
+# agent_before_settle asks for one more turn on a red gate, and before_agent_start puts the rules
+# into the system prompt. Measured on Pi 0.87.1, a .pi/AGENTS.md never reached the model, so the
+# rules travel with the extension; an earlier install's .pi/AGENTS.md is removed when it is ours.
+# Skills need nothing -- Pi reads the Agent Skills layout this installer already writes to .agents/skills/.
 ui_begin "installing the Pi extension"
 mkdir -p "$APP/.pi/extensions"
 cp "$SRC/plugins/mendix-mdl-harness.pi.js" "$APP/.pi/extensions/mendix-mdl-harness.js"
-{
-  printf '# Project rules\n\n'
-  printf 'The rules for building in this app are in `.claude/rules/mdl-skills.md`. Read that file\n'
-  printf 'before the first command of a session, and follow it for the whole session.\n\n'
-  printf 'Two things it cannot say for itself:\n\n'
-  printf -- '- `tests/precheck.sh` runs for you before every `mxcli exec`, and blocks the call when the\n'
-  printf '  script would break the build. Do not call it by hand.\n'
-  printf -- '- When a turn ends after a model change, `tests/gate.sh` runs and its failures come back as\n'
-  printf '  your next turn. Finish the work rather than reporting it as done.\n'
-} > "$APP/.pi/AGENTS.md"
-ui_done "Pi extension" "1 $I_ARROW .pi/extensions/, rules $I_ARROW .pi/AGENTS.md"
+if [ -f "$APP/.pi/AGENTS.md" ] && head -3 "$APP/.pi/AGENTS.md" | grep -q 'The rules for building in this app are in `.claude/rules/mdl-skills.md`'; then
+  rm -f "$APP/.pi/AGENTS.md"
+fi
+ui_done "Pi extension" "1 $I_ARROW .pi/extensions/ (rules in the system prompt)"
 
 # --- 15. Step: install the test harness ---
 # Core scripts are upgraded in place; other files are copied only when absent. verify-*.test.sh are the app's own.
@@ -1860,7 +1855,7 @@ ui_row "hooks"    "3"                 ".claude/settings.local.json  ${C_GREY}(Cl
 ui_row "hooks"    "3"                 ".codex/hooks.json  ${C_GREY}(Codex)${C_RESET}"
 ui_row "hooks"    "4"                 ".cursor/hooks.json  ${C_GREY}(Cursor, + .cursor/rules/)${C_RESET}"
 ui_row "plugin"   "1"                 ".opencode/plugin/  ${C_GREY}(OpenCode, + opencode.json)${C_RESET}"
-ui_row "extension" "1"                ".pi/extensions/  ${C_GREY}(Pi, + .pi/AGENTS.md)${C_RESET}"
+ui_row "extension" "1"                ".pi/extensions/  ${C_GREY}(Pi, rules included)${C_RESET}"
 if [ "$codex_reminder" = "added" ]; then
   ui_row "reminder" "1"               ".codex/config.toml  ${C_GREY}(after the first prompt)${C_RESET}"
 else

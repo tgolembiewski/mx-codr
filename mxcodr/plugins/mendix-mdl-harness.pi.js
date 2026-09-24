@@ -9,15 +9,19 @@
  *                       returns the output plus `continue: true` for one more turn
  *                       (at most MAX_GATE_ROUNDS times)
  *
- * The project rules are NOT injected here: Pi reads `.pi/AGENTS.md` on its own, which is where the
- * installer puts them.
+ *   before_agent_start  appends the project rules (.claude/rules/mdl-skills.md) to the system prompt
+ *
+ * The rules come from here, not from a file Pi reads: measured on Pi 0.87.1, `.pi/AGENTS.md` never
+ * reached the system prompt -- only the root AGENTS.md did, which mxcli regenerates -- and a session
+ * that never saw the rules ran `git init` and a commit unasked, skipped orient.sh and wrote its own
+ * page-peeking script.
  *
  * State is per process, which is per session: Pi loads this file once per run, and `session_start`
  * resets it for a branched or switched session.
  */
 
 import { spawnSync } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const MAX_GATE_ROUNDS = 3
@@ -26,6 +30,8 @@ const GATE_TIMEOUT_MS = 900000
 const PRECHECK_TIMEOUT_MS = 180000
 // Gate and precheck output kept in what the model is shown.
 const OUTPUT_LIMIT = 6000
+// Marks the rules once they are in the system prompt, so a second handler run adds nothing.
+const RULES_MARKER = "<mendix-project-rules>"
 
 // Windows: Git Bash is often not on a GUI process's PATH, so probe the install directories too.
 function resolveBash() {
@@ -105,6 +111,29 @@ export default function mendixMdlHarness(pi) {
     const root = ctx && ctx.cwd ? ctx.cwd : process.cwd()
     return existsSync(join(root, "tests", "gate.sh")) ? root : null
   }
+
+  // Pi rebuilds the system prompt for every agent run, so the rules are appended each time; the
+  // file is read once per process. The marker keeps a second handler from adding them twice.
+  let rulesText = null
+  pi.on("before_agent_start", (event, ctx) => {
+    const root = harnessRoot(ctx)
+    if (!root) return
+    if (rulesText === null) {
+      const path = join(root, ".claude", "rules", "mdl-skills.md")
+      try {
+        rulesText = existsSync(path) ? readFileSync(path, "utf8") : ""
+      } catch {
+        rulesText = ""
+      }
+    }
+    if (!rulesText || (event.systemPrompt || "").includes(RULES_MARKER)) return
+    return {
+      systemPrompt:
+        `${event.systemPrompt || ""}\n\n${RULES_MARKER}\n` +
+        "The rules below are this Mendix project's own and apply to the whole session.\n\n" +
+        `${rulesText}\n</mendix-project-rules>`,
+    }
+  })
 
   pi.on("session_start", () => {
     gateRequired = false
