@@ -293,6 +293,55 @@ PY_FRESH
 }
 
 # --- 8. Temporary files (GNU and BSD mktemp both accept an XXXXXX template) ---
+# The syntax sessions look up most, from THIS project's mxcli, written once per mxcli version.
+# Measured on three sessions: 22, 25 and 19 `./mxcli syntax` calls each, the same topics every
+# time; a fourth listed the digest's table of contents and still asked 165 times, so a file to
+# read is not enough -- the digest goes where each host loads instructions by itself:
+#   .claude/rules/mdl-syntax-digest.md    Claude Code, at session start
+#   .cursor/rules/mdl-syntax-digest.mdc   Cursor, alwaysApply
+#   tools/mdl-checks/syntax-digest.md     OpenCode (opencode.json lists it), Pi (the extension
+#                                         puts it into the system prompt), anyone else (cat it)
+# The first line of the canonical file records the mxcli version it came from; a topic this
+# mxcli does not know is skipped. Needs MXCLI; returns 1 when there is nothing to write.
+MDL_SYNTAX_DIGEST="tools/mdl-checks/syntax-digest.md"
+MDL_SYNTAX_TOPICS="domain-model.entity.create domain-model.association.create domain-model.enumeration.create
+  security.module-role security.user-role security.demo-user security.entity-access settings.alter
+  module page.create page.action snippet.create navigation.create microflow.object-operations"
+
+mdl_syntax_digest() {
+  local version topic block tmp
+  [ -n "${MXCLI:-}" ] || return 1
+  version="$("$MXCLI" --version 2>/dev/null | head -1)"
+  [ -n "$version" ] || return 1
+  [ -d "$(dirname "$MDL_SYNTAX_DIGEST")" ] || return 1
+  if ! { [ -f "$MDL_SYNTAX_DIGEST" ] && [ "$(head -1 "$MDL_SYNTAX_DIGEST")" = "<!-- $version -->" ]; }; then
+    tmp="$MDL_SYNTAX_DIGEST.tmp"
+    {
+      printf '<!-- %s -->\n' "$version"
+      printf '# MDL syntax this project looks up most\n\n'
+      printf 'Generated from `./mxcli syntax <topic>` of this project. The rest: `./mxcli syntax`.\n'
+      for topic in $MDL_SYNTAX_TOPICS; do
+        block="$("$MXCLI" syntax "$topic" 2>/dev/null \
+          | awk '/^Syntax:$/ { on = 1; next } /^[A-Z][A-Za-z ]+:$/ { on = 0 } on')"
+        [ -n "$block" ] || continue
+        printf '\n## %s\n\n```\n%s\n```\n' "$topic" "$block"
+      done
+    } > "$tmp" && mv "$tmp" "$MDL_SYNTAX_DIGEST" || return 1
+  fi
+  # The copies the hosts load by themselves, refreshed whenever they differ.
+  if [ -d .claude/rules ] && ! cmp -s "$MDL_SYNTAX_DIGEST" .claude/rules/mdl-syntax-digest.md; then
+    cp "$MDL_SYNTAX_DIGEST" .claude/rules/mdl-syntax-digest.md
+  fi
+  if [ -d .cursor/rules ]; then
+    tmp="$(mdl_tmpfile mdl-digest)"
+    { printf -- '---\ndescription: The MDL syntax this project looks up most, from its own mxcli\nalwaysApply: true\n---\n\n'
+      cat "$MDL_SYNTAX_DIGEST"; } > "$tmp"
+    cmp -s "$tmp" .cursor/rules/mdl-syntax-digest.mdc || cp "$tmp" .cursor/rules/mdl-syntax-digest.mdc
+    rm -f "$tmp"
+  fi
+  return 0
+}
+
 mdl_tmpdir() {  # mdl_tmpdir <name> -- portable `mktemp -d -t <name>`
   mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX"
 }

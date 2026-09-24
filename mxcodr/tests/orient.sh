@@ -15,36 +15,6 @@ WORK="$(mdl_tmpdir mdl-orient)"
 trap 'rm -rf "$WORK"' EXIT
 
 
-# --- The syntax sessions look up most, written once per mxcli version. ---
-# Measured on three sessions: 22, 25 and 19 `./mxcli syntax` calls each, the same topics every
-# time, each a round trip. The `Syntax:` block of each topic, from THIS project's mxcli so it
-# always matches the version, goes to one file the agent reads once instead. A topic this mxcli
-# does not know is skipped; the first line records the version the file was made from.
-SYNTAX_DIGEST="tools/mdl-checks/syntax-digest.md"
-SYNTAX_TOPICS="domain-model.entity.create domain-model.association.create domain-model.enumeration.create
-  security.module-role security.user-role security.demo-user security.entity-access settings.alter
-  module page.create page.action snippet.create navigation.create microflow.object-operations"
-
-syntax_digest_current() {
-  local version
-  version="$("$MXCLI" --version 2>/dev/null | head -1)"
-  [ -n "$version" ] || return 1
-  [ -f "$SYNTAX_DIGEST" ] && [ "$(head -1 "$SYNTAX_DIGEST")" = "<!-- $version -->" ] && return 0
-  [ -d "$(dirname "$SYNTAX_DIGEST")" ] || return 1
-  local topic block tmp="$SYNTAX_DIGEST.tmp"
-  {
-    printf '<!-- %s -->\n' "$version"
-    printf '# MDL syntax this project looks up most\n\n'
-    printf 'Generated from `./mxcli syntax <topic>` of this project. The rest: `./mxcli syntax`.\n'
-    for topic in $SYNTAX_TOPICS; do
-      block="$("$MXCLI" syntax "$topic" 2>/dev/null \
-        | awk '/^Syntax:$/ { on = 1; next } /^[A-Z][A-Za-z ]+:$/ { on = 0 } on')"
-      [ -n "$block" ] || continue
-      printf '\n## %s\n\n```\n%s\n```\n' "$topic" "$block"
-    done
-  } > "$tmp" && mv "$tmp" "$SYNTAX_DIGEST"
-}
-
 # --- Sections: each prints its own "== heading" and runs in the background. ---
 
 structure_section() {
@@ -104,8 +74,8 @@ app_section() {
   mdl_check_install_freshness
   # A pointer, not the text: sessions pipe this output through `head`, and a digest printed
   # here would be cut there.
-  if syntax_digest_current; then
-    echo "   syntax: read $SYNTAX_DIGEST once before the first script -- the $(grep -c '^## ' "$SYNTAX_DIGEST") topics every session otherwise looks up"
+  if mdl_syntax_digest; then
+    echo "   syntax: $MDL_SYNTAX_DIGEST -- the $(grep -c '^## ' "$MDL_SYNTAX_DIGEST") topics every session otherwise looks up; loaded into the session under Claude Code, Cursor, OpenCode and Pi, elsewhere cat it whole once"
   fi
 }
 

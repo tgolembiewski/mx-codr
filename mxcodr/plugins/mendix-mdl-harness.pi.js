@@ -9,7 +9,8 @@
  *                       returns the output plus `continue: true` for one more turn
  *                       (at most MAX_GATE_ROUNDS times)
  *
- *   before_agent_start  appends the project rules (.claude/rules/mdl-skills.md) to the system prompt
+ *   before_agent_start  appends the project rules (.claude/rules/mdl-skills.md) and the syntax
+ *                       digest (tools/mdl-checks/syntax-digest.md) to the system prompt
  *
  * The rules come from here, not from a file Pi reads: measured on Pi 0.87.1, `.pi/AGENTS.md` never
  * reached the system prompt -- only the root AGENTS.md did, which mxcli regenerates -- and a session
@@ -115,23 +116,30 @@ export default function mendixMdlHarness(pi) {
   // Pi rebuilds the system prompt for every agent run, so the rules are appended each time; the
   // file is read once per process. The marker keeps a second handler from adding them twice.
   let rulesText = null
+  let digestText = ""
+  const readOr = (path, fallback) => {
+    try {
+      return existsSync(path) ? readFileSync(path, "utf8") : fallback
+    } catch {
+      return fallback
+    }
+  }
   pi.on("before_agent_start", (event, ctx) => {
     const root = harnessRoot(ctx)
     if (!root) return
-    if (rulesText === null) {
-      const path = join(root, ".claude", "rules", "mdl-skills.md")
-      try {
-        rulesText = existsSync(path) ? readFileSync(path, "utf8") : ""
-      } catch {
-        rulesText = ""
-      }
-    }
+    if (rulesText === null) rulesText = readOr(join(root, ".claude", "rules", "mdl-skills.md"), "")
+    // The syntax digest appears once orient.sh or the installer has written it; until then it is
+    // looked for again on every run. A file to read was not enough: a session listed its table
+    // of contents and still asked `./mxcli syntax` 165 times.
+    if (!digestText) digestText = readOr(join(root, "tools", "mdl-checks", "syntax-digest.md"), "")
     if (!rulesText || (event.systemPrompt || "").includes(RULES_MARKER)) return
     return {
       systemPrompt:
         `${event.systemPrompt || ""}\n\n${RULES_MARKER}\n` +
         "The rules below are this Mendix project's own and apply to the whole session.\n\n" +
-        `${rulesText}\n</mendix-project-rules>`,
+        `${rulesText}\n` +
+        (digestText ? `\n${digestText}\n` : "") +
+        "</mendix-project-rules>",
     }
   })
 

@@ -110,7 +110,7 @@ no checker to remember the arguments of, no order to run things in. After
 |---|---|
 | The six rules, in prose | `SKILL.md` files in the three directories each host looks in |
 | The always-loaded reminder | `.claude/rules/` and `.cursor/rules/`, and Pi's system prompt through its extension, on every turn |
-| The syntax sessions look up most | `tools/mdl-checks/syntax-digest.md`, written by `tests/orient.sh` from the project's own mxcli |
+| The syntax sessions look up most | a digest from the project's own mxcli, loaded into the session: `.claude/rules/`, `.cursor/rules/`, `opencode.json`, Pi's system prompt |
 | `MOD001`, `REU001`, `UI001` | `mxcli lint` discovers `.claude/lint-rules/*.star` by itself |
 | `check_mdl.py`, `check_test_coverage.py` | the skills that need them name the exact command; the gate runs them too |
 | The gate | host hooks fire it, and the `test-first-delivery` skill tells the agent to |
@@ -142,7 +142,7 @@ and then working with your agent as usual.
 | `naming-and-captions` | PascalCase, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages, a business caption on every activity |
 | `reuse-and-snippets` | a snippet used on more than one page, a `SUB_` microflow with more than one caller |
 | `organize-project` | nothing orphaned, nothing left at module root |
-| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS |
+| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS; one navigation menu for every role on Atlas_Default, never a menu built from buttons |
 
 ## Requirements
 
@@ -209,7 +209,7 @@ If you already have Git Bash, skip `bootstrap.ps1` and run `bash mxcodr/install.
 .claude/skills/<name>/       Claude Code
 .agents/skills/<name>/       Codex, Pi, and other tools on the open SKILL.md standard
 .ai-context/skills/<name>/   mxcli, Cursor, OpenCode, Windsurf, Aider
-.claude/rules/               the always-loaded rule (Cursor's copy in .cursor/rules/,
+.claude/rules/               the always-loaded rule and the syntax digest (Cursor's copies in .cursor/rules/,
                              Pi gets it through its extension)
 .claude/lint-rules/          found by `mxcli lint` with nothing to register
 tools/mdl-checks/            the Python checkers the skills cite
@@ -229,8 +229,8 @@ reaches an installed project is not a fix. Your own `verify-*.test.sh` and
 
 One command, seven checks, run concurrently — the browser suite, `mx check`, `mxcli
 lint`, test coverage, naming/captions, page layout and the security level. Every step
-runs even when another fails, so one call reports the whole picture. Exit 0 only when
-all seven pass.
+runs even when another fails, so one call reports the whole picture, and a red run ends with the list of what still
+blocks DONE. Exit 0 only when all seven pass.
 
 ```
 == gate

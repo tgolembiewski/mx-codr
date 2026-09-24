@@ -75,9 +75,9 @@ COMPARISON_RE = re.compile(r"[<>]=?|!=|\s=\s")
 
 # (regex, rule code, message label) for variable names.
 VARIABLE_RULES = (
-    (PLACEHOLDER_VAR_RE, "placeholder-variable", "placeholder variable name"),
-    (THROWAWAY_VAR_RE, "placeholder-variable", "throwaway variable name"),
-    (TYPE_ECHO_VAR_RE, "type-echo-variable", "variable name only restates its type"),
+    (PLACEHOLDER_VAR_RE, "placeholder-variable", "placeholder variable name -- name what it holds, e.g. $OpenInvoiceCount"),
+    (THROWAWAY_VAR_RE, "placeholder-variable", "throwaway variable name -- name what it holds, e.g. $DueDate"),
+    (TYPE_ECHO_VAR_RE, "type-echo-variable", "variable name only restates its type -- name what it holds, e.g. $OverdueInvoices"),
 )
 
 
@@ -139,7 +139,7 @@ def decision_findings(lines: list[str], index: int) -> tuple[list[Failure], list
     if "caption" not in annotation_kinds(annotations):
         failure = Failure(
             "decision-caption",
-            f"decision without @caption: {line.strip()[:70]}",
+            f"decision without @caption -- put @caption '<the question it answers?>' on the line above: {line.strip()[:70]}",
             index + 1,
         )
         return [failure], [], False
@@ -162,14 +162,14 @@ def decision_findings(lines: list[str], index: int) -> tuple[list[Failure], list
     if "$" in text or COMPARISON_RE.search(text):
         failure = Failure(
             "caption-restates-expression",
-            f"caption restates the expression: '{text}'",
+            f"caption restates the expression: '{text}' -- write the business question instead, with no $, <, >, != or =, ending in '?'",
             index + 1,
         )
         return [failure], [], True
     if not text.rstrip().endswith("?"):
         failure = Failure(
             "caption-not-a-question",
-            f"decision caption is not phrased as a question: '{text}'",
+            f"decision caption is not phrased as a question: '{text}' -- end it with '?', e.g. 'Is the invoice overdue?'",
             index + 1,
         )
         return [failure], [], True
@@ -208,7 +208,7 @@ def action_findings(lines: list[str], index: int) -> list[Failure]:
         return [
             Failure(
                 "action-caption",
-                f"action without business-operation @caption: {line.strip()[:70]}",
+                f"action without business-operation @caption -- put @caption '<what it does for the business>' on the line above: {line.strip()[:70]}",
                 index + 1,
             )
         ]
@@ -217,7 +217,7 @@ def action_findings(lines: list[str], index: int) -> list[Failure]:
         return [
             Failure(
                 "action-caption-is-default",
-                f"action caption restates the Mendix default: '{text}'",
+                f"action caption restates the Mendix default: '{text}' -- say what it does for the business, e.g. 'Load the open invoices'",
                 index + 1,
             )
         ]
@@ -228,7 +228,8 @@ def variable_findings(line: str, line_number: int) -> list[Failure]:
     failures = []
     for regex, check, label in VARIABLE_RULES:
         for hit in regex.findall(line):
-            failures.append(Failure(check, f"{label}: {hit}", line_number))
+            what, _, fix = label.partition(" -- ")
+            failures.append(Failure(check, f"{what}: {hit}" + (f" -- {fix}" if fix else ""), line_number))
     return failures
 
 

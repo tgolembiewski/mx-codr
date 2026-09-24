@@ -1686,7 +1686,7 @@ else:
 
 config.setdefault("$schema", "https://opencode.ai/config.json")
 instructions = config.setdefault("instructions", [])
-for entry in (".claude/rules/mdl-skills.md",):
+for entry in (".claude/rules/mdl-skills.md", "tools/mdl-checks/syntax-digest.md"):
     if entry not in instructions:
         instructions.append(entry)
 
@@ -1748,6 +1748,13 @@ if [ ! -e "$APP/.gitattributes" ] && [ -f "$SRC/.gitattributes" ]; then
   cp "$SRC/.gitattributes" "$APP/.gitattributes"
 fi
 ui_done "test harness" "$suite_written $I_ARROW tests/  (verify-*.test.sh left alone)"
+
+# The syntax digest, now rather than at the first orient: Claude Code reads .claude/rules/ only
+# when a session starts, so a digest written during the first session would reach only the
+# second. Same function orient.sh calls; best effort -- a missing or old mxcli skips it.
+if [ -x "$APP/mxcli$EXE" ] && [ -f "$APP/tests/portable.sh" ]; then
+  ( cd "$APP" && MXCLI="./mxcli$EXE" && . tests/portable.sh && mdl_syntax_digest ) >/dev/null 2>&1 || true
+fi
 
 # --- 16. Step: record the install, then check the environment ---
 # INSTALL.json lets the gate detect stale or locally edited harness files.
