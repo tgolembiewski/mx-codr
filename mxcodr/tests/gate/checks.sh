@@ -178,13 +178,18 @@ check_naming() {
   return "$gate"
 }
 
-# Sets nav_args for the Log out rule (NAV01): only when project security is on, since only then
-# do users sign in. Returns 1, with the summary written, when the navigation cannot be read.
+# Sets nav_args: the menu icons (NAV05) always; the Log out and role-home rules (NAV01-NAV03) only
+# when project security is on, since only then do users sign in. Returns 1, with the summary
+# written, when security is on and the navigation cannot be read.
 layout_sign_out_inputs() {
   local level
   level="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | grep -i 'Security Level' | head -1)"
   case "$level" in
-    *[Oo]ff*|"") return 0 ;;
+    *[Oo]ff*|"")
+      # Without sign-in only the icons are checked, and a navigation that cannot be read does not block.
+      "$MXCLI" -p "$MPR" -c "DESCRIBE NAVIGATION" > "$WORK/navigation.mdl" 2>/dev/null \
+        && nav_args=(--navigation "$WORK/navigation.mdl")
+      return 0 ;;
   esac
   if ! "$MXCLI" -p "$MPR" -c "DESCRIBE NAVIGATION" > "$WORK/navigation.mdl" 2>/dev/null; then
     echo "layout: could not run -- DESCRIBE NAVIGATION failed" > "$WORK/layout.summary"

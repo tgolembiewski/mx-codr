@@ -519,6 +519,7 @@ project's own layouts:
 `NAV02` | warning | the Log out item is not the last item of its menu |
 `NAV03` | error | project security is on and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons — a menu built by hand |
+`NAV05` | error | a menu item or sub-menu has no icon; the message suggests an Atlas_Filled icon for its caption |
 
 `GRID01` came from the same session: a customer grid showed its date column as formatted
 `Content` and dropped the column's `Attribute`, and its date filter rendered a red "Unable to

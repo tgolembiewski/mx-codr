@@ -22,6 +22,7 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  profile's menu
 #   GRID01   FAIL  a grid filter in a column with no Attribute (and none of its own): it renders
 #                  "Unable to get filter store" and filters nothing
+#   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
 #   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
 #                  built by hand, with no hamburger, no active item and no phone view
 
@@ -403,6 +404,62 @@ def role_home_findings(navigation: str) -> list[dict]:
     return failures
 
 
+# A sub-menu line: `menu '<caption>' [icon ...] (`.
+SUB_MENU_RE = re.compile(r"^\s*menu\s+'(?P<caption>[^']*)'(?P<rest>.*)$", re.IGNORECASE)
+ICON_RE = re.compile(r"\bicon\b", re.IGNORECASE)
+# Caption words -> an Atlas_Filled icon that shows the same thing; first match wins.
+ICON_HINTS = (
+    (("log out", "logout", "sign out"), "logout"),
+    (("home", "start"), "home"),
+    (("dashboard", "overview", "kpi"), "dashboard"),
+    (("report", "analytic", "statistic", "chart"), "analytics-bars"),
+    (("invoice", "bill"), "cash-payment-bill"),
+    (("payment", "credit"), "credit-card"),
+    (("order", "cart", "purchase"), "shopping-cart"),
+    (("shipment", "delivery", "product", "stock"), "shipment-box"),
+    (("customer", "client", "contact", "user", "people", "employee", "account"), "user-neutral-group"),
+    (("task", "todo", "approval", "inbox"), "task-list-multiple"),
+    (("document", "file", "contract"), "document"),
+    (("calendar", "schedule", "planning"), "calendar"),
+    (("mail", "message", "email"), "email"),
+    (("setup", "setting", "config", "admin"), "cog"),
+    (("search", "find"), "search"),
+)
+
+
+def suggested_icon(caption: str) -> str:
+    low = caption.lower()
+    for words, icon in ICON_HINTS:
+        if any(word in low for word in words):
+            return f'Atlas_Core.Atlas_Filled.{icon}' if "-" not in icon else f'Atlas_Core.Atlas_Filled."{icon}"'
+    return ""
+
+
+def menu_icon_findings(navigation: str) -> list[dict]:
+    """NAV05: every menu entry carries an icon that shows what it opens."""
+    failures = []
+    profile = ""
+    for line in navigation.splitlines():
+        found = PROFILE_RE.match(line)
+        if found:
+            profile = found.group("name")
+            continue
+        entry = MENU_ITEM_RE.match(line) or SUB_MENU_RE.match(line)
+        if not entry or not profile or ICON_RE.search(entry.group("rest")):
+            continue
+        caption = entry.group("caption")
+        icon = suggested_icon(caption)
+        fix = (f"`icon {icon}`" if icon else
+               "an icon that shows what it opens, from `DESCRIBE ICON COLLECTION Atlas_Core.Atlas_Filled`")
+        failures.append({
+            "check": "NAV05",
+            "line": 0,
+            "message": (f"navigation profile {profile}: menu entry '{caption}' has no icon -- add {fix} at the end"
+                        f" of its line; with the sidebar collapsed the icon is all a user sees"),
+        })
+    return failures
+
+
 LAYOUT_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?layout\s+(?P<name>[\w.]+)", re.IGNORECASE)
 SHOW_PAGE_RE = re.compile(r"\bshow_page\s+(?P<page>[\w.]+)", re.IGNORECASE)
 
@@ -494,6 +551,8 @@ def main() -> int:
         failures += nav_failures
         warnings += nav_warnings
         failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
+    if args.navigation and args.navigation.exists():
+        failures += menu_icon_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
     if args.layouts:
         layouts, _ = collect(args.layouts)
         failures += layout_menu_findings(layouts)
