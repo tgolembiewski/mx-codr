@@ -145,6 +145,11 @@ that break the build, jar files unpacked in search of an API:
 - **Every page another page or a microflow opens starts with Back, top left** --
   `actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: 'Atlas_Core.Atlas_Filled.chevron-left')`
   as its first widget, above the heading; pop-ups excepted (gate `BACK01`).
+- **Once users sign in, every page shows who is signed in, top right** -- the page opens with one
+  row -- a container with `'Flex container': 'Horizontal (row)'` and `'Align items X': 'Space
+  between (only for horizontal containers)'` (Back, then the snippet) or `'Right'` (the snippet alone) -- holding `snippetcall
+  scCurrentUser (Snippet: <Module>.SNIPPET_CurrentUser)`; the skill `spacing-and-layout` has the
+  snippet and both rows (gate `USER01`).
 - **One layout for every page that is not a pop-up** -- chosen once for the app
   (`Atlas_Core.Atlas_Default` unless it is a top-bar app); pages on different layouts
   make the menu change or open and close between pages (gate `LAYOUT01`).

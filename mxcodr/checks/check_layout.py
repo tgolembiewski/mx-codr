@@ -27,6 +27,9 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  layout: the menu and its open/closed state change from page to page
 #   ICON01   FAIL  a button (actionbutton, linkbutton) without an icon; the message suggests one
 #                  from its action and caption
+#   USER01   FAIL  users sign in, and a page (pop-ups and the login page aside) does not open with
+#                  the "who is signed in" snippet, <Module>.SNIPPET_CurrentUser, on the right of its top
+#                  row -- first, or right after the Back button in the same container
 #   BACK01   FAIL  a page another page or a flow opens (show_page) does not start with a Back
 #                  button: close_page, icon chevron-left, top left. Pop-ups are exempt (they have X)
 #   ACCOUNT01 FAIL users sign in, the Administration module is there, and the menu has no item for
@@ -424,6 +427,80 @@ def button_icon_findings(lines: list[str]) -> list[dict]:
     return failures
 
 
+# USER01 -------------------------------------------------------------------------------------
+SNIPPET_DEF_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?snippet\s+(?P<name>[\w.]+)", re.IGNORECASE)
+
+
+def row_pushes_right(block: list[str]) -> bool:
+    """The container around the current-user snippet lays out as a row that puts it at the right edge."""
+    lines = block
+    at = next((i for i, line in enumerate(lines)
+               if "snippetcall" in line and CURRENT_USER_SNIPPET in line), None)
+    if at is None:
+        return False
+    indent = len(lines[at]) - len(lines[at].lstrip())
+    for i in range(at - 1, -1, -1):
+        line = lines[i]
+        own = len(line) - len(line.lstrip())
+        if own < indent and re.match(r"^\s*container\s", line):
+            head = line
+            j = i + 1
+            while not head.rstrip().endswith("{") and j < at:
+                head += " " + lines[j].strip()
+                j += 1
+            return "Flex container" in head and re.search(r"Align items X'\s*:\s*'(Right|Space between)", head) is not None
+        if own < indent and WIDGET_LINE_RE.match(line):
+            return False  # directly in a column or data view: nothing aligns it
+    return False
+
+
+def current_user_findings(lines: list[str], snippets: str, navigation: str, layouts: str) -> list[dict]:
+    """USER01: every page shows who is signed in, in the same place -- its first widget, top right."""
+    defined = [m.group("name") for m in map(SNIPPET_DEF_RE.match, snippets.splitlines())
+               if m and m.group("name").endswith("." + CURRENT_USER_SNIPPET)]
+    types = layout_types(layouts)
+    login_pages = {m.group("page") for m in map(LOGIN_PAGE_RE.match, navigation.splitlines()) if m}
+    missing, unaligned, failures = [], [], []
+    for page, block in page_blocks(lines).items():
+        layout = PAGE_LAYOUT_RE.search("\n".join(block[:8]))
+        name = layout.group("layout") if layout else ""
+        if page in login_pages or re.search(r"popup|login", name + " " + types.get(name, ""), re.IGNORECASE):
+            continue
+        lead = leading_widgets(block)
+        is_user = lambda w: w[0] == "snippetcall" and CURRENT_USER_SNIPPET in w[1]
+        # First on the page, or right after the Back button in the same row.
+        if lead and (is_user(lead[0]) or (len(lead) == 2 and is_back_button(lead[0][0], lead[0][1])
+                                          and is_user(lead[1]) and lead[0][2] == lead[1][2])):
+            if not row_pushes_right(block):
+                unaligned.append(page)
+            continue
+        missing.append(page)
+    if unaligned:
+        failures.append({"check": "USER01", "line": 0, "message": (
+            f"{len(unaligned)} page(s) show who is signed in on the left: {', '.join(unaligned[:6])} -- the row"
+            f" holding the snippet needs DesignProperties ['Flex container': 'Horizontal (row)', 'Align items X':"
+            f" 'Space between (only for horizontal containers)'] when the Back button is in it, or ['Flex container': 'Horizontal (row)', 'Align"
+            f" items X': 'Right'] when it is not; 'Align items X' does nothing without 'Flex container'")})
+    if not missing:
+        return failures
+    module = missing[0].split(".")[0]
+    snippet = defined[0] if defined else f"{module}.{CURRENT_USER_SNIPPET}"
+    how = ("" if defined else
+           f" {snippet} does not exist yet: create it as the spacing-and-layout skill shows -- a non-persistent"
+           f" {module}.SignedInUser with a Label, a microflow DS_SignedInUser filling it with the account's e-mail"
+           f" or user name, and the snippet: a data view on"
+           f" that microflow with `linkbutton lnkCurrentUser (Caption: '{{1}}', CaptionParams: [{{1}} = Label],"
+           f" Icon: 'Atlas_Core.Atlas_Filled.user', Action: microflow Administration.ManageMyAccount)`.")
+    shown = ", ".join(missing[:6]) + (f" and {len(missing) - 6} more" if len(missing) > 6 else "")
+    return failures + [{"check": "USER01", "line": 0, "message": (
+        f"{len(missing)} page(s) do not start with who is signed in: {shown} -- open each page with one row"
+        f" above the heading: with a Back button, `container ctPageTop (DesignProperties: ['Flex container':"
+        f" 'Horizontal (row)', 'Align items X': 'Space between (only for horizontal containers)', 'Align items Y': 'Center']) {{ <the Back"
+        f" button> snippetcall scCurrentUser (Snippet: {snippet}) }}`; without one, the same container with"
+        f" 'Align items X': 'Right' and only the snippet call. Back stays on the left, the user's icon and"
+        f" e-mail sit on the right, just under the language selector, on every page.{how}")}]
+
+
 # LAYOUT01 -----------------------------------------------------------------------------------
 # Layouts that are rightly different from the app's main one: a pop-up closes with its own X, a
 # login page has no menu, and phone/tablet profiles have layouts of their own.
@@ -504,6 +581,10 @@ def page_blocks(lines: list[str]) -> dict[str, list[str]]:
     return blocks
 
 
+# The "who is signed in" snippet sits above everything, the Back button included (USER01).
+CURRENT_USER_SNIPPET = "SNIPPET_CurrentUser"
+
+
 def first_widget(block: list[str]) -> tuple[str, str]:
     """(type, full property text) of the first widget that is not a container."""
     # The page header (`create page X (` ... `) {`) ends at its first line ending in `{`.
@@ -523,6 +604,27 @@ def first_widget(block: list[str]) -> tuple[str, str]:
                 look += 1
         return found.group("type").lower(), props
     return "", ""
+
+
+def leading_widgets(block: list[str], count: int = 2) -> list[tuple[str, str, int]]:
+    """(type, property text, indent) of the first <count> widgets that are not containers."""
+    body = next((i + 1 for i, line in enumerate(block) if line.rstrip().endswith("{")), len(block))
+    found = []
+    for index in range(body, len(block)):
+        line = block[index]
+        widget = WIDGET_LINE_RE.match(line)
+        if line.strip().startswith("--") or not widget or widget.group("type").lower() in BACK_WRAPPERS:
+            continue
+        props = line
+        if line.rstrip().endswith("("):
+            look = index + 1
+            while look < len(block) and not block[look].strip().startswith(")"):
+                props += " " + block[look].strip()
+                look += 1
+        found.append((widget.group("type").lower(), props, len(line) - len(line.lstrip())))
+        if len(found) == count:
+            break
+    return found
 
 
 def is_back_button(wtype: str, props: str) -> bool:
@@ -965,6 +1067,10 @@ def main() -> int:
                                              roles_all, text + "\n" + flows_text)
     if args.users_sign_in and own_modules and nav_text:
         failures += admin_home_findings(nav_text, roles_all, own_modules)
+    if args.users_sign_in:
+        snippets_all, _ = collect(args.sign_out_sources) if args.sign_out_sources else ("", [])
+        layouts_all, _ = collect(args.layouts) if args.layouts else ("", [])
+        failures += current_user_findings(text.splitlines(), snippets_all, nav_text, layouts_all)
     if args.users_sign_in and args.admin_module and args.navigation and args.navigation.exists():
         roles_text = (args.user_roles.read_text(encoding="utf-8", errors="replace")
                       if args.user_roles and args.user_roles.exists() else "")
