@@ -201,6 +201,27 @@ layout_sign_out_inputs() {
   # A sign-out button in a snippet (a shared header, say) also counts; unreadable snippets do not block.
   describe_all layout-snippets "$WORK/snippets" "SNIPPETS" || true
   nav_args=(--navigation "$WORK/navigation.mdl" --sign-out-sources "$WORK/snippets" --users-sign-in)
+  # ACCOUNT01-03: only when the Administration module is there to link to.
+  if "$MXCLI" -p "$MPR" --json -c "SHOW PAGES IN Administration" 2>/dev/null | grep -q '"Administration.Account_Overview"' \
+     && "$MXCLI" -p "$MPR" --json -c "SHOW MICROFLOWS IN Administration" 2>/dev/null | grep -q '"Administration.ManageMyAccount"'; then
+    nav_args+=(--admin-module)
+    local role guest
+    : > "$WORK/userroles.mdl"
+    while IFS= read -r role; do
+      [ -n "$role" ] && "$MXCLI" -p "$MPR" -c "DESCRIBE USER ROLE $role" >> "$WORK/userroles.mdl" 2>/dev/null
+    done < <("$MXCLI" -p "$MPR" --json -c "SHOW USER ROLES" 2>/dev/null \
+      | "$PY" -c 'import json, sys
+try:
+    rows = json.load(sys.stdin)
+except Exception:
+    rows = []
+for row in rows if isinstance(rows, list) else []:
+    print(row.get("Name", ""))' 2>/dev/null)
+    nav_args+=(--user-roles "$WORK/userroles.mdl")
+    guest="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | grep -iE '^(Guest|Anonymous) (User )?Role:' | head -1 | sed -E 's/^[^:]*:[[:space:]]*//')"
+    if [ -n "$guest" ]; then nav_args+=(--guest-role "$guest"); fi
+  fi
+  return 0
 }
 
 # Widget spacing, read from `describe page` (Starlark lint rules cannot see widgets).

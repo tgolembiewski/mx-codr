@@ -233,6 +233,30 @@ Two items with the same icon read as the same screen; pick different ones.
 The gate fails `NAV03` when a role's home page is not in the menu, and `NAV04` when
 one of the project's own layouts opens two or more pages from buttons.
 
+## Users and "My account" in the menu
+
+Once users sign in, the menu also carries the Administration module's own account screens.
+Nothing needs building, and nothing in the Marketplace module changes:
+
+```sql
+    menu item 'Users' page Administration.Account_Overview icon Atlas_Core.Atlas_Filled."user-neutral-group";
+    menu item 'My account' microflow Administration.ManageMyAccount icon Atlas_Core.Atlas_Filled.user;
+    menu item 'Log out' sign_out icon Atlas_Core.Atlas_Filled.logout;
+```
+
+- **Users** (`Account_Overview`) is user management: create accounts, reset passwords,
+  assign roles. Only `Administration.Administrator` may open it, so only administrators
+  see the item — the one-menu rule does the rest.
+- **My account** is every user's own account and password. The page behind it,
+  `Administration.MyAccount`, needs the account as its parameter, so a menu item cannot open
+  it; `ManageMyAccount` fetches the signed-in account and opens it.
+- Every user role that signs in includes `Administration.User` (without it "My account" is
+  hidden), and the administrators' role includes `Administration.Administrator`:
+  `alter user role Employee add module roles (Administration.User);`
+
+The gate fails `ACCOUNT01` (no Users item), `ACCOUNT02` (no My account item) and `ACCOUNT03`
+(a role without `Administration.User`, or nobody with `Administration.Administrator`).
+
 ## Every button has an icon
 
 Every `actionbutton` and `linkbutton`, on a page or in a snippet, carries an icon that
@@ -363,6 +387,9 @@ layout: PASS  0 failure(s) over 6 page(s)
 `NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
 `NAV05` | error | a menu item or sub-menu has no icon (the message suggests one for its caption) |
+`ACCOUNT01` | error | users sign in and the menu has no `page Administration.Account_Overview` item (user management) |
+`ACCOUNT02` | error | users sign in and the menu has no `microflow Administration.ManageMyAccount` item (own account, password) |
+`ACCOUNT03` | error | a role that signs in lacks `Administration.User`, or no role has `Administration.Administrator` |
 `ICON01` | error | a button (`actionbutton`, `linkbutton`) without an icon; the message suggests one from its action and caption |
 `LAYOUT01` | error | the app's pages (pop-ups, login and phone/tablet pages aside) use more than one layout |
 `BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups are exempt |

@@ -151,6 +151,10 @@ that break the build, jar files unpacked in search of an API:
 - **Every button has an icon that shows what it does** -- `Icon: 'Atlas_Core.Atlas_Filled.floppy-disk'`
   for Save, `trash-can` Delete, `pencil` Edit, `add` New, `view` Open, `chevron-left` Back
   (skill: `spacing-and-layout` has the table; gate `ICON01`).
+- **Once users sign in, the menu has Users and My account** -- `menu item 'Users' page
+  Administration.Account_Overview` (administrators only) and `menu item 'My account' microflow
+  Administration.ManageMyAccount` (own account and password), and every signed-in role includes
+  `Administration.User` (gate `ACCOUNT01`-`ACCOUNT03`).
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 
