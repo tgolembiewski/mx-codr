@@ -209,6 +209,27 @@ ran together into one line of text, a fixed 232 px panel covered half a phone
 screen, and there was no hamburger and no highlighted page. Keep the pages on
 `Atlas_Core.Atlas_Default` (or another stock Atlas layout) and put them in the menu.
 
+Every menu entry — item or sub-menu, Log out included — has an **icon that shows
+what it opens**: with the sidebar collapsed the icon is all a user sees. Take it
+from `Atlas_Core.Atlas_Filled` (`DESCRIBE ICON COLLECTION Atlas_Core.Atlas_Filled`
+lists the names; hyphenated ones are double-quoted). Ones that fit common screens:
+
+| Screen | Icon |
+|---|---|
+| orders, cart | `Atlas_Core.Atlas_Filled."shopping-cart"` |
+| customers, users, contacts | `Atlas_Core.Atlas_Filled."user-neutral-group"` |
+| invoices, bills | `Atlas_Core.Atlas_Filled."cash-payment-bill"` |
+| dashboard, overview | `Atlas_Core.Atlas_Filled.dashboard` |
+| reports | `Atlas_Core.Atlas_Filled."analytics-bars"` |
+| shipments, products | `Atlas_Core.Atlas_Filled."shipment-box"` |
+| tasks, approvals | `Atlas_Core.Atlas_Filled."task-list-multiple"` |
+| documents | `Atlas_Core.Atlas_Filled.document` |
+| setup, settings | `Atlas_Core.Atlas_Filled.cog` |
+| home | `Atlas_Core.Atlas_Filled.home` |
+| Log out | `Atlas_Core.Atlas_Filled.logout` |
+
+Two items with the same icon read as the same screen; pick different ones.
+
 The gate fails `NAV03` when a role's home page is not in the menu, and `NAV04` when
 one of the project's own layouts opens two or more pages from buttons.
 
@@ -259,6 +280,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `GRID01` | error | a grid filter sits in a column with no `Attribute:` and has none of its own: it renders "Unable to get filter store" and filters nothing |
 `NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
+`NAV05` | error | a menu item or sub-menu has no icon (the message suggests one for its caption) |
 
 ## What this cannot see
 

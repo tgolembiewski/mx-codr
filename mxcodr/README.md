@@ -151,13 +151,18 @@ The hooks are the part that does not depend on the model choosing to comply:
 
 Sessions read the gate through `tail -3`, `tail -25` or a `sed … | head`, and each of those cut
 off either the verdict or the details under it; after a compaction a session had neither and
-spent an hour rediscovering what was left. Every red run now ends with one line per failed check
--- how many findings and the first of them -- and the verdict again as the very last line:
+spent an hour rediscovering what was left. Every red run now ends with each failed check, how
+many findings it has and up to five of them with their fix, and the verdict again as the very last
+line:
 
 ```
 == still blocking DONE
-   naming: 8 -- first: [loop-annotation] line 796: loop without @annotation -- put @annotation '<why it repeats>' on the line above: while $MonthBack >= 0
-   layout: 1 -- first: [NAV01] line 0: navigation profile Responsive: users sign in, but its menu has no way to log out -- add `menu item 'Log out' sign_out …`
+   naming: 8
+     - [loop-annotation] line 796: loop without @annotation -- put @annotation '<why it repeats>' on the line above: while $MonthBack >= 0
+     - …four more…
+     ... 3 more under == naming above
+   layout: 1
+     - [NAV01] line 0: navigation profile Responsive: users sign in, but its menu has no way to log out -- add `menu item 'Log out' sign_out …`
    NOT DONE — failed: naming layout
 ```
 
@@ -519,10 +524,20 @@ project's own layouts:
 `NAV02` | warning | the Log out item is not the last item of its menu |
 `NAV03` | error | project security is on and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons — a menu built by hand |
+`NAV05` | error | a menu item or sub-menu has no icon; the message suggests an Atlas_Filled icon for its caption |
 
 `GRID01` came from the same session: a customer grid showed its date column as formatted
 `Content` and dropped the column's `Attribute`, and its date filter rendered a red "Unable to
 get filter store" box. `mxcli check`, `mx check` and lint all passed it.
+
+The same sessions left three smaller fixes. A red gate now ends with every finding of each
+failed check (up to five, each with its fix), not only the first: a model that read the gate
+through `| tail -16` saw one NAV finding and opened `check_layout.py` to learn what the other six
+wanted. A `sleep` in the same command as `tests/gate.sh` is blocked by the Claude Code hook and the
+OpenCode and Pi plugins, because the gate waits for the runtime itself; two sessions added one
+anyway. And the OQL helpers (`oql_count`, `oql_value`, `await_row`, `diagnose.sh`) quote the entity
+name: `FROM OrderDesk.Order` does not parse, so a test on an entity named `Order` failed and
+`diagnose.sh` printed a false 0 rows. A Pi session found and fixed that one in its own copy.
 
 `NAV03` and `NAV04` came from a Pi session that needed an employee menu and a customer
 menu, found that MDL menu items take no roles, and built two layouts of link buttons
