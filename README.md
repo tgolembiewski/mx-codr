@@ -15,17 +15,19 @@ It sits on top of [mxcli](https://github.com/mendixlabs/mxcli):
 
 ## What you get
 
-- **Test-first, automatically.** The agent writes a failing browser test before each
-  feature, and every page and action ends up with one.
-- **One command decides "done".** `bash tests/gate.sh` runs the browser tests,
-  `mx check`, lint, test coverage, naming, layout and security together, in under half a
-  minute.
-- **Rules the agent keeps following.** Hooks repeat them on every prompt and after
-  every model change, so they don't fade by the third feature.
-- **A model people can read.** Business captions on every activity, process folders,
-  shared snippets and sub-microflows instead of copies, spacing from the Atlas theme.
-- **Your agent, your OS.** Claude Code, Codex, Cursor, OpenCode and Pi, on macOS, Linux
-  and Windows — Windows on ARM included.
+- **Tests first.** For each feature the agent first writes a failing browser test, then
+  builds until it passes. Every page and action microflow gets a test.
+- **One "done" check.** `bash tests/gate.sh` (the *gate*) runs the tests, Mendix's
+  consistency check and the rules below in about 30 seconds. Only **DONE** means done.
+- **No broken model.** The agent changes the app with small MDL scripts (text files, a
+  bit like SQL for a Mendix model). Each is tested on a copy first; if Studio Pro would
+  show errors, your `.mpr` is not touched.
+- **A proper Mendix app.** One menu for all roles, icons, one layout, Back buttons,
+  "Users" and "My account" for signed-in users, no leftover `MyFirstModule`.
+- **A readable model.** Business captions, process folders, reused snippets and
+  sub-microflows, Atlas spacing.
+- **Any agent, any OS.** Claude Code, Codex, Cursor, OpenCode or Pi, on macOS, Linux or
+  Windows.
 
 ## Get started
 
@@ -50,6 +52,36 @@ Administrator rights are needed because winget installs Docker Desktop. Already 
 Git Bash? Run `bash mxcodr/install.sh --with-deps` from Git Bash instead.
 
 Start a new agent session and ask for a feature. That's it.
+
+## What it enforces
+
+The gate checks every rule below. If one is broken, it stays red and tells the agent
+what to fix. Codes in brackets are what the gate prints.
+
+**Done**
+- A failing test before each feature; a test for every page and action microflow.
+- Mendix's consistency check at 0 errors; project security at Production.
+- Only the full gate says DONE. Running one test says PASSED.
+
+**Structure**
+- Process folders, `ACT_`/`SUB_` microflows under 15 activities, nothing at module root.
+- `MyFirstModule` removed once the app has its own module (`MODULE01`).
+- PascalCase names, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages.
+- A business caption on every activity; decisions as questions; a note on every loop.
+- Reuse: snippets and sub-microflows instead of copies; data grids use column filters
+  (`UI001`, `GRID01`).
+
+**Screens**
+- One menu for all roles on a standard Atlas layout (`NAV03`, `NAV04`), an icon on every
+  item (`NAV05`), Log out last (`NAV01`, `NAV02`).
+- "Users" for admins and "My account" for everyone once people sign in
+  (`ACCOUNT01`-`03`); admins start on a page of the app (`HOME01`).
+- One layout for all pages except pop-ups (`LAYOUT01`).
+- A Back button top left on every page opened from another page (`BACK01`).
+- An icon on every button (`ICON01`); Atlas spacing, no custom CSS (`SPACE01`-`03`).
+
+The agent learns these from six *skills* (short guides) that the installer puts in
+place. You don't need to read them.
 
 ## The installer sets everything up
 
@@ -132,17 +164,6 @@ bash mxcodr/install.sh --with-deps
 ```
 
 and then working with your agent as usual.
-
-## What it enforces
-
-| Rule | What it asks for |
-|---|---|
-| `test-first-delivery` | a failing test before the feature, and a test naming every page and `ACT_` microflow |
-| `module-structure` | documents in process-named folders, `ACT_`/`SUB_` split, microflows under 15 activities; MyFirstModule removed once the app has its own module |
-| `naming-and-captions` | PascalCase, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages, a business caption on every activity |
-| `reuse-and-snippets` | a snippet used on more than one page, a `SUB_` microflow with more than one caller |
-| `organize-project` | nothing orphaned, nothing left at module root |
-| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS; one navigation menu for every role on Atlas_Default, never a menu built from buttons; one layout for every page; a Back button top left on every page another page opens; an icon on every button; Users and My account in the menu once users sign in |
 
 ## Requirements
 
