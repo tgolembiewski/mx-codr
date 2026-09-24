@@ -148,6 +148,9 @@ that break the build, jar files unpacked in search of an API:
 - **One layout for every page that is not a pop-up** -- chosen once for the app
   (`Atlas_Core.Atlas_Default` unless it is a top-bar app); pages on different layouts
   make the menu change or open and close between pages (gate `LAYOUT01`).
+- **Every button has an icon that shows what it does** -- `Icon: 'Atlas_Core.Atlas_Filled.floppy-disk'`
+  for Save, `trash-can` Delete, `pencil` Edit, `add` New, `view` Open, `chevron-left` Back
+  (skill: `spacing-and-layout` has the table; gate `ICON01`).
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 

@@ -178,7 +178,7 @@ check_naming() {
   return "$gate"
 }
 
-# Sets nav_args: the menu icons (NAV05) always; the Log out and role-home rules (NAV01-NAV03) only
+# Sets nav_args: the menu icons (NAV05) and the snippets' buttons (ICON01) always; the Log out and role-home rules (NAV01-NAV03) only
 # when project security is on, since only then do users sign in. Returns 1, with the summary
 # written, when security is on and the navigation cannot be read.
 layout_sign_out_inputs() {
@@ -189,6 +189,9 @@ layout_sign_out_inputs() {
       # Without sign-in only the icons are checked, and a navigation that cannot be read does not block.
       "$MXCLI" -p "$MPR" -c "DESCRIBE NAVIGATION" > "$WORK/navigation.mdl" 2>/dev/null \
         && nav_args=(--navigation "$WORK/navigation.mdl")
+      # Snippets carry buttons too (ICON01); unreadable ones do not block.
+      describe_all layout-snippets "$WORK/snippets" "SNIPPETS" || true
+      nav_args+=(--sign-out-sources "$WORK/snippets")
       return 0 ;;
   esac
   if ! "$MXCLI" -p "$MPR" -c "DESCRIBE NAVIGATION" > "$WORK/navigation.mdl" 2>/dev/null; then

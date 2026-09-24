@@ -25,6 +25,8 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  "Unable to get filter store" and filters nothing
 #   LAYOUT01 FAIL  the app's pages (pop-ups, login and phone/tablet pages aside) use more than one
 #                  layout: the menu and its open/closed state change from page to page
+#   ICON01   FAIL  a button (actionbutton, linkbutton) without an icon; the message suggests one
+#                  from its action and caption
 #   BACK01   FAIL  a page another page or a flow opens (show_page) does not start with a Back
 #                  button: close_page, icon chevron-left, top left. Pop-ups are exempt (they have X)
 #   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
@@ -318,6 +320,98 @@ def column_filter_findings(lines: list[str]) -> list[dict]:
             depth += body.count("{") - body.count("}")
             index += 1
         index = body_start
+    return failures
+
+
+# ICON01 -------------------------------------------------------------------------------------
+BUTTON_TYPES = ("actionbutton", "linkbutton")
+DOCUMENT_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?(?:page|snippet)\s+(?P<name>[\w.]+)",
+                         re.IGNORECASE)
+CAPTION_RE = re.compile(r"\bCaption:\s*'(?P<caption>[^']*)'", re.IGNORECASE)
+ACTION_RE = re.compile(r"\bAction:\s*(?P<action>[a-z_]+(?:\s+close_page)?)", re.IGNORECASE)
+BUTTON_ICON_RE = re.compile(r"\bIcon:", re.IGNORECASE)
+# What the button does -> an Atlas_Filled icon that shows it. The action decides first (a Back
+# button is close_page whatever its caption), then words in the caption; first match wins.
+ACTION_ICONS = (
+    ("delete", "trash-can"),
+    ("save_changes", "floppy-disk"),
+    ("cancel_changes", "remove"),
+    ("sign_out", "logout"),
+    ("close_page", "chevron-left"),
+)
+CAPTION_ICONS = (
+    (("back",), "chevron-left"),
+    (("advance", "next", "move to", "forward", "proceed", "start"), "arrow-right"),
+    (("discard",), "trash-can"),
+    (("reset", "restore"), "refresh"),
+    (("new", "add", "create"), "add"),
+    (("edit", "change", "modify", "update"), "pencil"),
+    (("delete", "remove"), "trash-can"),
+    (("save",), "floppy-disk"),
+    (("cancel", "close"), "remove"),
+    (("search", "find"), "search"),
+    (("pdf",), "file-pdf"),
+    (("invoice", "bill"), "cash-payment-bill"),
+    (("download", "export"), "download-bottom"),
+    (("upload", "import"), "upload-bottom"),
+    (("print",), "print"),
+    (("send", "email", "mail", "remind", "notify"), "email"),
+    (("refresh", "reload", "sync"), "refresh"),
+    (("copy", "duplicate"), "copy"),
+    (("approve", "confirm", "accept", "submit", "complete", "done"), "checkmark"),
+    (("reject", "decline", "deny"), "thumbs-down"),
+    (("filter",), "filter"),
+    (("pay",), "credit-card"),
+    (("ship", "deliver"), "shipment-box"),
+    (("order", "cart"), "shopping-cart"),
+    (("setting", "setup", "config"), "cog"),
+    (("view", "open", "detail", "show"), "view"),
+    (("log out", "logout", "sign out"), "logout"),
+)
+
+
+def button_icon(action: str, caption: str) -> str:
+    action, caption = action.lower(), caption.lower()
+    for key, icon in ACTION_ICONS:
+        if key in action and not (key == "close_page" and ("save" in action or "cancel" in action)):
+            return icon
+    for words, icon in CAPTION_ICONS:
+        if any(re.search(r"\b" + re.escape(word), caption) for word in words):
+            return icon
+    return ""
+
+
+def button_icon_findings(lines: list[str]) -> list[dict]:
+    """ICON01: every button carries an icon that shows what it does."""
+    failures, document = [], ""
+    for index, line in enumerate(lines):
+        found = DOCUMENT_RE.match(line)
+        if found:
+            document = found.group("name")
+            continue
+        widget = WIDGET_LINE_RE.match(line)
+        if not widget or widget.group("type").lower() not in BUTTON_TYPES:
+            continue
+        props = line
+        if line.rstrip().endswith("("):
+            look = index + 1
+            while look < len(lines) and not lines[look].strip().startswith(")"):
+                props += " " + lines[look].strip()
+                look += 1
+        if BUTTON_ICON_RE.search(props):
+            continue
+        caption = CAPTION_RE.search(props)
+        action = ACTION_RE.search(props)
+        icon = button_icon(action.group("action") if action else "", caption.group("caption") if caption else "")
+        fix = ("an icon that shows what it does, e.g. " + f"`Icon: 'Atlas_Core.Atlas_Filled.{icon}'`" if icon else
+               "an icon that shows what it does, from `DESCRIBE ICON COLLECTION Atlas_Core.Atlas_Filled`")
+        failures.append({
+            "check": "ICON01",
+            "line": index + 1,
+            "message": (f"{document}: {widget.group('type').lower()} {widget.group('name')}"
+                        f"{' (' + repr(caption.group('caption')) + ')' if caption else ''} has no icon -- add {fix}"
+                        f" to its properties; every button shows what it does with an icon"),
+        })
     return failures
 
 
@@ -714,6 +808,8 @@ def main() -> int:
                        if args.navigation and args.navigation.exists() else "")
     layouts_text, _ = collect(args.layouts) if args.layouts else ("", [])
     failures += one_layout_findings(text.splitlines(), navigation_text, layouts_text)
+    snippets_text, _ = collect(args.sign_out_sources) if args.sign_out_sources else ("", [])
+    failures += button_icon_findings(text.splitlines() + snippets_text.splitlines())
     opened, _ = collect(args.opened_from) if args.opened_from else ("", [])
     failures += back_button_findings(text.splitlines(), opened)
     if args.layouts:
