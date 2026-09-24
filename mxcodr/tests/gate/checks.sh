@@ -225,6 +225,9 @@ check_layout() {
   # The project's own layouts, for a menu built from buttons (NAV04); unreadable ones do not block.
   describe_all layout-layouts "$WORK/layouts" "LAYOUTS" || true
   ls "$WORK"/layouts/*.mdl >/dev/null 2>&1 && nav_args+=(--layouts "$WORK/layouts")
+  # Flows open pages too (`show page` in an ACT_ microflow), for the Back-button rule (BACK01).
+  describe_all layout-flows "$WORK/layout-flows" "MICROFLOWS NANOFLOWS" || true
+  ls "$WORK"/layout-flows/*.mdl >/dev/null 2>&1 && nav_args+=(--opened-from "$WORK/layout-flows")
   out="$("$PY" tools/mdl-checks/check_layout.py "$WORK/pages" "${nav_args[@]}" 2>&1)"; code=$?
   checker_verdict "$code" "$out"; gate=$?
   if [ "$gate" = "2" ]; then

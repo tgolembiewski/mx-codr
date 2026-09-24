@@ -2,10 +2,11 @@
 """Check that page widgets are spaced with Atlas Spacing design properties.
 
 Input: `describe page` dumps (.mdl files or directories), normally from tests/gate.sh;
-optionally `DESCRIBE NAVIGATION` output (--navigation), snippet dumps (--sign-out-sources) and
-`describe layout` dumps of the project's own layouts (--layouts).
+optionally `DESCRIBE NAVIGATION` output (--navigation), snippet dumps (--sign-out-sources),
+`describe layout` dumps of the project's own layouts (--layouts) and microflow/nanoflow dumps
+whose `show page` also opens pages (--opened-from).
 Usage: check_layout.py <file.mdl|dir> ... [--navigation nav.mdl] [--sign-out-sources dir]
-                       [--layouts dir] [--users-sign-in] [--json]
+                       [--layouts dir] [--opened-from dir] [--users-sign-in] [--json]
 --json keys: verdict, pages, sources, failures, warnings.
 Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 """
@@ -22,6 +23,8 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  profile's menu
 #   GRID01   FAIL  a grid filter in a column with no Attribute (and none of its own): it renders
 #                  "Unable to get filter store" and filters nothing
+#   BACK01   FAIL  a page another page or a flow opens (show_page) does not start with a Back
+#                  button: close_page, icon chevron-left, top left. Pop-ups are exempt (they have X)
 #   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
 #   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
 #                  built by hand, with no hamburger, no active item and no phone view
@@ -316,6 +319,101 @@ def column_filter_findings(lines: list[str]) -> list[dict]:
     return failures
 
 
+# BACK01 -------------------------------------------------------------------------------------
+SHOW_PAGE_ANY_RE = re.compile(r"\bshow[_ ]page\s+(?P<page>[A-Za-z_]\w*\.[A-Za-z_]\w*)", re.IGNORECASE)
+PAGE_LAYOUT_RE = re.compile(r"\bLayout:\s*(?P<layout>[\w.]+)", re.IGNORECASE)
+WIDGET_LINE_RE = re.compile(r"^\s*(?P<type>[a-z]+)\s+(?P<name>\"[^\"]*\"|[\w.]+)\s*(?P<rest>[({].*)?$", re.IGNORECASE)
+# Containers a Back button may sit inside and still be the first thing on the page.
+BACK_WRAPPERS = {"layoutgrid", "row", "column", "container", "dataview", "scrollcontainer", "region", "header"}
+BACK_ICON = 'Atlas_Core.Atlas_Filled.chevron-left'
+BACK_BUTTON = (f"actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: '{BACK_ICON}',"
+               f" DesignProperties: ['Spacing': ['margin-bottom': 'M']])")
+
+
+def page_blocks(lines: list[str]) -> dict[str, list[str]]:
+    """{page: its describe lines}, in dump order."""
+    blocks: dict[str, list[str]] = {}
+    page = ""
+    for line in lines:
+        found = PAGE_RE.match(line)
+        if found:
+            page = found.group("name")
+            blocks[page] = []
+        if page:
+            blocks[page].append(line)
+    return blocks
+
+
+def first_widget(block: list[str]) -> tuple[str, str]:
+    """(type, full property text) of the first widget that is not a container."""
+    # The page header (`create page X (` ... `) {`) ends at its first line ending in `{`.
+    body = next((i + 1 for i, line in enumerate(block) if line.rstrip().endswith("{")), len(block))
+    for index in range(body, len(block)):
+        line = block[index]
+        if line.strip().startswith("--"):
+            continue
+        found = WIDGET_LINE_RE.match(line)
+        if not found or found.group("type").lower() in BACK_WRAPPERS:
+            continue
+        props = line
+        if line.rstrip().endswith("("):
+            look = index + 1
+            while look < len(block) and not block[look].strip().startswith(")"):
+                props += " " + block[look].strip()
+                look += 1
+        return found.group("type").lower(), props
+    return "", ""
+
+
+def is_back_button(wtype: str, props: str) -> bool:
+    return (wtype in ("actionbutton", "linkbutton") and re.search(r"close_page", props, re.IGNORECASE) is not None
+            and "chevron-left" in props)
+
+
+def back_button_findings(lines: list[str], opened_from: str) -> list[dict]:
+    """BACK01: every page reached from another page or a flow starts with a way back."""
+    blocks = page_blocks(lines)
+    openers: dict[str, list[str]] = {}
+    for page, block in blocks.items():
+        for hit in SHOW_PAGE_ANY_RE.finditer("\n".join(block[1:])):
+            if hit.group("page") != page:
+                openers.setdefault(hit.group("page"), []).append(page)
+    flow = ""
+    for line in opened_from.splitlines():
+        head = re.match(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?(?:microflow|nanoflow)\s+(?P<name>[\w.]+)",
+                        line, re.IGNORECASE)
+        if head:
+            flow = head.group("name")
+        for hit in SHOW_PAGE_ANY_RE.finditer(line):
+            openers.setdefault(hit.group("page"), []).append(flow or "a flow")
+    failures = []
+    for page, sources in sorted(openers.items()):
+        block = blocks.get(page)
+        if not block:
+            continue  # not one of this project's pages
+        layout = PAGE_LAYOUT_RE.search("\n".join(block[:8]))
+        if layout and "popup" in layout.group("layout").lower():
+            continue  # a pop-up closes with its own X
+        wtype, props = first_widget(block)
+        if is_back_button(wtype, props):
+            continue
+        has_close = re.search(r"close_page", "\n".join(block), re.IGNORECASE) is not None
+        where = ", ".join(dict.fromkeys(sources))
+        if not has_close:
+            problem = "has no way back"
+        elif wtype not in ("actionbutton", "linkbutton") or not re.search(r"close_page", props, re.IGNORECASE):
+            problem = "has a close button, but not as its first widget (top left)"
+        else:
+            problem = "starts with its close button, but without the chevron-left icon"
+        failures.append({
+            "check": "BACK01",
+            "line": 0,
+            "message": (f"{page} is opened from {where} and {problem} -- make the first widget of the page,"
+                        f" before its heading, `{BACK_BUTTON}`: CLOSE_PAGE returns to the page it came from"),
+        })
+    return failures
+
+
 # `create or replace navigation <Profile>` starts a profile's block in DESCRIBE NAVIGATION output.
 PROFILE_RE = re.compile(r"^\s*create\s+(?:or\s+replace\s+)?navigation\s+(?P<name>\w+)", re.IGNORECASE)
 # One `menu item '<caption>' ...;` line.
@@ -533,6 +631,8 @@ def main() -> int:
                         help="more dumps (snippets) where a sign-out button counts")
     parser.add_argument("--layouts", type=Path, action="append", default=[],
                         help="describe-layout dumps of the project's own layouts")
+    parser.add_argument("--opened-from", type=Path, action="append", default=[],
+                        help="microflow/nanoflow dumps whose `show page` opens pages (BACK01)")
     parser.add_argument("--users-sign-in", action="store_true",
                         help="project security is on, so the menu needs a Log out item")
     parser.add_argument("--json", action="store_true")
@@ -553,6 +653,8 @@ def main() -> int:
         failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
     if args.navigation and args.navigation.exists():
         failures += menu_icon_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
+    opened, _ = collect(args.opened_from) if args.opened_from else ("", [])
+    failures += back_button_findings(text.splitlines(), opened)
     if args.layouts:
         layouts, _ = collect(args.layouts)
         failures += layout_menu_findings(layouts)
