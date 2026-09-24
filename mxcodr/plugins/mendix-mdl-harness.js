@@ -90,6 +90,15 @@ function clearState(sessionID, suffix) {
   if (path) try { rmSync(path, { force: true }) } catch { /* ignore */ }
 }
 
+// `...; sleep 12; bash tests/gate.sh`: the gate waits for the runtime itself. Two Pi sessions did
+// this anyway, against the rule file; a block says it at the moment it happens.
+const SLEEP_BEFORE_GATE =
+  "Blocked: drop the `sleep` -- tests/gate.sh waits for the runtime and for --watch to apply the latest change itself, and says so; a hand-rolled wait only adds seconds. Run the same command without it."
+
+function isSleepBeforeGate(command) {
+  return typeof command === "string" && /\bsleep\s+\d/.test(command) && /tests\/gate\.sh/.test(command)
+}
+
 function isMxcliExec(command) {
   return typeof command === "string" && /mxcli(\.exe)? exec/.test(command)
 }
@@ -160,6 +169,7 @@ export const MendixMdlHarness = async ({ client, directory, worktree }) => {
       if (!installed) return
       if (input.tool !== "bash") return
       const command = output.args?.command
+      if (isSleepBeforeGate(command)) throw new Error(SLEEP_BEFORE_GATE)
       if (!isMxcliExec(command)) return
       const precheck = join(root, "tests", "precheck.sh")
       if (!existsSync(precheck)) return

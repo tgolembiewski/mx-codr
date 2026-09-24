@@ -6,8 +6,7 @@
 
 # Cheap substring test first: almost no Bash call is an `mxcli exec`.
 input="$(cat)"
-case "$input" in *"mxcli exec"*|*"mxcli.exe exec"*) ;; *) exit 0 ;; esac
-[ -f tests/precheck.sh ] || exit 0
+case "$input" in *"mxcli exec"*|*"mxcli.exe exec"*|*"tests/gate.sh"*) ;; *) exit 0 ;; esac
 
 # Prints the first Python that actually runs (Windows may have only a Store stub); inlined so the hook is self-contained.
 mdl_find_python() {
@@ -36,7 +35,14 @@ PY="$(mdl_find_python || true)"
 PY="${PY:-python3}"
 
 command="$(printf '%s' "$input" | "$PY" -c 'import json,sys; d=json.load(sys.stdin); print(d.get("tool_input",{}).get("command",""))' 2>/dev/null)"
+# `...; sleep 12; bash tests/gate.sh`: the gate waits for the runtime itself.
+if printf '%s' "$command" | grep -qE '(^|[^[:alnum:]_])sleep[[:space:]]+[0-9]' \
+   && printf '%s' "$command" | grep -q 'tests/gate\.sh'; then
+  echo "Blocked: drop the \`sleep\` -- tests/gate.sh waits for the runtime and for --watch to apply the latest change itself, and says so; a hand-rolled wait only adds seconds. Run the same command without it." >&2
+  exit 2
+fi
 case "$command" in *"mxcli exec"*|*"mxcli.exe exec"*) ;; *) exit 0 ;; esac
+[ -f tests/precheck.sh ] || exit 0
 
 # The .mdl words of the command, split like a shell (shlex, no execution; globs expanded,
 # bounded like after-mxcli-exec.sh). Inline MDL has no script to check: let it through.
