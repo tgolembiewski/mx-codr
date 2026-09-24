@@ -29,6 +29,12 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  from its action and caption
 #   BACK01   FAIL  a page another page or a flow opens (show_page) does not start with a Back
 #                  button: close_page, icon chevron-left, top left. Pop-ups are exempt (they have X)
+#   ACCOUNT01 FAIL users sign in, the Administration module is there, and the menu has no item for
+#                  Administration.Account_Overview (user management; only administrators see it)
+#   ACCOUNT02 FAIL ... and no item for microflow Administration.ManageMyAccount (every user's own
+#                  account and password; it opens Administration.MyAccount, which needs an account)
+#   ACCOUNT03 FAIL a user role that signs in lacks Administration.User, or no role has
+#                  Administration.Administrator
 #   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
 #   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
 #                  built by hand, with no hamburger, no active item and no phone view
@@ -709,6 +715,57 @@ def menu_icon_findings(navigation: str) -> list[dict]:
     return failures
 
 
+# ACCOUNT01-03 ---------------------------------------------------------------------------------
+ADMIN_PAGE = "Administration.Account_Overview"
+MY_ACCOUNT_FLOW = "Administration.ManageMyAccount"
+ADMIN_ITEM = f"menu item 'Users' page {ADMIN_PAGE} icon Atlas_Core.Atlas_Filled.\"user-neutral-group\";"
+MY_ACCOUNT_ITEM = f"menu item 'My account' microflow {MY_ACCOUNT_FLOW} icon Atlas_Core.Atlas_Filled.user;"
+USER_ROLE_RE = re.compile(r"^\s*create\s+user\s+role\s+(?P<name>[\w.]+)\s*\((?P<roles>[^)]*)\)", re.IGNORECASE)
+
+
+def account_findings(navigation: str, user_roles: str, guest_role: str) -> list[dict]:
+    """ACCOUNT01-03: user management for administrators, own account and password for everyone."""
+    failures = []
+    targets: dict[str, str] = {}
+    profile = ""
+    for line in navigation.splitlines():
+        found = PROFILE_RE.match(line)
+        if found:
+            profile = found.group("name")
+            targets.setdefault(profile, "")
+            continue
+        if profile and MENU_ITEM_RE.match(line):
+            targets[profile] += line + "\n"
+    for profile, menu in sorted(targets.items()):
+        if not menu:
+            continue  # a profile without a menu is not where users navigate
+        if not re.search(r"\bpage\s+" + re.escape(ADMIN_PAGE) + r"\b", menu, re.IGNORECASE):
+            failures.append({"check": "ACCOUNT01", "line": 0, "message": (
+                f"navigation profile {profile}: no menu item for user management -- add `{ADMIN_ITEM}` before"
+                f" Log out. It is the Administration module's own page; only Administration.Administrator can"
+                f" open it, so everyone else never sees the item")})
+        if not re.search(r"\bmicroflow\s+" + re.escape(MY_ACCOUNT_FLOW) + r"\b", menu, re.IGNORECASE):
+            failures.append({"check": "ACCOUNT02", "line": 0, "message": (
+                f"navigation profile {profile}: no menu item for the user's own account and password -- add"
+                f" `{MY_ACCOUNT_ITEM}` before Log out. It opens Administration.MyAccount (view the account,"
+                f" change the password) for whoever is signed in; a menu item cannot open MyAccount itself,"
+                f" because the page needs the account as its parameter")})
+    roles = {m.group("name"): {r.strip() for r in m.group("roles").split(",")}
+             for m in map(USER_ROLE_RE.match, user_roles.splitlines()) if m}
+    for name, module_roles in sorted(roles.items()):
+        if name == guest_role or "Administration.User" in module_roles:
+            continue
+        failures.append({"check": "ACCOUNT03", "line": 0, "message": (
+            f"user role {name} signs in but lacks Administration.User, so 'My account' is hidden from it and"
+            f" its users cannot change their password -- `alter user role {name} add module roles"
+            f" (Administration.User);`")})
+    if roles and not any("Administration.Administrator" in r for r in roles.values()):
+        failures.append({"check": "ACCOUNT03", "line": 0, "message": (
+            "no user role has Administration.Administrator, so nobody can manage users -- add it to the"
+            " administrators' role: `alter user role Administrator add module roles (Administration.Administrator);`")})
+    return failures
+
+
 LAYOUT_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?layout\s+(?P<name>[\w.]+)", re.IGNORECASE)
 SHOW_PAGE_RE = re.compile(r"\bshow_page\s+(?P<page>[\w.]+)", re.IGNORECASE)
 
@@ -782,6 +839,10 @@ def main() -> int:
                         help="more dumps (snippets) where a sign-out button counts")
     parser.add_argument("--layouts", type=Path, action="append", default=[],
                         help="describe-layout dumps of the project's own layouts")
+    parser.add_argument("--admin-module", action="store_true",
+                        help="the Administration module (Account_Overview, ManageMyAccount) is in the project")
+    parser.add_argument("--user-roles", type=Path, help="DESCRIBE USER ROLE output for every user role")
+    parser.add_argument("--guest-role", default="", help="the anonymous user role, which does not sign in")
     parser.add_argument("--opened-from", type=Path, action="append", default=[],
                         help="microflow/nanoflow dumps whose `show page` opens pages (BACK01)")
     parser.add_argument("--users-sign-in", action="store_true",
@@ -802,6 +863,11 @@ def main() -> int:
         failures += nav_failures
         warnings += nav_warnings
         failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
+    if args.users_sign_in and args.admin_module and args.navigation and args.navigation.exists():
+        roles_text = (args.user_roles.read_text(encoding="utf-8", errors="replace")
+                      if args.user_roles and args.user_roles.exists() else "")
+        failures += account_findings(args.navigation.read_text(encoding="utf-8", errors="replace"),
+                                     roles_text, args.guest_role)
     if args.navigation and args.navigation.exists():
         failures += menu_icon_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
     navigation_text = (args.navigation.read_text(encoding="utf-8", errors="replace")
