@@ -49,6 +49,17 @@ for script in "$@"; do
 done
 set -- "${scripts[@]}"
 
+# SCRIPT01: a document these scripts create that another script in the same folder creates too.
+# Whichever runs last wins, so re-running one silently undoes the other -- no mx check sees it.
+if [ -f tools/mdl-checks/gate_helpers.py ]; then
+  duplicates="$("$PY" tools/mdl-checks/gate_helpers.py duplicate-definitions "$@" 2>/dev/null)"
+  if [ -n "$duplicates" ]; then
+    echo "precheck: SCRIPT01 -- a document is created in more than one script (the real model is untouched):"
+    printf '%s\n' "$duplicates"
+    exit 1
+  fi
+fi
+
 started="$(date +%s)"
 # The model often runs this by hand and the hook then runs it again before the exec: the second
 # run is skipped when the scripts and the .mpr are unchanged since a pass (the exec itself

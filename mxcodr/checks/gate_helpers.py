@@ -9,6 +9,8 @@
     gate_helpers.py deployment-age <mpr> <built>  warn when the model is newer than the built deployment
     gate_helpers.py runtime-age <mpr> <lstart>    warn when the model changed after the runtime started
     gate_helpers.py missing-browser <config>      the executablePath a Playwright config names, if it is missing
+    gate_helpers.py duplicate-definitions <mdl>... documents these scripts create that another script
+                                                  in the same folder creates too (SCRIPT01)
 
 Exit 0 unless noted: qualified-names exits 1 when stdin is not a JSON list.
 Warnings are printed to stdout, ready to show under the gate's output.
@@ -137,6 +139,49 @@ def missing_browser(config):
     return 0
 
 
+# `create [or modify|or replace] [persistent|...] <kind> Module.Name` at the start of a line.
+DEFINITION_RE = re.compile(
+    r"^[ \t]*create\s+(?:or\s+(?:modify|replace)\s+)?(?:(?:persistent|non-persistent|view|external)\s+)?"
+    r"(?P<kind>page|snippet|layout|microflow|nanoflow|entity|enumeration|workflow|menu|constant)\s+"
+    r"(?P<name>[\w\"]+\.[\w\"]+)", re.IGNORECASE | re.MULTILINE)
+
+
+def definitions(path):
+    """{(kind, Module.Name)} a script creates."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except OSError:
+        return set()
+    return {(m.group("kind").lower(), m.group("name").replace('"', ""))
+            for m in DEFINITION_RE.finditer(text)}
+
+
+def duplicate_definitions(scripts):
+    """SCRIPT01: a document two scripts create is whatever the last one run says. Order_Detail was
+    created in two scripts; re-running the earlier one put back a page without its PDF button, and
+    a session spent 25 steps looking for the cause in the runtime."""
+    reported = set()
+    for script in scripts:
+        own = definitions(script)
+        if not own:
+            continue
+        folder = os.path.dirname(script) or "."
+        for other in sorted(os.listdir(folder)):
+            path = os.path.join(folder, other)
+            if not other.endswith(".mdl") or os.path.abspath(path) == os.path.abspath(script):
+                continue
+            for kind, name in sorted(own & definitions(path)):
+                pair = (kind, name, frozenset((os.path.abspath(script), os.path.abspath(path))))
+                if pair in reported:
+                    continue
+                reported.add(pair)
+                print("  - %s %s is created in %s and in %s: whichever runs last decides what the %s is, and "
+                      "re-running the other silently undoes it. Keep ONE `create` of it, in one script, and "
+                      "change it there (or with `alter %s`)." % (kind, name, script, path, kind, kind))
+    return 0
+
+
 def main(argv):
     if len(argv) < 2:
         print(__doc__.strip(), file=sys.stderr)
@@ -156,6 +201,8 @@ def main(argv):
         return deployment_age(*args)
     if command == "runtime-age" and len(args) == 2:
         return runtime_age(*args)
+    if command == "duplicate-definitions":
+        return duplicate_definitions(args)
     if command == "missing-browser" and len(args) == 1:
         return missing_browser(args[0])
     print("unknown or incomplete command: %s" % " ".join(argv[1:]), file=sys.stderr)
