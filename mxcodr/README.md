@@ -147,6 +147,23 @@ The hooks are the part that does not depend on the model choosing to comply:
 | `plugins/mendix-mdl-harness.js` | OpenCode `chat.message`, `tool.execute.before`, `tool.execute.after`, `event(session.idle)` | one plugin doing all four: runs the precheck before an exec and throws to abort a failing one, appends the rules to each user message, appends coverage failures to the tool output the model reads, and on idle runs the gate and submits its output through `client.session.prompt` (capped at 3 rounds) |
 | `plugins/mendix-mdl-harness.pi.js` | Pi `before_agent_start`, `tool_call`, `tool_result`, `agent_before_settle` | the same three jobs in Pi's own API: `tool_call` returns `block: true` with the precheck output as `reason`, `tool_result` appends the coverage failures to what the model reads, and `agent_before_settle` runs the gate and returns `continue: true` so a red gate becomes the next turn (capped at 3 rounds). `before_agent_start` appends `.claude/rules/mdl-skills.md` to the system prompt, once per run; the skills come from `.agents/skills/`, which Pi discovers on its own |
 
+### A red gate ends with what still blocks DONE
+
+Sessions read the gate through `tail -3`, `tail -25` or a `sed … | head`, and each of those cut
+off either the verdict or the details under it; after a compaction a session had neither and
+spent an hour rediscovering what was left. Every red run now ends with one line per failed check
+-- how many findings and the first of them -- and the verdict again as the very last line:
+
+```
+== still blocking DONE
+   naming: 8 -- first: [loop-annotation] line 796: loop without @annotation -- put @annotation '<why it repeats>' on the line above: while $MonthBack >= 0
+   layout: 1 -- first: [NAV01] line 0: navigation profile Responsive: users sign in, but its menu has no way to log out -- add `menu item 'Log out' sign_out …`
+   NOT DONE — failed: naming layout
+```
+
+Every naming finding carries its fix after ` -- `, as the layout ones already did: a session that
+could not tell what `loop-annotation` wanted opened `check_mdl.py` to find out.
+
 ### What the gate says about tests that never failed
 
 A full `bash tests/gate.sh` lists every `verify-*.test.sh` with no recorded red run in
@@ -171,12 +188,18 @@ red-first run -- the scratch `verify-zz-*.test.sh` two sessions wrote for this l
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
 round trip, and mostly the same fourteen topics: entities, associations, enumerations, module
 and user roles, demo users, entity access, settings, modules, pages, page actions, snippets,
-navigation and object operations. `tests/orient.sh` writes their `Syntax:` blocks to
-`tools/mdl-checks/syntax-digest.md` from the project's own `./mxcli` (about 17 kB), so it matches
-the version, and writes it again when the mxcli version changes; its first line records which one.
-orient prints where the file is rather than the file: sessions pipe orient through `head`. The
-rules file tells the agent to read it once, before the first script, and keeps only what no
-`syntax` topic says -- the spacing, grid-filter and message rules that are this harness's own.
+navigation and object operations. Their `Syntax:` blocks go into one digest (about 17 kB) made
+from the project's own `./mxcli`, so it matches the version; its first line records which one,
+and it is written again when the version changes.
+
+A file the agent is told to read was not enough -- a fourth session listed the digest's table of
+contents and still asked 165 times -- so the digest now goes where each host loads instructions
+by itself: `.claude/rules/mdl-syntax-digest.md` (Claude Code), `.cursor/rules/mdl-syntax-digest.mdc`
+(Cursor, `alwaysApply`), `opencode.json`'s `instructions` (OpenCode), the system prompt the Pi
+extension extends (Pi); under Codex the rules say to `cat` it once. The installer writes it --
+Claude Code reads `.claude/rules/` only when a session starts -- and `tests/orient.sh` keeps it
+current (`mdl_syntax_digest` in `portable.sh`). The rules file keeps only what no `syntax` topic
+says: the spacing, grid-filter and message rules that are this harness's own.
 
 ### What `tests/precheck.sh` does and does not catch
 

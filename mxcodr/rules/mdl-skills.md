@@ -47,11 +47,14 @@ everywhere, and `bash tests/gate.sh --restart` is the one way to restart the app
 the gate says the model changed after the runtime started. To stop it (before
 `mxcli fix widgets`, say), `bash tests/gate.sh --stop` -- never a hand-written kill loop.
 Never wrap a harness command in `timeout`: macOS has none (`timeout: command not found`), and
-the gate, `--only` runs and the boot carry their own limits.
+the gate, `--only` runs and the boot carry their own limits. Never hand-roll a wait for the app
+or for a reload either (`for i in $(seq 1 30); do sleep 5; grep … gate-boot.log`): `gate.sh`
+and `gate.sh --only` wait for the runtime and for `--watch` to apply the latest change, and say so.
 
-**Read `tools/mdl-checks/syntax-digest.md` once, before the first script.** `tests/orient.sh`
-writes it from this project's own mxcli: the `Syntax:` blocks of the fourteen topics every
-session otherwise looks up one call at a time (entities, associations, enumerations, module and
+**The syntax digest is already in your context** under Claude Code, Cursor, OpenCode and Pi --
+anywhere else, `cat tools/mdl-checks/syntax-digest.md` whole, once, right after orient.sh. The
+installer writes it and `tests/orient.sh` refreshes it from this project's own mxcli: the
+`Syntax:` blocks of the fourteen topics every session otherwise looks up one call at a time (entities, associations, enumerations, module and
 user roles, demo users, entity access, settings, modules, pages, page actions, snippets,
 navigation, object operations) -- 22, 25 and 19 lookups in three measured sessions.
 
@@ -71,6 +74,9 @@ generated a dozen versions of the same statement into a temporary file and ran
 `./mxcli check <file> -p <app>.mpr --references` is the cheaper answer and a stricter one --
 it also refuses names that do not exist (0.4s against a rebuilt precheck's seconds, measured).
 Keep `tests/precheck.sh` for the script you are about to exec, which a hook runs for you.
+Never `exec` a probe into the model to try a syntax out: a session left `ZZ_Probe1`..`3` in
+its module that way, documents with no test and no caption for the gate to count. `./mxcli
+check <file>` answers the same question and writes nothing.
 
 What neither the digest nor `./mxcli syntax` says -- this harness's own rules:
 

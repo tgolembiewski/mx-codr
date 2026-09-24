@@ -41,6 +41,14 @@ Rules that keep it that way:
 - **Assert on the database, not the screen**, wherever the database can answer.
   `await_row` polls with OQL and costs nothing; a grid assertion depends on paging
   and sort order and belongs only in the test whose job is rendering.
+- **A file the app generates is a row, not a download.** A PDF or export button in
+  Mendix writes a `System.FileDocument` specialisation first and only then hands it to
+  the browser -- as a download, or in a new tab when the action says "show in browser",
+  in which case no download event ever fires. So click the button in the scenario and
+  assert the row: `await_row InvoicePdf "HasContents = true"`. One session spent about
+  forty minutes on the browser side instead -- `playwright-cli response-body`, a grep for
+  `file?guid` through 48 GB of caches, a throwaway microflow test -- for an assertion that
+  is one line against the database.
 - **One scenario, one purpose.** A scenario that throws reports one failure for the
   whole flow, so keep the flow short enough that the message is unambiguous, and
   return named fields (`{header: true, missing: [...]}`) rather than one boolean.
