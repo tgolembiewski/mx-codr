@@ -1,6 +1,6 @@
 ---
 name: spacing-and-layout
-description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in), a Back button top left on every page another page opens and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
+description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in), a Back button top left on every page another page opens, an icon on every button and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
 ---
 
 # Spacing and layout
@@ -233,6 +233,38 @@ Two items with the same icon read as the same screen; pick different ones.
 The gate fails `NAV03` when a role's home page is not in the menu, and `NAV04` when
 one of the project's own layouts opens two or more pages from buttons.
 
+## Every button has an icon
+
+Every `actionbutton` and `linkbutton`, on a page or in a snippet, carries an icon that
+shows what it does, from `Atlas_Core.Atlas_Filled`:
+
+```sql
+actionbutton btnSave (Caption: 'Save', Action: SAVE_CHANGES CLOSE_PAGE,
+  Icon: 'Atlas_Core.Atlas_Filled.floppy-disk', ButtonStyle: Primary)
+```
+
+| The button | Icon |
+|---|---|
+| Back (`close_page`) | `chevron-left` |
+| Save | `floppy-disk` |
+| Cancel, Close | `remove` |
+| Delete, Remove, Discard | `trash-can` |
+| New, Add | `add` |
+| Edit | `pencil` |
+| Open, View, Details | `view` |
+| Next, Advance, Move to … | `arrow-right` |
+| Approve, Confirm, Submit | `checkmark` |
+| Reject | `thumbs-down` |
+| Send, Remind, Email | `email` |
+| PDF | `file-pdf` |
+| Invoice | `cash-payment-bill` |
+| Download, Export / Upload, Import | `download-bottom` / `upload-bottom` |
+| Search / Filter / Print / Refresh, Reset / Copy | `search` / `filter` / `print` / `refresh` / `copy` |
+| Log out | `logout` |
+
+Anything else: `DESCRIBE ICON COLLECTION Atlas_Core.Atlas_Filled` lists the names. The gate
+fails `ICON01` for a button without one and suggests an icon from its action and caption.
+
 ## One layout for every page
 
 Pick the layout once, for the whole app, and give it to every page that is not a pop-up.
@@ -331,6 +363,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
 `NAV05` | error | a menu item or sub-menu has no icon (the message suggests one for its caption) |
+`ICON01` | error | a button (`actionbutton`, `linkbutton`) without an icon; the message suggests one from its action and caption |
 `LAYOUT01` | error | the app's pages (pop-ups, login and phone/tablet pages aside) use more than one layout |
 `BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups are exempt |
 
