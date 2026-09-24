@@ -15,7 +15,7 @@ bootstrap.ps1     Windows only: gets Git Bash, Python and Node, then hands over 
 VERSION           date-based version, copied to tools/mdl-checks/VERSION in the target
 MXCLI_TESTED      the mxcli build this bundle was verified against; orient.sh warns when the
                   project's ./mxcli is older
-rules/            mdl-skills.md (Claude, OpenCode, and Pi through .pi/AGENTS.md) and
+rules/            mdl-skills.md (Claude, OpenCode, and Pi through its extension) and
                   mdl-skills.mdc (Cursor) — the always-loaded rule
 hooks/            host-specific prompt/PostToolUse adapters plus the Codex and Cursor gates
 plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js (Pi) -- the same
@@ -99,11 +99,13 @@ So the project's own instructions live where mxcli does not reach:
   own shape: an `alwaysApply` `.mdc` rule, plus three hooks. All three wire formats
   differ from the other hosts, which is why it gets its own adapters rather than
   sharing Codex's.
-- **`.pi/extensions/mendix-mdl-harness.js` and `.pi/AGENTS.md`** — Pi reads project
-  instructions from `.pi/AGENTS.md` and discovers skills from `.agents/skills/` on its
-  own, so only the hooks need code: one extension on `tool_call`, `tool_result` and
-  `agent_before_settle`. Pi asks for project trust before it runs an extension from the
-  project directory (`pi --approve` for one run).
+- **`.pi/extensions/mendix-mdl-harness.js`** — Pi discovers skills from `.agents/skills/` on
+  its own; the hooks and the rules come from one extension. The rules go into the system prompt
+  on `before_agent_start`, because on Pi 0.87.1 a `.pi/AGENTS.md` never reached the model -- only
+  the root `AGENTS.md` did, which mxcli regenerates -- and the session that never saw the rules
+  ran `git init` and a commit unasked. An earlier install's `.pi/AGENTS.md` is removed. Pi asks
+  for project trust before it runs an extension from the project directory (`pi --approve` for
+  one run).
 - **`.codex/config.toml`** — receives a short `developer_instructions` block that
   asks Codex to remind the user about `/hooks` after the first prompt. This has to
   live outside the hook: a hook awaiting trust cannot remind the user to trust it.
@@ -143,7 +145,7 @@ The hooks are the part that does not depend on the model choosing to comply:
 | `after-mxcli-exec-cursor.sh` | Cursor `postToolUse` | returns coverage failures as `additional_context` — `afterShellExecution` sees the command but cannot answer the agent — and writes the marker |
 | `stop-gate-cursor.sh` | Cursor `stop` | runs the gate and returns its output as `followup_message`, auto-submitted as the next user message; `loop_limit` caps the retries |
 | `plugins/mendix-mdl-harness.js` | OpenCode `chat.message`, `tool.execute.before`, `tool.execute.after`, `event(session.idle)` | one plugin doing all four: runs the precheck before an exec and throws to abort a failing one, appends the rules to each user message, appends coverage failures to the tool output the model reads, and on idle runs the gate and submits its output through `client.session.prompt` (capped at 3 rounds) |
-| `plugins/mendix-mdl-harness.pi.js` | Pi `tool_call`, `tool_result`, `agent_before_settle` | the same three jobs in Pi's own API: `tool_call` returns `block: true` with the precheck output as `reason`, `tool_result` appends the coverage failures to what the model reads, and `agent_before_settle` runs the gate and returns `continue: true` so a red gate becomes the next turn (capped at 3 rounds). The rules are not injected: Pi reads `.pi/AGENTS.md`, and the skills come from `.agents/skills/`, which it discovers on its own |
+| `plugins/mendix-mdl-harness.pi.js` | Pi `before_agent_start`, `tool_call`, `tool_result`, `agent_before_settle` | the same three jobs in Pi's own API: `tool_call` returns `block: true` with the precheck output as `reason`, `tool_result` appends the coverage failures to what the model reads, and `agent_before_settle` runs the gate and returns `continue: true` so a red gate becomes the next turn (capped at 3 rounds). `before_agent_start` appends `.claude/rules/mdl-skills.md` to the system prompt, once per run; the skills come from `.agents/skills/`, which Pi discovers on its own |
 
 ### What the gate says about tests that never failed
 
@@ -163,6 +165,18 @@ Each boot empties `.mxcli/gate-boot.log` and keeps the one before it as
 visible text and console errors. It writes no test file, claims no coverage and records no
 red-first run -- the scratch `verify-zz-*.test.sh` two sessions wrote for this left a
 "went green without ever being red" record behind every time.
+
+### The syntax every session looks up
+
+Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
+round trip, and mostly the same fourteen topics: entities, associations, enumerations, module
+and user roles, demo users, entity access, settings, modules, pages, page actions, snippets,
+navigation and object operations. `tests/orient.sh` writes their `Syntax:` blocks to
+`tools/mdl-checks/syntax-digest.md` from the project's own `./mxcli` (about 17 kB), so it matches
+the version, and writes it again when the mxcli version changes; its first line records which one.
+orient prints where the file is rather than the file: sessions pipe orient through `head`. The
+rules file tells the agent to read it once, before the first script, and keeps only what no
+`syntax` topic says -- the spacing, grid-filter and message rules that are this harness's own.
 
 ### What `tests/precheck.sh` does and does not catch
 
@@ -258,7 +272,7 @@ cd "$W"
 ls .claude/skills .agents/skills .ai-context/skills          # 6 in each
 diff -r .claude/skills/module-structure .agents/skills/module-structure
 python3 -m json.tool .codex/hooks.json >/dev/null             # Codex hooks merged
-ls .pi/AGENTS.md .pi/extensions/                             # Pi rules and extension
+ls .pi/extensions/                                            # Pi extension (rules included)
 python3 -c 'import tomllib; tomllib.load(open(".codex/config.toml", "rb"))'
 ./mxcli lint -p InvoiceDesk.mpr | grep -E 'MOD001|REU001|UI001'  # rules load and fire
 python3 tools/mdl-checks/check_test_coverage.py . InvoiceDesk
