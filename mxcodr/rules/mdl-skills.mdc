@@ -90,6 +90,8 @@ datagrid dg (...) { column colStatus (attribute: "Status") { dropdownfilter fltS
   --   dropdownfilter fltCustomer (Association: Mod.Order_Customer,
   --   datasource: database Mod.Customer, CaptionAttribute: Name). Boolean takes none.
   --   Never a filter bar of your own over a helper entity: lint rule UI001 fails on it
+  --   The column needs its Attribute even when it shows Content: the filter filters on it,
+  --   and without one it renders "Unable to get filter store" (gate GRID01)
 show message '{1}' type info|warning|error objects [$Obj/Name + ' saved'];   -- '{1}' is the slot, the
 show message 'Plain text' type info;                                          -- list fills it
 validation feedback $Obj/Attr message 'Name is required';   -- more: ./mxcli -c "HELP" | grep -A6 'show message'

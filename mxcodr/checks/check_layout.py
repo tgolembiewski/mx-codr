@@ -20,6 +20,8 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #   NAV02    WARN  the sign_out item is not the last item of its menu
 #   NAV03    FAIL  users sign in, and a role's home page (`home page X for Role`) is not in that
 #                  profile's menu
+#   GRID01   FAIL  a grid filter in a column with no Attribute (and none of its own): it renders
+#                  "Unable to get filter store" and filters nothing
 #   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
 #                  built by hand, with no hamburger, no active item and no phone view
 
@@ -248,6 +250,71 @@ def missing_heading_warnings(headed: dict[str, bool]) -> list[dict]:
     return warnings
 
 
+COLUMN_RE = re.compile(r"^\s*column\s+(?P<name>\"[^\"]*\"|[\w/.]+)", re.IGNORECASE)
+FILTER_RE = re.compile(r"^\s*(?P<type>textfilter|numberfilter|datefilter|dropdownfilter)\s+(?P<name>\w+)(?P<rest>.*)$",
+                       re.IGNORECASE)
+# A filter's own target: `Attribute:`, `attributes: [...]` or `Association:`.
+FILTER_TARGET_RE = re.compile(r"\b(attributes?|association)\s*:", re.IGNORECASE)
+PAGE_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?page\s+(?P<name>[\w.]+)", re.IGNORECASE)
+
+
+def column_filter_findings(lines: list[str]) -> list[dict]:
+    """GRID01: a filter only works on the column's attribute; with none, Data Grid 2 shows an error box."""
+    failures = []
+    page = ""
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        found = PAGE_RE.match(line)
+        if found:
+            page = found.group("name")
+        column = COLUMN_RE.match(line)
+        if not column:
+            index += 1
+            continue
+        # The header runs to the line that opens the body (`{`) or closes without one.
+        header, start = [], index
+        while index < len(lines):
+            header.append(lines[index])
+            if lines[index].rstrip().endswith("{") or lines[index].rstrip().endswith(")"):
+                break
+            index += 1
+        opens_body = header[-1].rstrip().endswith("{")
+        index += 1
+        if not opens_body:
+            continue
+        has_attribute = bool(re.search(r"\bAttribute\s*:", " ".join(header), re.IGNORECASE))
+        # Scan the body for the column's own filters, then resume right after the header: a
+        # layoutgrid column holds whole datagrids whose columns need checking too.
+        body_start, depth = index, 1
+        while index < len(lines) and depth > 0:
+            body = lines[index]
+            flt = FILTER_RE.match(body)
+            if flt and depth == 1 and not has_attribute:
+                own = flt.group("rest")
+                # A filter's properties may continue on the lines below `name (`.
+                look = index + 1
+                if own.rstrip().endswith("("):
+                    while look < len(lines) and not lines[look].strip().startswith(")"):
+                        own += " " + lines[look]
+                        look += 1
+                if not FILTER_TARGET_RE.search(own):
+                    failures.append({
+                        "check": "GRID01",
+                        "line": start + 1,
+                        "message": (f"{page}: column {column.group('name')} has a {flt.group('type').lower()}"
+                                    f" {flt.group('name')} but no Attribute -- the filter filters on the column's"
+                                    f" attribute, so it renders \"Unable to get filter store\" and filters nothing."
+                                    f" Add the attribute it should filter to the column, e.g. `column colCreated"
+                                    f" (Attribute: DateCreated, Caption: 'Created', ShowContentAs: dynamicText, ...)`;"
+                                    f" the column still shows its Content"),
+                    })
+            depth += body.count("{") - body.count("}")
+            index += 1
+        index = body_start
+    return failures
+
+
 # `create or replace navigation <Profile>` starts a profile's block in DESCRIBE NAVIGATION output.
 PROFILE_RE = re.compile(r"^\s*create\s+(?:or\s+replace\s+)?navigation\s+(?P<name>\w+)", re.IGNORECASE)
 # One `menu item '<caption>' ...;` line.
@@ -383,6 +450,8 @@ def check(lines: list[str]) -> tuple[list[dict], list[dict], int]:
                 continue
             failures.extend(run_gap_findings(page, run))
             failures.extend(run_alignment_findings(page, run))
+
+    failures.extend(column_filter_findings(lines))
 
     headed = headed_pages(widgets)
     return failures, missing_heading_warnings(headed), len(headed)

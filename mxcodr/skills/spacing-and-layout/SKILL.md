@@ -256,6 +256,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `HEAD01` | warning | the page renders no heading and calls no header snippet |
 `NAV01` | error | project security is on, a navigation menu has no `sign_out` item, and no page or snippet has a sign-out button |
 `NAV02` | warning | the `sign_out` item is not the last item of its menu |
+`GRID01` | error | a grid filter sits in a column with no `Attribute:` and has none of its own: it renders "Unable to get filter store" and filters nothing |
 `NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
 

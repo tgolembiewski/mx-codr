@@ -514,10 +514,15 @@ project's own layouts:
 `SPACE02` | error | a spacing value outside `None` `S` `M` `L` |
 `SPACE03` | error | widgets on one line disagreeing on vertical margins, or none carrying `margin-bottom` |
 `HEAD01` | warning | the page renders no heading and calls no header snippet |
+`GRID01` | error | a grid filter in a column with no `Attribute:` (and none of its own) — it renders "Unable to get filter store" |
 `NAV01` | error | project security is on and no menu, page or snippet offers Log out |
 `NAV02` | warning | the Log out item is not the last item of its menu |
 `NAV03` | error | project security is on and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons — a menu built by hand |
+
+`GRID01` came from the same session: a customer grid showed its date column as formatted
+`Content` and dropped the column's `Attribute`, and its date filter rendered a red "Unable to
+get filter store" box. `mxcli check`, `mx check` and lint all passed it.
 
 `NAV03` and `NAV04` came from a Pi session that needed an employee menu and a customer
 menu, found that MDL menu items take no roles, and built two layouts of link buttons
