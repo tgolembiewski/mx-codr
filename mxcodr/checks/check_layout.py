@@ -477,28 +477,20 @@ def current_user_findings(lines: list[str], snippets: str, navigation: str, layo
         missing.append(page)
     if unaligned:
         failures.append({"check": "USER01", "line": 0, "message": (
-            f"{len(unaligned)} page(s) show who is signed in on the left: {', '.join(unaligned[:6])} -- the row"
-            f" holding the snippet needs DesignProperties ['Flex container': 'Horizontal (row)', 'Align items X':"
-            f" 'Space between (only for horizontal containers)'] when the Back button is in it, or ['Flex container': 'Horizontal (row)', 'Align"
-            f" items X': 'Right'] when it is not; 'Align items X' does nothing without 'Flex container'")})
+            f"{len(unaligned)} page(s) show the signed-in user on the left: {', '.join(unaligned[:6])} -- the"
+            f" row around it needs {ROW_RIGHT_PROPS}, or 'Space between (only for horizontal containers)'"
+            f" instead of 'Right' when the Back button is in it")})
     if not missing:
         return failures
     module = missing[0].split(".")[0]
     snippet = defined[0] if defined else f"{module}.{CURRENT_USER_SNIPPET}"
-    how = ("" if defined else
-           f" {snippet} does not exist yet: create it as the spacing-and-layout skill shows -- a non-persistent"
-           f" {module}.SignedInUser with a Label, a microflow DS_SignedInUser filling it with the account's e-mail"
-           f" or user name, and the snippet: a data view on"
-           f" that microflow with `linkbutton lnkCurrentUser (Caption: '{{1}}', CaptionParams: [{{1}} = Label],"
-           f" Icon: 'Atlas_Core.Atlas_Filled.user', Action: microflow Administration.ManageMyAccount)`.")
     shown = ", ".join(missing[:6]) + (f" and {len(missing) - 6} more" if len(missing) > 6 else "")
+    missing_snippet = "" if defined else f" ({snippet} does not exist yet: the skill has it)"
     return failures + [{"check": "USER01", "line": 0, "message": (
-        f"{len(missing)} page(s) do not start with who is signed in: {shown} -- open each page with one row"
-        f" above the heading: with a Back button, `container ctPageTop (DesignProperties: ['Flex container':"
-        f" 'Horizontal (row)', 'Align items X': 'Space between (only for horizontal containers)', 'Align items Y': 'Center']) {{ <the Back"
-        f" button> snippetcall scCurrentUser (Snippet: {snippet}) }}`; without one, the same container with"
-        f" 'Align items X': 'Right' and only the snippet call. Back stays on the left, the user's icon and"
-        f" e-mail sit on the right, just under the language selector, on every page.{how}")}]
+        f"{len(missing)} page(s) lack the signed-in user top right: {shown} -- start each with `container"
+        f" ctPageTop (DesignProperties: {ROW_RIGHT_PROPS}) {{ snippetcall scCurrentUser (Snippet: {snippet}) }}`;"
+        f" on a page with Back, Back goes first in that row and 'Right' becomes 'Space between (only for"
+        f" horizontal containers)'{missing_snippet}. Skill spacing-and-layout, 'Who is signed in'")}]
 
 
 # LAYOUT01 -----------------------------------------------------------------------------------
@@ -581,8 +573,9 @@ def page_blocks(lines: list[str]) -> dict[str, list[str]]:
     return blocks
 
 
-# The "who is signed in" snippet sits above everything, the Back button included (USER01).
+# The "who is signed in" snippet, on the right of every page's top row (USER01).
 CURRENT_USER_SNIPPET = "SNIPPET_CurrentUser"
+ROW_RIGHT_PROPS = "['Flex container': 'Horizontal (row)', 'Align items X': 'Right']"
 
 
 def first_widget(block: list[str]) -> tuple[str, str]:
@@ -662,16 +655,16 @@ def back_button_findings(lines: list[str], opened_from: str) -> list[dict]:
         has_close = re.search(r"close_page", "\n".join(block), re.IGNORECASE) is not None
         where = ", ".join(dict.fromkeys(sources))
         if not has_close:
-            problem = "has no way back"
+            problem = "has no Back button"
         elif wtype not in ("actionbutton", "linkbutton") or not re.search(r"close_page", props, re.IGNORECASE):
-            problem = "has a close button, but not as its first widget (top left)"
+            problem = "has a close button, but not as its first widget"
         else:
-            problem = "starts with its close button, but without the chevron-left icon"
+            problem = "starts with a Back button without the chevron-left icon"
         failures.append({
             "check": "BACK01",
             "line": 0,
-            "message": (f"{page} is opened from {where} and {problem} -- make the first widget of the page,"
-                        f" before its heading, `{BACK_BUTTON}`: CLOSE_PAGE returns to the page it came from"),
+            "message": (f"{page} (opened from {where}) {problem} -- its first widget must be `{BACK_BUTTON}`"
+                        f" (skill spacing-and-layout, 'Back, top left')"),
         })
     return failures
 

@@ -200,6 +200,14 @@ with a return"), instead of "produced no result ... needs: playwright-cli open",
 session to the browser. The `sleep` block covers a hand-rolled wait on `.mxcli/gate-boot.log` or
 `runtime.log` too, not only one in front of `tests/gate.sh`.
 
+With `mxcli run --watch`, the gate now waits until the boot log has been quiet for a few seconds
+after its last "applied" line, and until the app actually serves the web client that
+`index.html` names. Several execs in a row rebuild one after another, and a gate that started in
+the gap between two builds ran the suite into a restart that was re-bundling the client (404 on
+`dist/index.js`); every test in that window failed. The USER01 and BACK01 messages are now one
+line each with the code to paste, after a session read `check_layout.py` three times to
+understand them.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
