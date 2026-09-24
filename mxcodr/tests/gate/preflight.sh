@@ -50,13 +50,43 @@ watch_applied_latest_change() {
   while [ "$MPR" -nt "$boot_log" ] && [ "$waited" -lt "${MDL_WATCH_SETTLE_SECONDS:-5}" ]; do
     sleep 1; waited=$((waited + 1))
   done
+  # Done means the last line says "applied" AND the log has been quiet for a few seconds: three
+  # execs in a row rebuild three times, and the gap between two builds looked like the end --
+  # the suite then ran into a restart and a web client being re-bundled (404 on dist/index.js).
   waited=0
-  while [ "$waited" -lt 120 ] && tail -1 "$boot_log" 2>/dev/null \
-        | grep -qE 'Change detected, rebuilding|re-bundling|Web client bundled'; do
+  local quiet="${MDL_WATCH_QUIET_SECONDS:-3}"
+  while [ "$waited" -lt 120 ]; do
+    if tail -1 "$boot_log" 2>/dev/null | grep -qE 'applied via (reload|restart)' \
+       && [ "$(log_age "$boot_log")" -ge "$quiet" ] && [ ! "$MPR" -nt "$boot_log" ]; then
+      break
+    fi
     [ "$waited" = "0" ] && echo "   (waiting for --watch to apply the latest model change)"
     sleep 1; waited=$((waited + 1))
   done
-  [ ! "$MPR" -nt "$boot_log" ] && tail -1 "$boot_log" 2>/dev/null | grep -qE 'applied via (reload|restart)'
+  tail -1 "$boot_log" 2>/dev/null | grep -qE 'applied via (reload|restart)' || return 1
+  client_served
+}
+
+# Seconds since <file> last changed.
+log_age() {
+  "$PY" -c 'import os, sys, time; print(int(time.time() - os.path.getmtime(sys.argv[1])))' "$1" 2>/dev/null || echo 999
+}
+
+# The app answers with the web client it names in index.html: after a restart that re-bundles
+# the client, index.html is back before dist/index.js is, and every test in that window fails.
+client_served() {
+  [ -n "${BASE_URL:-}" ] || return 0
+  local script code waited=0
+  script="$(curl -s --max-time 5 "$BASE_URL/index.html" 2>/dev/null | grep -oE 'src="[^"]+\.js' | head -1 | sed 's/^src="//')"
+  [ -n "$script" ] || return 0
+  while [ "$waited" -lt "${MDL_CLIENT_WAIT_SECONDS:-60}" ]; do
+    code="$(curl -s -o /dev/null --max-time 5 -w '%{http_code}' "$BASE_URL/$script" 2>/dev/null)"
+    [ "$code" = "200" ] && return 0
+    [ "$waited" = "0" ] && echo "   (waiting for the app to serve its web client, $script)"
+    sleep 1; waited=$((waited + 1))
+  done
+  echo "   !! the app still does not serve $script -- run bash tests/gate.sh --restart" | tee -a "$WORK/stale.note"
+  return 1
 }
 
 # Primary signal, needs no pgrep (Git Bash): .mpr newer than the built deployment.
