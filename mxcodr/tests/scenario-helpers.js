@@ -27,7 +27,9 @@
   const sign_in_if_asked = async () => {
     await page.waitForSelector(LOGIN_FIELD + ', .mx-page', {timeout: 20000});
     if (!(await page.locator(LOGIN_FIELD).count())) return;
-    if (!PASSWORD) throw new Error('app shows a login page but TEST_PASSWORD is empty');
+    if (!PASSWORD) throw new Error('app shows a login page but there is no password for TEST_USER='
+      + USER + ' -- set TEST_USER to a user with a TEST_PASSWORD_<user>= line in tests/credentials.env,'
+      + ' or add one for this user');
     // Login-page selectors only. `.alert` and `.mx-validation-message` also occur on
     // ordinary pages, and a race that matched those would report a refused sign-in
     // for an app that had loaded perfectly well.
