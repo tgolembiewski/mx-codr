@@ -23,6 +23,8 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  profile's menu
 #   GRID01   FAIL  a grid filter in a column with no Attribute (and none of its own): it renders
 #                  "Unable to get filter store" and filters nothing
+#   LAYOUT01 FAIL  the app's pages (pop-ups, login and phone/tablet pages aside) use more than one
+#                  layout: the menu and its open/closed state change from page to page
 #   BACK01   FAIL  a page another page or a flow opens (show_page) does not start with a Back
 #                  button: close_page, icon chevron-left, top left. Pop-ups are exempt (they have X)
 #   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
@@ -317,6 +319,61 @@ def column_filter_findings(lines: list[str]) -> list[dict]:
             index += 1
         index = body_start
     return failures
+
+
+# LAYOUT01 -----------------------------------------------------------------------------------
+# Layouts that are rightly different from the app's main one: a pop-up closes with its own X, a
+# login page has no menu, and phone/tablet profiles have layouts of their own.
+OWN_KIND_LAYOUT_RE = re.compile(r"popup|login|phone|tablet", re.IGNORECASE)
+LAYOUT_TYPE_RE = re.compile(r"layouttype:\s*'(?P<type>\w+)'", re.IGNORECASE)
+LOGIN_PAGE_RE = re.compile(r"^\s*login\s+page\s+(?P<page>[\w.]+)", re.IGNORECASE)
+
+
+def layout_types(layouts: str) -> dict[str, str]:
+    """{Module.Layout: layouttype} for the project's own layouts."""
+    types, layout = {}, ""
+    for line in layouts.splitlines():
+        found = LAYOUT_RE.match(line)
+        if found:
+            layout = found.group("name")
+        kind = LAYOUT_TYPE_RE.search(line)
+        if kind and layout:
+            types.setdefault(layout, kind.group("type"))
+    return types
+
+
+def one_layout_findings(lines: list[str], navigation: str, layouts: str) -> list[dict]:
+    """LAYOUT01: every page of the app is framed by the same layout."""
+    types = layout_types(layouts)
+    login_pages = {m.group("page") for m in map(LOGIN_PAGE_RE.match, navigation.splitlines()) if m}
+    by_layout: dict[str, list[str]] = {}
+    for page, block in page_blocks(lines).items():
+        found = PAGE_LAYOUT_RE.search("\n".join(block[:8]))
+        if not found or page in login_pages:
+            continue
+        layout = found.group("layout")
+        if OWN_KIND_LAYOUT_RE.search(layout) or OWN_KIND_LAYOUT_RE.search(types.get(layout, "")):
+            continue
+        by_layout.setdefault(layout, []).append(page)
+    if len(by_layout) < 2:
+        return []
+    ranked = sorted(by_layout.items(), key=lambda item: (-len(item[1]), item[0]))
+    main = ranked[0][0]
+    summary = "; ".join(f"{layout} ({len(pages)}: {', '.join(pages[:4])}{', ...' if len(pages) > 4 else ''})"
+                        for layout, pages in ranked)
+    # One statement per module and layout: ALTER PAGES takes a single module.
+    moves = " ".join(
+        f"`alter pages in {module} set layout = {main} where layout = {layout};`"
+        for layout, pages in ranked[1:]
+        for module in dict.fromkeys(page.split(".")[0] for page in pages))
+    return [{
+        "check": "LAYOUT01",
+        "line": 0,
+        "message": (f"the app's pages use {len(ranked)} layouts, so the menu and whether it is open change from"
+                    f" page to page: {summary} -- pick ONE for every page that is not a pop-up, e.g. the most used,"
+                    f" {main}: {moves} Then set the same `Layout:` in the scripts that create those pages,"
+                    f" or re-running them moves the pages back"),
+    }]
 
 
 # BACK01 -------------------------------------------------------------------------------------
@@ -653,6 +710,10 @@ def main() -> int:
         failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
     if args.navigation and args.navigation.exists():
         failures += menu_icon_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
+    navigation_text = (args.navigation.read_text(encoding="utf-8", errors="replace")
+                       if args.navigation and args.navigation.exists() else "")
+    layouts_text, _ = collect(args.layouts) if args.layouts else ("", [])
+    failures += one_layout_findings(text.splitlines(), navigation_text, layouts_text)
     opened, _ = collect(args.opened_from) if args.opened_from else ("", [])
     failures += back_button_findings(text.splitlines(), opened)
     if args.layouts:
