@@ -1,6 +1,6 @@
 ---
 name: spacing-and-layout
-description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in), a Back button top left on every page another page opens, an icon on every button and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
+description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in), a Back button top left on every page another page opens, an icon on every button, who is signed in top right and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
 ---
 
 # Spacing and layout
@@ -307,6 +307,73 @@ moves between them.
 
 The gate fails `LAYOUT01` when the app's pages use more than one layout, and lists them.
 
+## Who is signed in, top right, on every page
+
+Once users sign in, every page (pop-ups and the login page aside) shows the user icon and the
+signed-in user's e-mail on the right of its top row, just under the language selector, with
+the Back button (where there is one) on the left of the same row. Clicking it opens My account.
+
+```sql
+/** Who is signed in, as one line for the page header. */
+create or modify non-persistent entity Shop.SignedInUser ( Label: String(200) );
+grant Shop.User on Shop.SignedInUser (read *);      -- every role that signs in
+
+/** The signed-in user's e-mail, or their user name when the account has none. */
+create or modify microflow Shop.DS_SignedInUser ()
+returns Shop.SignedInUser as $SignedInUser
+begin
+  @caption 'Find the signed-in account'
+  retrieve $Account from Administration.Account where [id = '[%CurrentUser%]'] limit 1;
+  declare $Label String = $Account/Name;
+  @caption 'Has an e-mail address?'
+  if $Account/Email != empty and $Account/Email != '' then
+    @caption 'Use the e-mail'
+    set $Label = $Account/Email;
+  end if;
+  @caption 'Create the header line'
+  $SignedInUser = create Shop.SignedInUser (Label = $Label);
+  return $SignedInUser;
+end;
+/
+grant execute on microflow Shop.DS_SignedInUser to Shop.User;
+
+create or modify snippet Shop.SNIPPET_CurrentUser {
+  dataview dvCurrentUser (DataSource: microflow Shop.DS_SignedInUser) {
+    linkbutton lnkCurrentUser (Caption: '{1}', CaptionParams: [{1} = Label],
+      Icon: 'Atlas_Core.Atlas_Filled.user', Action: microflow Administration.ManageMyAccount)
+  }
+}
+```
+
+Then every page opens with one row. The row, not the snippet, decides where the link goes:
+
+```sql
+  -- a page opened from another page: Back on the left, the user on the right
+  container ctPageTop (DesignProperties: ['Flex container': 'Horizontal (row)',
+      'Align items X': 'Space between (only for horizontal containers)', 'Align items Y': 'Center', 'Spacing': ['margin-bottom': 'M']]) {
+    actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: 'Atlas_Core.Atlas_Filled.chevron-left')
+    snippetcall scCurrentUser (Snippet: Shop.SNIPPET_CurrentUser)
+  }
+
+  -- any other page: the user on the right
+  container ctPageTop (DesignProperties: ['Flex container': 'Horizontal (row)',
+      'Align items X': 'Right', 'Align items Y': 'Center', 'Spacing': ['margin-bottom': 'M']]) {
+    snippetcall scCurrentUser (Snippet: Shop.SNIPPET_CurrentUser)
+  }
+```
+
+- `Align items X` is Atlas's `justify-content`, and it only works together with
+  `Flex container`: without it the link lands on the left, above the heading (seen in a
+  session). It moves the row's direct children, which is why it goes on the row.
+- `CurrentUser` is a reserved name in Mendix (CE7247) -- hence `SignedInUser`.
+- A button caption takes an attribute, not an expression, so the microflow picks e-mail or
+  user name and the snippet only shows `Label`.
+- Why a snippet and not the layout's top bar: copying an Atlas layout with mxcli drops its
+  sidebar toggle (the hamburger), and Atlas_Core itself is a Marketplace module that is
+  never edited.
+
+The gate fails `USER01` for every page that does not start with the snippet.
+
 ## Back, top left, on every page you navigate to
 
 A page that another page or a microflow opens (`show_page`, `show page`) starts with a
@@ -392,6 +459,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `ACCOUNT03` | error | a role that signs in lacks `Administration.User`, or no role has `Administration.Administrator` |
 `ICON01` | error | a button (`actionbutton`, `linkbutton`) without an icon; the message suggests one from its action and caption |
 `LAYOUT01` | error | the app's pages (pop-ups, login and phone/tablet pages aside) use more than one layout |
+`USER01` | error | users sign in, and a page (pop-ups and the login page aside) does not open with `<Module>.SNIPPET_CurrentUser` on the right of its top row (first, or right after Back in the same container) |
 `BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups are exempt |
 
 ## What this cannot see

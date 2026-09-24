@@ -551,6 +551,7 @@ project's own layouts:
 `HOME01` | error | users sign in and the administrators' role opens on a page outside the app's own modules (the template's `Home_Web`, an Administration page) |
 `ICON01` | error | a button (`actionbutton`, `linkbutton`, on a page or in a snippet) without an icon; the message suggests an Atlas_Filled icon from its action and caption |
 `LAYOUT01` | error | the app's pages use more than one layout (pop-ups, the login page and phone/tablet layouts aside), so the menu changes between pages |
+`USER01` | error | users sign in, and a page (pop-ups and the login page aside) does not open with `<Module>.SNIPPET_CurrentUser` on the right of its top row, after Back if there is one: the user icon and e-mail, top right, the same place on every page |
 `BACK01` | error | a page another page or a flow opens (`show_page`) does not start with a Back button: `close_page`, icon `chevron-left`, top left. Pop-ups are exempt |
 
 `GRID01` came from the same session: a customer grid showed its date column as formatted
