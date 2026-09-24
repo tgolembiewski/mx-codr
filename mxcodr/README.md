@@ -188,6 +188,10 @@ deployment build sees: a Marketplace module whose version does not match the pro
 version passes the precheck and fails the build (CE4271). `MDL_PRECHECK=0` in `tests/harness.env`
 turns the whole thing off.
 
+When a script fails to apply at all, precheck prints the errors themselves -- the `✗` lines, a
+`Parse error:` or an `Error:` line, at most fifteen -- and then the verdict; a `tail` of mxcli
+0.24's output kept only its six-line summary and showed "33 error(s) above" with nothing above it.
+
 Under the errors it prints a one-line hint per error code, from `tests/gate/hints.sh` -- the same
 hints the gate prints for a failed boot. They earn their place by having cost a session time:
 twenty-six `CE2729` lines in one precheck were a single missing pair of grants, and now say so.

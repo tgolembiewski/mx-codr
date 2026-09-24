@@ -95,7 +95,19 @@ fi
 for script in "$@"; do
   out="$("$MXCLI" exec "$script" -p "$scratch/$MPR" 2>&1)" || {
     echo "precheck: $script fails to apply (the real model is untouched):"
-    printf '%s\n' "$out" | grep -v '^Using project' | tail -6
+    # The errors themselves, then the verdict. mxcli 0.24 prints every error first and a 6-line
+    # summary after them ("Refusing to execute: N error(s) above"); a plain `tail -6` kept only
+    # the summary, and a session read "33 error(s) above" with nothing above it three times in
+    # thirty seconds, then guessed at the causes. Errors are the `✗` lines and their `at` line;
+    # a parse or apply failure prints `Parse error:` / `Error:` instead. At most 15 are shown.
+    printf '%s\n' "$out" | sed $'s/\x1b\\[[0-9;]*m//g' | grep -v '^Using project' | awk '
+      /^[[:space:]]*✗|Parse error:|^Error:|^[[:space:]]*Error:/ {
+        if (++shown > 15) { more++; next }
+        print; want_at = 1; next }
+      want_at && /^[[:space:]]+at [^[:space:]]/ { print; want_at = 0; next }
+      { want_at = 0 }
+      /issues: [0-9]+ errors|^Refusing to execute/ { print }
+      END { if (more) printf "  ... and %d more\n", more }'
     exit 1
   }
 done
