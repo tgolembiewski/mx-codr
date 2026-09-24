@@ -33,13 +33,16 @@ body='
   page.on("console", (m) => { if (m.type() === "error") problems.push(m.text()); });
   await open_app();
 '
+# A look, not a test: a menu item for the page the user is already on (their home page, say)
+# changes nothing, which menu() reports as a failed click. Here that means "already there".
 if [ -n "$menu_item" ]; then
   if [ -n "$widget" ]; then
     body="$body
   await menu(\"$menu_item\", \"$widget\");"
   else
     body="$body
-  await menu(\"$menu_item\");"
+  try { await menu(\"$menu_item\"); }
+  catch (e) { if (!/nothing happened/.test(e.message)) throw e; }"
   fi
 fi
 body="$body
@@ -49,6 +52,10 @@ body="$body
 
 result="$(scenario "$body")" || {
   echo "peek: the browser could not reach that page. The line above says why." >&2
+  if [ -z "${TEST_PASSWORD:-}" ] && [ -f "${CREDENTIALS:-tests/credentials.env}" ]; then
+    users="$(grep -oE '^TEST_PASSWORD_[^=]+' "${CREDENTIALS:-tests/credentials.env}" | sed 's/^TEST_PASSWORD_//' | tr '\n' ' ')"
+    [ -n "$users" ] && echo "peek: users with a password in tests/credentials.env: $users-- e.g. TEST_USER=${users%% *} bash tests/peek.sh '$menu_item'" >&2
+  fi
   exit 1
 }
 

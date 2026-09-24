@@ -188,6 +188,13 @@ visible text and console errors. It writes no test file, claims no coverage and 
 red-first run -- the scratch `verify-zz-*.test.sh` two sessions wrote for this left a
 "went green without ever being red" record behind every time.
 
+A peek at the page a user already lands on (their home page) no longer fails as "clicked menu …
+but nothing happened": for a look that means "already there". Signed in as a user with no
+password in `tests/credentials.env`, the error names the user and peek lists the users that do
+have one. And a gate check that stops without writing why is no longer a bare "could not run": the
+gate says the fault is in the harness, not in the project, after a session spent many steps
+taking the gate apart to find a fault of its own.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
