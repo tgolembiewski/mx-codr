@@ -217,6 +217,9 @@ check_layout() {
   fi
   local -a nav_args=()
   layout_sign_out_inputs || return 2
+  # The project's own layouts, for a menu built from buttons (NAV04); unreadable ones do not block.
+  describe_all layout-layouts "$WORK/layouts" "LAYOUTS" || true
+  ls "$WORK"/layouts/*.mdl >/dev/null 2>&1 && nav_args+=(--layouts "$WORK/layouts")
   out="$("$PY" tools/mdl-checks/check_layout.py "$WORK/pages" "${nav_args[@]}" 2>&1)"; code=$?
   checker_verdict "$code" "$out"; gate=$?
   if [ "$gate" = "2" ]; then

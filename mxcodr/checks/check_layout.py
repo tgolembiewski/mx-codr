@@ -2,9 +2,10 @@
 """Check that page widgets are spaced with Atlas Spacing design properties.
 
 Input: `describe page` dumps (.mdl files or directories), normally from tests/gate.sh;
-optionally `DESCRIBE NAVIGATION` output (--navigation) and snippet dumps (--sign-out-sources).
+optionally `DESCRIBE NAVIGATION` output (--navigation), snippet dumps (--sign-out-sources) and
+`describe layout` dumps of the project's own layouts (--layouts).
 Usage: check_layout.py <file.mdl|dir> ... [--navigation nav.mdl] [--sign-out-sources dir]
-                       [--users-sign-in] [--json]
+                       [--layouts dir] [--users-sign-in] [--json]
 --json keys: verdict, pages, sources, failures, warnings.
 Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 """
@@ -17,6 +18,12 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #   NAV01    FAIL  users sign in (--users-sign-in), but a navigation menu has no sign_out item
 #                  and no page or snippet has a sign-out button
 #   NAV02    WARN  the sign_out item is not the last item of its menu
+#   NAV03    FAIL  users sign in, and a role's home page (`home page X for Role`) is not in that
+#                  profile's menu
+#   GRID01   FAIL  a grid filter in a column with no Attribute (and none of its own): it renders
+#                  "Unable to get filter store" and filters nothing
+#   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
+#                  built by hand, with no hamburger, no active item and no phone view
 
 from __future__ import annotations
 
@@ -243,6 +250,71 @@ def missing_heading_warnings(headed: dict[str, bool]) -> list[dict]:
     return warnings
 
 
+COLUMN_RE = re.compile(r"^\s*column\s+(?P<name>\"[^\"]*\"|[\w/.]+)", re.IGNORECASE)
+FILTER_RE = re.compile(r"^\s*(?P<type>textfilter|numberfilter|datefilter|dropdownfilter)\s+(?P<name>\w+)(?P<rest>.*)$",
+                       re.IGNORECASE)
+# A filter's own target: `Attribute:`, `attributes: [...]` or `Association:`.
+FILTER_TARGET_RE = re.compile(r"\b(attributes?|association)\s*:", re.IGNORECASE)
+PAGE_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?page\s+(?P<name>[\w.]+)", re.IGNORECASE)
+
+
+def column_filter_findings(lines: list[str]) -> list[dict]:
+    """GRID01: a filter only works on the column's attribute; with none, Data Grid 2 shows an error box."""
+    failures = []
+    page = ""
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        found = PAGE_RE.match(line)
+        if found:
+            page = found.group("name")
+        column = COLUMN_RE.match(line)
+        if not column:
+            index += 1
+            continue
+        # The header runs to the line that opens the body (`{`) or closes without one.
+        header, start = [], index
+        while index < len(lines):
+            header.append(lines[index])
+            if lines[index].rstrip().endswith("{") or lines[index].rstrip().endswith(")"):
+                break
+            index += 1
+        opens_body = header[-1].rstrip().endswith("{")
+        index += 1
+        if not opens_body:
+            continue
+        has_attribute = bool(re.search(r"\bAttribute\s*:", " ".join(header), re.IGNORECASE))
+        # Scan the body for the column's own filters, then resume right after the header: a
+        # layoutgrid column holds whole datagrids whose columns need checking too.
+        body_start, depth = index, 1
+        while index < len(lines) and depth > 0:
+            body = lines[index]
+            flt = FILTER_RE.match(body)
+            if flt and depth == 1 and not has_attribute:
+                own = flt.group("rest")
+                # A filter's properties may continue on the lines below `name (`.
+                look = index + 1
+                if own.rstrip().endswith("("):
+                    while look < len(lines) and not lines[look].strip().startswith(")"):
+                        own += " " + lines[look]
+                        look += 1
+                if not FILTER_TARGET_RE.search(own):
+                    failures.append({
+                        "check": "GRID01",
+                        "line": start + 1,
+                        "message": (f"{page}: column {column.group('name')} has a {flt.group('type').lower()}"
+                                    f" {flt.group('name')} but no Attribute -- the filter filters on the column's"
+                                    f" attribute, so it renders \"Unable to get filter store\" and filters nothing."
+                                    f" Add the attribute it should filter to the column, e.g. `column colCreated"
+                                    f" (Attribute: DateCreated, Caption: 'Created', ShowContentAs: dynamicText, ...)`;"
+                                    f" the column still shows its Content"),
+                    })
+            depth += body.count("{") - body.count("}")
+            index += 1
+        index = body_start
+    return failures
+
+
 # `create or replace navigation <Profile>` starts a profile's block in DESCRIBE NAVIGATION output.
 PROFILE_RE = re.compile(r"^\s*create\s+(?:or\s+replace\s+)?navigation\s+(?P<name>\w+)", re.IGNORECASE)
 # One `menu item '<caption>' ...;` line.
@@ -290,6 +362,80 @@ def sign_out_findings(navigation: str, other_mdl: str) -> tuple[list[dict], list
     return failures, warnings
 
 
+
+# `home page Module.Page for Role` in DESCRIBE NAVIGATION output; the default home page has no `for`.
+ROLE_HOME_RE = re.compile(r"^\s*home\s+page\s+(?P<page>[\w.]+)\s+for\s+(?P<role>[\w.]+)", re.IGNORECASE)
+MENU_PAGE_RE = re.compile(r"^\s*menu\s+item\s+'[^']*'\s+page\s+(?P<page>[\w.]+)", re.IGNORECASE)
+
+# The one-menu-for-every-role fact the NAV03/NAV04 messages carry, so the fix needs no lookup.
+ONE_MENU = ("one menu serves every role: Mendix hides a menu item from a user who cannot open its page, so"
+            " give each role its pages with `grant view on page` and list them all in the menu")
+
+
+def role_home_findings(navigation: str) -> list[dict]:
+    """NAV03: a role opens on a page its menu does not offer, so it cannot get back there."""
+    failures = []
+    homes: dict[str, list[tuple[str, str]]] = {}
+    menu_pages: dict[str, set[str]] = {}
+    profile = ""
+    for line in navigation.splitlines():
+        found = PROFILE_RE.match(line)
+        if found:
+            profile = found.group("name")
+            continue
+        home = ROLE_HOME_RE.match(line)
+        if home and profile:
+            homes.setdefault(profile, []).append((home.group("page"), home.group("role")))
+        item = MENU_PAGE_RE.match(line)
+        if item and profile:
+            menu_pages.setdefault(profile, set()).add(item.group("page").lower())
+    for profile, pairs in sorted(homes.items()):
+        for page, role in pairs:
+            if page.lower() in menu_pages.get(profile, set()):
+                continue
+            failures.append({
+                "check": "NAV03",
+                "line": 0,
+                "message": (f"navigation profile {profile}: role {role} opens on {page}, which is not in the menu"
+                            f" -- add `menu item '<caption>' page {page} icon <icon>;` before Log out"
+                            f" (DESCRIBE NAVIGATION {profile} first and keep the other items); {ONE_MENU}"),
+            })
+    return failures
+
+
+LAYOUT_RE = re.compile(r"^\s*create\s+(?:or\s+(?:replace|modify)\s+)?layout\s+(?P<name>[\w.]+)", re.IGNORECASE)
+SHOW_PAGE_RE = re.compile(r"\bshow_page\s+(?P<page>[\w.]+)", re.IGNORECASE)
+
+
+def layout_menu_findings(layouts: str) -> list[dict]:
+    """NAV04: a project layout that navigates with buttons instead of the navigation menu."""
+    targets: dict[str, list[str]] = {}
+    layout = ""
+    for line in layouts.splitlines():
+        found = LAYOUT_RE.match(line)
+        if found:
+            layout = found.group("name")
+            continue
+        if not layout:
+            continue
+        for hit in SHOW_PAGE_RE.finditer(line):
+            pages = targets.setdefault(layout, [])
+            if hit.group("page") not in pages:
+                pages.append(hit.group("page"))
+    failures = []
+    for layout, pages in sorted(targets.items()):
+        if len(pages) < 2:
+            continue  # one link, a logo to the home page say, is not a menu
+        failures.append({
+            "check": "NAV04",
+            "line": 0,
+            "message": (f"layout {layout} is a hand-built menu (buttons to {', '.join(pages[:4])}) -- it has no"
+                        f" hamburger, no active item and no phone view. Put those pages in the navigation"
+                        f" menu (`create or replace navigation`), move the pages to Atlas_Core.Atlas_Default"
+                        f" and drop the layout; {ONE_MENU}"),
+        })
+    return failures
+
 def check(lines: list[str]) -> tuple[list[dict], list[dict], int]:
     """Return (failures, warnings, page count)."""
     widgets = parse(lines)
@@ -304,6 +450,8 @@ def check(lines: list[str]) -> tuple[list[dict], list[dict], int]:
                 continue
             failures.extend(run_gap_findings(page, run))
             failures.extend(run_alignment_findings(page, run))
+
+    failures.extend(column_filter_findings(lines))
 
     headed = headed_pages(widgets)
     return failures, missing_heading_warnings(headed), len(headed)
@@ -326,6 +474,8 @@ def main() -> int:
     parser.add_argument("--navigation", type=Path, help="DESCRIBE NAVIGATION output")
     parser.add_argument("--sign-out-sources", type=Path, action="append", default=[],
                         help="more dumps (snippets) where a sign-out button counts")
+    parser.add_argument("--layouts", type=Path, action="append", default=[],
+                        help="describe-layout dumps of the project's own layouts")
     parser.add_argument("--users-sign-in", action="store_true",
                         help="project security is on, so the menu needs a Log out item")
     parser.add_argument("--json", action="store_true")
@@ -343,6 +493,10 @@ def main() -> int:
             args.navigation.read_text(encoding="utf-8", errors="replace"), text + "\n" + extra)
         failures += nav_failures
         warnings += nav_warnings
+        failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
+    if args.layouts:
+        layouts, _ = collect(args.layouts)
+        failures += layout_menu_findings(layouts)
     report = {
         "verdict": "PASS" if not failures else "FAIL",
         "pages": pages,
