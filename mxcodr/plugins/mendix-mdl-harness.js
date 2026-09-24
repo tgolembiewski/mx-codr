@@ -90,13 +90,15 @@ function clearState(sessionID, suffix) {
   if (path) try { rmSync(path, { force: true }) } catch { /* ignore */ }
 }
 
-// `...; sleep 12; bash tests/gate.sh`: the gate waits for the runtime itself. Two Pi sessions did
+// `...; sleep 12; bash tests/gate.sh` or `sleep 30; tail .mxcli/gate-boot.log`: the gate waits for
+// the runtime and for --watch itself. Two Pi sessions did
 // this anyway, against the rule file; a block says it at the moment it happens.
 const SLEEP_BEFORE_GATE =
   "Blocked: drop the `sleep` -- tests/gate.sh waits for the runtime and for --watch to apply the latest change itself, and says so; a hand-rolled wait only adds seconds. Run the same command without it."
 
 function isSleepBeforeGate(command) {
-  return typeof command === "string" && /\bsleep\s+\d/.test(command) && /tests\/gate\.sh/.test(command)
+  return typeof command === "string" && /\bsleep\s+\d/.test(command)
+    && /tests\/gate\.sh|gate-boot\.log|runtime\.log/.test(command)
 }
 
 // `for f in a b; do mxcli exec mdlsource/$f.mdl`: the scripts are a variable, so precheck sees none.

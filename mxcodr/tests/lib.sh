@@ -340,8 +340,13 @@ _mdl_fail_on_scenario_error() {
     logged="$(_runtime_errors_since "${_MDL_SCENARIO_START:-}")"
     fail "browser scenario failed: ${logged:+runtime logged during this test: $logged | }${why:-no error text}${refusal:+ -- $refusal}"
   fi
-  # Neither marker: the code never ran (e.g. browser not open).
+  # Neither marker. "### Ran Playwright code" means the code did run and simply returned nothing:
+  # a session read the old "needs: playwright-cli open" hint for that case and went looking at
+  # the browser instead of the missing `return` at the end of its scenario.
   if ! printf '%s' "$output" | grep -q '^### Result'; then
+    if printf '%s' "$output" | grep -q '^### Ran Playwright code'; then
+      fail "browser scenario returned nothing -- end the scenario body with a return, e.g. \`return {ok: true};\` (the checks above it ran; a scenario must return a value)"
+    fi
     fail "browser scenario produced no result: $(printf '%s' "$output" | tr '\n' ' ' | tr -s ' ' | cut -c1-200) (running a test outside the runner needs: playwright-cli open)"
   fi
 }

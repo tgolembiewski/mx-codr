@@ -196,6 +196,37 @@ access and nothing else.
    that restart was most of the 13 s every test run waited for. Schema once, up front;
    screens and logic as often as you like.
 
+## MyFirstModule goes once the app has its own module
+
+A new Mendix app starts with `MyFirstModule`: a `Home_Web` page, a `MyFirstLogic` microflow,
+an image collection and a `User` module role. It is scaffolding. As soon as the app has a
+module of its own with pages, remove it, so nothing in the app opens on the template's empty
+home page and no role carries a module role that grants nothing:
+
+```sql
+create or modify page Shop.Admin_Home (Title: 'Administration', Layout: Atlas_Core.Atlas_Default) {
+  -- what an administrator starts the day with, and a link to Users
+}
+grant view on page Shop.Admin_Home to Shop.Admin;
+create or replace navigation Responsive
+  home page Shop.Order_List
+  home page Shop.Admin_Home for Administrator
+  -- the other role homes and the menu, as before
+;
+alter user role Administrator remove module roles (MyFirstModule.User);
+alter user role User remove module roles (MyFirstModule.User);
+drop module MyFirstModule;
+```
+
+Order matters: re-point every `home page` and menu item first, move anything your pages or
+flows use from `MyFirstModule` (an image, a flow) into your module, take `MyFirstModule.User`
+out of every user role, then drop the module. Remove it from the scripts in `mdlsource/` too,
+or a re-run brings it back. The administrators' role opens on a page of the app's own module,
+never on `MyFirstModule.Home_Web` or an Administration page.
+
+The gate fails `MODULE01` while `MyFirstModule` is still there, listing what still uses it,
+and `HOME01` when the administrators' role opens anywhere but the app's own module.
+
 ## Check it
 
 ```bash
@@ -213,6 +244,7 @@ cycles and cross-module coupling that no single rule catches.
 - [ ] Every new module answers yes to domain, reuse, or integration boundary
 - [ ] The domain model, roles and access rules went in first, in one script; pages and microflows after
 - [ ] No document sits at module root
+- [ ] `MyFirstModule` is gone, and the administrators open on a page of the app's own module
 - [ ] No folder is named after a document type
 - [ ] Shared documents live in `_Shared/`, not duplicated
 - [ ] A consumable module exposes `UseMe/` and hides `Private/`

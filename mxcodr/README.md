@@ -195,6 +195,11 @@ have one. And a gate check that stops without writing why is no longer a bare "c
 gate says the fault is in the harness, not in the project, after a session spent many steps
 taking the gate apart to find a fault of its own.
 
+A scenario that ends without a `return` now says so ("returned nothing -- end the scenario body
+with a return"), instead of "produced no result ... needs: playwright-cli open", which sent a
+session to the browser. The `sleep` block covers a hand-rolled wait on `.mxcli/gate-boot.log` or
+`runtime.log` too, not only one in front of `tests/gate.sh`.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
@@ -542,6 +547,8 @@ project's own layouts:
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons — a menu built by hand |
 `NAV05` | error | a menu item or sub-menu has no icon; the message suggests an Atlas_Filled icon for its caption |
 `ACCOUNT01`-`03` | error | users sign in and the Administration module is there, but the menu lacks `Users` (`page Administration.Account_Overview`) or `My account` (`microflow Administration.ManageMyAccount`, which opens `MyAccount` for the signed-in user), or a signed-in role lacks `Administration.User`, or no role has `Administration.Administrator` |
+`MODULE01` | error | the app has its own module with pages and the template's `MyFirstModule` is still there; the message lists what still uses it (home pages, user roles, pages or flows) and the steps to remove it |
+`HOME01` | error | users sign in and the administrators' role opens on a page outside the app's own modules (the template's `Home_Web`, an Administration page) |
 `ICON01` | error | a button (`actionbutton`, `linkbutton`, on a page or in a snippet) without an icon; the message suggests an Atlas_Filled icon from its action and caption |
 `LAYOUT01` | error | the app's pages use more than one layout (pop-ups, the login page and phone/tablet layouts aside), so the menu changes between pages |
 `BACK01` | error | a page another page or a flow opens (`show_page`) does not start with a Back button: `close_page`, icon `chevron-left`, top left. Pop-ups are exempt |
