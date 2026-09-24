@@ -115,6 +115,7 @@ print_verdict_and_exit() {
     echo "   NOT DONE — failed: ${failures[*]}"
     [ ${#cannot_run[@]} -eq 0 ] || echo "   and could not run: ${cannot_run[*]}"
     print_failure_details
+    print_blockers
     exit 1
   fi
   if [ ${#cannot_run[@]} -gt 0 ]; then
@@ -125,6 +126,33 @@ print_verdict_and_exit() {
   fi
   echo "   DONE — every check passed"
   exit 0
+}
+
+# The last lines of every red run: one line per failed check -- how many findings, and the first
+# of them -- then the verdict again. Sessions read the gate through `tail -3`, `tail -25` or
+# `sed -n '/== naming/,$p' | head`, so the verdict above the details, or the details above the
+# end, were each cut off by one of them; after a compaction the model had neither and spent an
+# hour rediscovering what still blocked DONE. Whatever tail it takes now ends with that list.
+print_blockers() {
+  local entry name label detail count first pattern
+  pattern='^[[:space:]]*- \[|\[error\]|^[[:space:]]*FAIL[[:space:]:]|^[[:space:]]+- '
+  echo "== still blocking DONE"
+  # details holds name|label for every failed or unrunnable check, in the order they printed.
+  for entry in ${details[@]+"${details[@]}"}; do
+    name="${entry%%|*}"; label="${entry#*|}"
+    detail="$WORK/$name.detail"
+    count=0; first=""
+    if [ -s "$detail" ]; then
+      count="$(grep -cE "$pattern" "$detail")"
+      first="$(grep -m1 -E "$pattern" "$detail" | sed -E 's/^[[:space:]]*(- )?//' | cut -c1-160)"
+    fi
+    if [ -n "$first" ]; then
+      echo "   $label: $count -- first: $first"
+    else
+      echo "   $label: see == $label above"
+    fi
+  done
+  echo "   NOT DONE — failed: ${failures[*]}"
 }
 
 # The cause of every failure, under the verdict: a session that reads only the last lines of
