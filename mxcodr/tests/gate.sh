@@ -133,24 +133,30 @@ print_verdict_and_exit() {
 # `sed -n '/== naming/,$p' | head`, so the verdict above the details, or the details above the
 # end, were each cut off by one of them; after a compaction the model had neither and spent an
 # hour rediscovering what still blocked DONE. Whatever tail it takes now ends with that list.
+# Findings listed per check under "still blocking DONE".
+BLOCKERS_SHOWN=5
+
 print_blockers() {
-  local entry name label detail count first pattern
+  local entry name label detail count shown pattern
   pattern='^[[:space:]]*- \[|\[error\]|^[[:space:]]*FAIL[[:space:]:]|^[[:space:]]+- '
   echo "== still blocking DONE"
   # details holds name|label for every failed or unrunnable check, in the order they printed.
+  # Every finding up to BLOCKERS_SHOWN, each with its fix: a session that saw only the first one
+  # (through `| tail -16`) opened check_layout.py to learn what the other six wanted.
   for entry in ${details[@]+"${details[@]}"}; do
     name="${entry%%|*}"; label="${entry#*|}"
     detail="$WORK/$name.detail"
-    count=0; first=""
-    if [ -s "$detail" ]; then
-      count="$(grep -cE "$pattern" "$detail")"
-      first="$(grep -m1 -E "$pattern" "$detail" | sed -E 's/^[[:space:]]*(- )?//' | cut -c1-160)"
-    fi
-    if [ -n "$first" ]; then
-      echo "   $label: $count -- first: $first"
-    else
+    count=0
+    [ -s "$detail" ] && count="$(grep -cE "$pattern" "$detail")"
+    if [ "$count" = "0" ]; then
       echo "   $label: see == $label above"
+      continue
     fi
+    echo "   $label: $count"
+    grep -E "$pattern" "$detail" | head -"$BLOCKERS_SHOWN" \
+      | sed -E 's/^[[:space:]]*(- )?//' | cut -c1-260 | sed 's/^/     - /'
+    shown=$(( count < BLOCKERS_SHOWN ? count : BLOCKERS_SHOWN ))
+    [ "$count" -gt "$shown" ] && echo "     ... $((count - shown)) more under == $label above"
   done
   echo "   NOT DONE — failed: ${failures[*]}"
 }
