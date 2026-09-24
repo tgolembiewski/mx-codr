@@ -142,6 +142,9 @@ that break the build, jar files unpacked in search of an API:
   (skill: `spacing-and-layout`; gate `NAV03`, `NAV04`). Every menu entry has an icon
   that shows what it opens, e.g. `icon Atlas_Core.Atlas_Filled."shopping-cart"` for
   orders (gate `NAV05`).
+- **Every page another page or a microflow opens starts with Back, top left** --
+  `actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: 'Atlas_Core.Atlas_Filled.chevron-left')`
+  as its first widget, above the heading; pop-ups excepted (gate `BACK01`).
 - **Tests sign in as that user:** `export TEST_USER=demo_customer` before sourcing
   `tests/lib.sh`, and `TEST_PASSWORD_demo_customer=...` in `tests/credentials.env`.
 

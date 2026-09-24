@@ -142,7 +142,7 @@ and then working with your agent as usual.
 | `naming-and-captions` | PascalCase, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages, a business caption on every activity |
 | `reuse-and-snippets` | a snippet used on more than one page, a `SUB_` microflow with more than one caller |
 | `organize-project` | nothing orphaned, nothing left at module root |
-| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS; one navigation menu for every role on Atlas_Default, never a menu built from buttons |
+| `spacing-and-layout` | widgets on one line spaced with Atlas design properties, never custom CSS; one navigation menu for every role on Atlas_Default, never a menu built from buttons; a Back button top left on every page another page opens |
 
 ## Requirements
 

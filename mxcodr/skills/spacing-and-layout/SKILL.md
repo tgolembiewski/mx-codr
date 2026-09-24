@@ -1,6 +1,6 @@
 ---
 name: spacing-and-layout
-description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in) and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
+description: "Spacing between widgets, using the theme's own Spacing design property rather than CSS — and the structure a screen is laid out with, including the main menu (one menu for every role, on Atlas_Default, ending with Log out once users can sign in), a Back button top left on every page another page opens and whether a create/edit form is a modal pop-up or a full page. Use before writing or altering any page, snippet or navigation menu, and when the gate's layout verdict fails."
 ---
 
 # Spacing and layout
@@ -233,6 +233,38 @@ Two items with the same icon read as the same screen; pick different ones.
 The gate fails `NAV03` when a role's home page is not in the menu, and `NAV04` when
 one of the project's own layouts opens two or more pages from buttons.
 
+## Back, top left, on every page you navigate to
+
+A page that another page or a microflow opens (`show_page`, `show page`) starts with a
+**Back** button, top left, above its heading. Without one, the only way back is the
+browser's own button or the menu, and a detail page reached from a list becomes a dead
+end — a Pi session built three of those.
+
+```sql
+create or modify page Sales.Order_Detail (Title: 'Order', Layout: Atlas_Core.Atlas_Default,
+  Params: { $Order: Sales.Order }) {
+  layoutgrid pageGrid {
+    row row1 {
+      column col1 (DesktopWidth: 12) {
+        actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE,
+          Icon: 'Atlas_Core.Atlas_Filled.chevron-left',
+          DesignProperties: ['Spacing': ['margin-bottom': 'M']])
+        dynamictext h (Content: 'Order', RenderMode: H1, DesignProperties: ['Spacing': ['margin-bottom': 'M']])
+      }
+    }
+  }
+}
+```
+
+- `CLOSE_PAGE` returns to the page the user came from, whichever that was — a list, a
+  dashboard, another detail page. Never a `show_page` back to a fixed page.
+- The icon is always the left chevron, `Atlas_Core.Atlas_Filled.chevron-left`.
+- It is the page's **first** widget, so it sits top left above the heading.
+- A pop-up (`Atlas_Core.PopupLayout`) needs none: it closes with its own X.
+- A page opened from a microflow counts too: `show page` in an `ACT_` flow.
+
+The gate fails `BACK01` for every opened page without it and says which page opens it.
+
 ## Headings
 
 Stock Atlas layouts render the **app** brand in the top region, not the page title,
@@ -281,6 +313,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `NAV03` | error | project security is on, and a role's home page (`home page X for Role`) is not in the menu |
 `NAV04` | error | one of the project's own layouts opens two or more pages from buttons: a menu built by hand |
 `NAV05` | error | a menu item or sub-menu has no icon (the message suggests one for its caption) |
+`BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups are exempt |
 
 ## What this cannot see
 
