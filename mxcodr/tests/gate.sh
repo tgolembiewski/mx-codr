@@ -12,7 +12,7 @@
 # Six verdicts: the browser suite (tests/verify-*.test.sh) and five model checks that
 # need no app -- mx check, lint, coverage, naming, layout, security. Every step runs even if
 # another fails; a passing model check is replayed while its inputs are unchanged.
-#   DONE — every check passed               exit 0
+#   DONE — every check passed               exit 0 (--only/--tests-only print PASSED, never DONE)
 #   NOT DONE — failed: <checks>             exit 1
 #   NOT DONE — could not run: <checks>      exit 2
 # Exit 2 also means the gate stopped early: no .mpr, bad argument, no app answering,
@@ -123,6 +123,14 @@ print_verdict_and_exit() {
     echo "   A check that did not run has not passed. Fix what stopped it, then run the gate again."
     print_failure_details
     exit 2
+  fi
+  # A partial run passing is not the gate passing: `--only 000` once ended in the same DONE line
+  # as the full gate, and a session took it for DONE with a red suite behind it.
+  if [ -n "${ONLY:-}" ] || [ "${TESTS_ONLY:-0}" = "1" ]; then
+    local scope="tests only"
+    [ -n "${ONLY:-}" ] && scope="--only $ONLY"
+    echo "   PASSED — $scope -- not DONE: the full gate has not run; run \`bash tests/gate.sh\`"
+    exit 0
   fi
   echo "   DONE — every check passed"
   exit 0
