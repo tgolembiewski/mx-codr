@@ -423,11 +423,16 @@ print(json.dumps(value))
   printf '%s' "$json"
 }
 
+# The entity as OQL reads it: quoted, so one named Order (or another reserved word) parses.
+oql_entity() {   # oql_entity <Entity>
+  printf '%s."%s"' "$MODULE" "${1//\"/}"
+}
+
 # oql_count <Entity> ["<where>"] -- WHERE is OQL: reach associations with JOIN, not paths.
 oql_count() {
   local entity="$1" where="${2:-}"
   [ -n "${MODULE:-}" ] || fail "oql_count needs a module: set MODULE=<YourModule> or run through tests/gate.sh"
-  local query="SELECT COUNT(*) AS Total FROM $MODULE.$entity"
+  local query="SELECT COUNT(*) AS Total FROM $(oql_entity "$entity")"
   # Not `[ -n "$where" ] && ...`: with set -e, the false test ends the function.
   if [ -n "$where" ]; then
     query="$query WHERE $where"
@@ -462,7 +467,7 @@ oql_value() {
   local entity="$1" attribute="$2" where="$3"
   local json
   [ -n "${MODULE:-}" ] || fail "oql_value needs a module: set MODULE=<YourModule> or run through tests/gate.sh"
-  json="$(oql "SELECT $attribute FROM $MODULE.$entity WHERE $where")" || exit 1
+  json="$(oql "SELECT $attribute FROM $(oql_entity "$entity") WHERE $where")" || exit 1
   printf '%s' "$json" | "$PY" -c "
 import json, sys
 rows = json.load(sys.stdin)

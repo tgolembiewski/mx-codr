@@ -38,7 +38,8 @@ for row in json.load(sys.stdin):
 
 # The row count of one entity; "?" when the answer has no count, 0 when unreadable.
 row_count() {   # row_count <Module.Entity>
-  "$MXCLI" oql -p "$MPR" --json "SELECT COUNT(*) AS n FROM $1" 2>/dev/null \
+  # Quoted: an entity named Order (a reserved word) does not parse bare, and printed a false 0.
+  "$MXCLI" oql -p "$MPR" --json "SELECT COUNT(*) AS n FROM ${1%.*}.\"${1##*.}\"" 2>/dev/null \
     | "$PY" -c '
 import json, sys
 text = sys.stdin.read()
