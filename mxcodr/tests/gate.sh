@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # tests/gate.sh -- the done gate: everything "finished" means, in one command.
 #
-#   bash tests/gate.sh                    # suite + mx check + lint + coverage + naming + layout + security
+#   bash tests/gate.sh                    # the suite and every model check (listed below)
 #   bash tests/gate.sh --only crud        # one script by name fragment, warm browser
 #   bash tests/gate.sh --tests-only       # the suite alone
 #   bash tests/gate.sh --boot-if-needed   # start the app first if nothing answers
 #   bash tests/gate.sh --restart          # stop this project's runtime, boot it again, then gate
 #   bash tests/gate.sh --stop             # stop this project's app (and its mxbuild), then exit
-#   bash tests/gate.sh --no-cache         # re-run the five model checks even if nothing changed
+#   bash tests/gate.sh --no-cache         # re-run the model checks even if nothing changed
 #
-# Six verdicts: the browser suite (tests/verify-*.test.sh) and five model checks that
-# need no app -- mx check, lint, coverage, naming, layout, security. Every step runs even if
-# another fails; a passing model check is replayed while its inputs are unchanged.
+# Seven verdicts: the browser suite (tests/verify-*.test.sh) and six model checks that need no
+# app -- mx check, lint, coverage, naming, layout, security. Every step runs even if another
+# fails; a passing model check is replayed while its inputs are unchanged.
 #   DONE — every check passed               exit 0 (--only/--tests-only print PASSED, never DONE)
 #   NOT DONE — failed: <checks>             exit 1
 #   NOT DONE — could not run: <checks>      exit 2
@@ -20,8 +20,8 @@
 # Env: BASE_URL (else 8081 then 8080), APP_PORT (8081), SCRIPT_TIMEOUT (90s),
 #      BOOT_TIMEOUT (180s), RUNTIME_LOG, ADMIN_PORT, ADMIN_PASSWORD, SERVE_PORT,
 #      ALLOW_BUSY_SESSION=1, MDL_GATE_CACHE=0, MDL_BOOT_COMMAND (replaces mxcli run),
-#      MDL_MXBUILD_PATH, MDL_DB_*, MDL_PSQL, MDL_VISUAL=warn|error|0, MDL_VISUAL_REVIEW=agent
-#      -- MDL_* may also be set in tests/harness.env.
+#      MDL_MXBUILD_PATH, MDL_DB_*, MDL_PSQL, MDL_VISUAL|MDL_RUNTIME_ERRORS=warn|error|0,
+#      MDL_VISUAL_REVIEW=agent -- MDL_* may also be set in tests/harness.env.
 # Lines 2-24 are printed by --help; keep them 23 lines.
 
 # How to read this file: main() at the bottom is the whole gate, step by step. The steps
@@ -106,7 +106,7 @@ print_warnings() {
   local file shown=0
   for file in "$WORK"/*.warnings; do
     [ -s "$file" ] || continue
-    [ "$shown" = "0" ] && { echo; echo "== warnings (they do not block DONE; fix them anyway -- MDL_VISUAL=error makes them block)"; }
+    [ "$shown" = "0" ] && { echo; echo "== warnings (they do not block DONE; fix them anyway -- MDL_VISUAL or MDL_RUNTIME_ERRORS=error makes them block)"; }
     shown=1
     head -12 "$file"
   done
@@ -241,6 +241,8 @@ main() {
   preflight_stale_model
   step_tests
   step_visual
+  step_runtime_errors
+  note_microflow_tests
   add_red_first_notes
   note_never_red_tests
   # 4. Wait for the model checks and collect their verdicts.

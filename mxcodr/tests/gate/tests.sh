@@ -80,6 +80,8 @@ step_tests() {
   # go too; review.md and verdicts.json stay, a verdict is keyed on a screenshot's bytes.
   rm -f .mxcli/visual/findings.jsonl .mxcli/visual/*.png 2>/dev/null
   echo "== tests: ${targets[*]}"
+  # From here on, what the runtime logs as an error happened during the suite (step_runtime_errors).
+  date '+%Y-%m-%d %H:%M:%S' > "$WORK/tests.started"
   out="$(run_suite "${targets[@]}")"
   status=$?
   echo $((SECONDS - started)) > "$WORK/tests.secs"
@@ -187,5 +189,42 @@ step_visual() {
   else
     printf '%s\n' "$out" > "$WORK/visual.warnings"
     summary+=("visual: $(printf '%s\n' "$out" | grep -c .) warning(s) -- see == warnings (MDL_VISUAL=error makes them block DONE)")
+  fi
+}
+
+# Microflow tests (*.test.mdl, *.test.md under tests/) are not run here: `mxcli test --local` boots
+# its own runtime on port 8081, where this project's app already runs. So the gate says they exist
+# and how to run them, in one summary line; `mxcli test --list` only parses the files (no boot).
+note_microflow_tests() {
+  local count how
+  [ -n "$(find tests -name '*.test.mdl' -o -name '*.test.md' 2>/dev/null | head -1)" ] || return 0
+  count="$("$MXCLI" test tests/ -p "$MPR" --list 2>/dev/null | sed -nE 's/^Found ([0-9]+) test.*/\1/p' | head -1)"
+  if [ -n "${MDL_BOOT_COMMAND:-}" ]; then
+    # This project boots without `mxcli run --local` (Windows), and `mxcli test --local` boots the same way.
+    how="run them with mxcli test (skill test-microflows): --local does not boot where mxcli run --local cannot"
+  else
+    # `;` before the boot: a failing test must not leave the app stopped.
+    how="run them: bash tests/gate.sh --stop && $MXCLI test tests/ -p $MPR --local; bash tests/gate.sh --boot-if-needed"
+  fi
+  summary+=("microflow tests: ${count:-some} under tests/, NOT run by the gate -- after changing logic $how")
+}
+
+# What the server logged as ERROR while the suite ran. A page action that throws shows a generic
+# dialog, and a test that does not look for it passes; the runtime log has the real error. A
+# warning while MDL_RUNTIME_ERRORS=warn (the default); =error blocks DONE, =0 turns it off.
+step_runtime_errors() {
+  local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}" mode="${MDL_RUNTIME_ERRORS:-warn}" out
+  [ "$mode" = "0" ] && return 0
+  [ -f "$log" ] && [ -s "$WORK/tests.started" ] || return 0
+  out="$(gate_py runtime-errors "$log" "$(cat "$WORK/tests.started")" 2>/dev/null)"
+  [ -n "$out" ] || return 0
+  if [ "$mode" = "error" ]; then
+    printf '%s\n' "$out" > "$WORK/runtime.detail"
+    echo "runtime: errors in the server log during the tests" > "$WORK/runtime.summary"
+    echo 1 > "$WORK/runtime.status"
+    collect runtime "runtime log"
+  else
+    printf '%s\n' "$out" >> "$WORK/runtime.warnings"
+    summary+=("runtime: the server logged $(printf '%s\n' "$out" | grep -c .) distinct error(s) during the tests -- see == warnings; the full log: ${log#"$APP_DIR"/}")
   fi
 }

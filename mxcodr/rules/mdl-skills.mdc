@@ -55,6 +55,11 @@ page and widget names: fix them like any finding. With `MDL_VISUAL_REVIEW=agent`
 screenshot per page and asks you to judge them in `.mxcli/visual/review.md` -- Read each PNG,
 answer every question, write `verdicts.json`; a page you change is asked again.
 
+The gate also lists errors the server logged while the suite ran (`RUNTIME01`): a test can
+pass while the page behind it threw. Microflow tests (`*.test.mdl`) are NOT run by the gate:
+after changing logic, `bash tests/gate.sh --stop`, then `./mxcli test tests/ -p <app>.mpr
+--local`, then `bash tests/gate.sh --boot-if-needed` -- boot again even when a test fails.
+
 **The syntax digest is already in your context** under Claude Code, Cursor, OpenCode and Pi --
 anywhere else, `cat tools/mdl-checks/syntax-digest.md` whole, once, right after orient.sh. The
 installer writes it and `tests/orient.sh` refreshes it from this project's own mxcli: the

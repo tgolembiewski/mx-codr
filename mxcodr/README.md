@@ -258,6 +258,21 @@ All of these are warnings for now: they do not block DONE. `MDL_VISUAL=error` ma
 block, `MDL_VISUAL=0` turns them off. `tests/harness.env` now also accepts
 `MDL_REQUIRE_PRODUCTION` and `MDL_GATE_CACHE`, which were documented there but ignored.
 
+### What the server logged while the suite ran
+
+The gate records when the suite starts and lists every distinct `ERROR`/`CRITICAL` line the
+runtime logged after it (`RUNTIME01`), leaving out what a client re-bundle or a restart logs on
+its own. A page action that throws shows the user a generic dialog, and a test that does not look
+for the dialog passes. `MDL_RUNTIME_ERRORS`.
+
+### Microflow tests are named, not run
+
+`mxcli test --local` boots its own runtime on port 8081, where the harness's app runs, so the gate
+does not run `*.test.mdl`. When there are any, the summary names how many and the three commands
+that run them (stop the app, `mxcli test --local`, boot again -- even when a test fails; on a
+project booted with `MDL_BOOT_COMMAND`, a pointer to the test-microflows skill instead). `RUNTIME01` is a warning for now;
+`MDL_RUNTIME_ERRORS=error` makes it block DONE, `=0` turns it off.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
