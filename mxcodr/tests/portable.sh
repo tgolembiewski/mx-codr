@@ -306,18 +306,22 @@ PY_FRESH
 MDL_SYNTAX_DIGEST="tools/mdl-checks/syntax-digest.md"
 MDL_SYNTAX_TOPICS="domain-model.entity.create domain-model.association.create domain-model.enumeration.create
   security.module-role security.user-role security.demo-user security.entity-access settings.alter
-  module page.create page.action snippet.create navigation.create microflow.object-operations"
+  module page.create page.action page.datasource snippet.create navigation.create microflow.object-operations"
 
 mdl_syntax_digest() {
-  local version topic block tmp
+  local version topic block tmp topics
   [ -n "${MXCLI:-}" ] || return 1
   version="$("$MXCLI" --version 2>/dev/null | head -1)"
   [ -n "$version" ] || return 1
   [ -d "$(dirname "$MDL_SYNTAX_DIGEST")" ] || return 1
-  if ! { [ -f "$MDL_SYNTAX_DIGEST" ] && [ "$(head -1 "$MDL_SYNTAX_DIGEST")" = "<!-- $version -->" ]; }; then
+  # Written again when mxcli or the topic list changes (page.datasource was added to a digest
+  # an installed project had already cached for its mxcli version).
+  topics="<!-- topics: $(echo $MDL_SYNTAX_TOPICS) -->"
+  if ! { [ -f "$MDL_SYNTAX_DIGEST" ] && [ "$(head -1 "$MDL_SYNTAX_DIGEST")" = "<!-- $version -->" ] \
+         && [ "$(sed -n 2p "$MDL_SYNTAX_DIGEST")" = "$topics" ]; }; then
     tmp="$MDL_SYNTAX_DIGEST.tmp"
     {
-      printf '<!-- %s -->\n' "$version"
+      printf '<!-- %s -->\n%s\n' "$version" "$topics"
       printf '# MDL syntax this project looks up most\n\n'
       printf 'Generated from `./mxcli syntax <topic>` of this project. The rest: `./mxcli syntax`.\n'
       for topic in $MDL_SYNTAX_TOPICS; do

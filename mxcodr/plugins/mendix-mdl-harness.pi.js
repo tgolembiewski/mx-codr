@@ -202,7 +202,9 @@ export default function mendixMdlHarness(pi) {
     if (!existsSync(hook)) return
     // Forward slashes: bash treats backslashes as escapes.
     // Claude-shaped payload with the real command, so restart advice sees the scripts.
-    const payload = JSON.stringify({ tool_input: { command } })
+    // The tool output too, so the hook can say in one line whether the exec applied.
+    const text = (event.content || []).filter((part) => part && part.type === "text").map((part) => part.text).join("\n")
+    const payload = JSON.stringify({ tool_input: { command }, tool_response: { output: text } })
     const { out } = run([hook.replace(/\\/g, "/")], root, undefined, payload)
     if (!out) return
     return { content: [...event.content, { type: "text", text: out }] }

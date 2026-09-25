@@ -203,7 +203,8 @@ export const MendixMdlHarness = async ({ client, directory, worktree }) => {
       // Forward slashes: bash treats backslashes as escapes.
       const hookPath = hook.replace(/\\/g, "/")
       // Claude-shaped payload with the real command, so restart advice sees the scripts.
-      const payload = JSON.stringify({ tool_input: { command } })
+      // The tool output too, so the hook can say in one line whether the exec applied.
+      const payload = JSON.stringify({ tool_input: { command }, tool_response: { output: output.output || "" } })
       const { out } = run([hookPath], root, undefined, payload)
       if (!out) return
       output.output = `${output.output || ""}\n\n${out}`
