@@ -38,6 +38,24 @@ PY="${PY:-python3}"
 command="$(printf '%s' "$input" | "$PY" -c 'import json,sys; d=json.load(sys.stdin); print(d.get("tool_input",{}).get("command",""))' 2>/dev/null)"
 # Precise check on the command field; read-only `mxcli -c` queries are skipped.
 case "$command" in *"mxcli exec"*|*"mxcli.exe exec"*) ;; *) exit 0 ;; esac
+# One line that says whether the exec applied, read from its output (Claude's tool_response; the
+# plugins pass it as tool_response.output). `grep -ci error` on that output always matched --
+# mxcli counts "0 errors, 2 warnings" -- and a session re-ran a clean exec twice to see why.
+_verdict="$(printf '%s' "$input" | "$PY" -c 'import json, re, sys
+d = json.load(sys.stdin)
+r = d.get("tool_response")
+text = "\n".join(str(r.get(k) or "") for k in ("stdout", "stderr", "output")) if isinstance(r, dict) else str(r or "")
+command = d.get("tool_input", {}).get("command", "")
+if re.search(r"Nothing was written|Refusing to execute|^\s*(Parse error|Error|error)\b", text, re.M):
+    print("exec: FAILED -- mxcli wrote nothing; the reason is in its output above. Fix the script and exec it again.")
+elif re.search(r"^\s*(Created|Modified|Replaced|Updated|Dropped|Altered|Moved|Granted|Revoked)\b|already in sync", text, re.M):
+    print("exec: applied. (\"0 errors, N warnings\" in mxcli output is a count, not a failure.)")
+elif re.search(r"\bgrep\b.*error", command, re.I):
+    print("exec: its output went through grep, so this cannot tell whether it applied. mxcli prints "
+          "\"Nothing was written\" and exits 1 when it refuses a script; \"0 errors, N warnings\" is a count, not a failure.")
+' 2>/dev/null)"
+[ -n "$_verdict" ] && printf '%s\n' "$_verdict"
+case "$_verdict" in "exec: FAILED"*) exit 0 ;; esac
 # Restart advice: under `mxcli run --watch` every change applies by itself (logic and pages by reload,
 # schema, module and security by an in-place restart); without it, schema and security need a restart.
 _app_running=0

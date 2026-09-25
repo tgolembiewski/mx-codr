@@ -1,8 +1,8 @@
 # tests/gate/preflight.sh -- checks run right before the tests: sessions, a stale model, the environment.
 # Sourced by tests/gate.sh; defines functions only.
 
-# Warnings before the tests; only preflight_session stops the gate (exit 2), on a
-# trial-licence session refusal in the runtime log within the last two minutes.
+# Warnings before the tests; preflight_session stops the gate (exit 2) on a trial-licence session
+# refusal in the runtime log within the last two minutes, preflight_debugger on a debugger left on.
 preflight_session() {
   local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}"
   local users
@@ -76,10 +76,43 @@ report_watch_build_failure() {   # report_watch_build_failure <boot-log>
   {
     echo "--watch could not rebuild the app, so it still runs the model from before your last exec:"
     gate_py watch-state "$1" | tail -n +2 | head -8 | sed 's/^/   /'
-    echo "   Fix the script and exec it again. \"Checking will resume after the next change\" is a"
-    echo "   hiccup of the incremental build: bash tests/gate.sh --restart rebuilds from scratch."
+    if debugger_enabled; then
+      # A session read this CE0116 as a hiccup of the build; it was its own `mxcli debug enable`.
+      echo "   The microflow debugger is on, and every rebuild fails while it is (CE0116 \"Could not"
+      echo "   check expression\" on whichever widget is checked). Run: ./mxcli debug disable"
+      echo "   then: bash tests/gate.sh --restart"
+    else
+      echo "   Fix the script and exec it again. \"Checking will resume after the next change\" is a"
+      echo "   hiccup of the incremental build: bash tests/gate.sh --restart rebuilds from scratch."
+    fi
     echo "   full log: $1"
   } >&2
+  exit 2
+}
+
+# True when the runtime's microflow debugger is on (`mxcli debug enable`), or breakpoints set
+# through mxcli are still recorded.
+debugger_enabled() {
+  [ -f "$APP_DIR/.mxcli/debug-breakpoints.json" ] && return 0
+  debugger_on
+}
+
+# True when the running app answers that its microflow debugger is on.
+debugger_on() {
+  [ -n "${BASE_URL:-}" ] || return 1
+  "$MXCLI" debug status -p "$MPR" --app-url "$BASE_URL" 2>/dev/null | grep -q 'Debugger: enabled'
+}
+
+# Stops the gate while the microflow debugger is on: a test that reaches a breakpoint waits there
+# until its timeout and fails on something that looks like the feature, and every --watch rebuild
+# fails while it is on. A session left it on after looking at one microflow.
+preflight_debugger() {
+  debugger_on || return 0
+  cat >&2 <<'MSG'
+the app's microflow debugger is on (`mxcli debug enable`): a test that reaches a breakpoint
+hangs there until its timeout, and every --watch rebuild fails with CE0116 while it is on.
+Run: ./mxcli debug disable   -- then run the gate again.
+MSG
   exit 2
 }
 

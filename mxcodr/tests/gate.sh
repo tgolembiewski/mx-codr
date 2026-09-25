@@ -224,6 +224,7 @@ main() {
   # 3. Preflights, then the suite.
   failures=(); cannot_run=(); summary=(); details=()
   preflight_session
+  preflight_debugger
   preflight_environment
   preflight_stale_model
   step_tests

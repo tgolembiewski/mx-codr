@@ -224,6 +224,20 @@ My Orders after placing an order): the menu is its way back, and a session delet
 entity and an association are written: a session spent five queries on "'Order' is not a valid
 entity path".
 
+A microflow debugger left on (`mxcli debug enable`) stops the gate before the tests: a test that
+reaches a breakpoint waits there until its timeout, and every `--watch` rebuild fails with CE0116
+"Could not check expression" while it is on. A failed rebuild says so too, and a session had
+taken that CE0116 for a hiccup of the build. Both say `./mxcli debug disable`.
+
+After an `mxcli exec` the hook's first line says whether it applied (`exec: applied` or
+`exec: FAILED`), read from the exec's output, which the OpenCode and Pi plugins now pass on. A
+session piped exec through `grep -ci error`, counted the "0 errors" of mxcli's summary, and ran a
+clean script again twice. `diagnose.sh` takes the entity with or without its module
+(`Order` or `Sales.Order`; the second asked for `Sales.Sales.Order`). The syntax digest adds
+`page.datasource` (a list inside a data view, over an association or from a microflow), after a
+session guessed `page.datagrid` and `page.widgets.datagrid`, and it is written again when its
+topic list changes, not only when mxcli does.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
