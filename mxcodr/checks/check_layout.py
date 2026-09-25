@@ -82,6 +82,11 @@ def collect(sources: list[Path]) -> tuple[str, list[Path]]:
     return "\n".join(chunks), used
 
 
+def read_optional(path: Path | None) -> str:
+    """Text of an optional input file; empty when it was not given or does not exist."""
+    return path.read_text(encoding="utf-8", errors="replace") if path and path.exists() else ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("sources", nargs="+", type=Path, help="describe-page dumps, or a directory of them")
@@ -109,44 +114,37 @@ def main() -> int:
         print(f"FAIL  no MDL found in {[str(s) for s in args.sources]}", file=sys.stderr)
         return 1
 
-    failures, warnings, pages = check(text.splitlines())
-    if args.users_sign_in and args.navigation and args.navigation.exists():
-        extra, _ = collect(args.sign_out_sources)
-        nav_failures, nav_warnings = sign_out_findings(
-            args.navigation.read_text(encoding="utf-8", errors="replace"), text + "\n" + extra)
+    # Every input is read once; a missing optional one is empty text.
+    lines = text.splitlines()
+    has_navigation = bool(args.navigation and args.navigation.exists())
+    navigation = read_optional(args.navigation)
+    roles = read_optional(args.user_roles)
+    snippets, _ = collect(args.sign_out_sources)
+    layouts, _ = collect(args.layouts)
+    flows, _ = collect(args.opened_from)
+    own_modules = args.own_modules.split()
+
+    failures, warnings, pages = check(lines)
+    if args.users_sign_in and has_navigation:
+        nav_failures, nav_warnings = sign_out_findings(navigation, text + "\n" + snippets)
         failures += nav_failures
         warnings += nav_warnings
-        failures += role_home_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
-    own_modules = args.own_modules.split()
-    nav_text = args.navigation.read_text(encoding="utf-8", errors="replace") if args.navigation and args.navigation.exists() else ""
-    roles_all = args.user_roles.read_text(encoding="utf-8", errors="replace") if args.user_roles and args.user_roles.exists() else ""
+        failures += role_home_findings(navigation)
     if args.template_module:
-        flows_text, _ = collect(args.opened_from) if args.opened_from else ("", [])
-        failures += template_module_findings(own_modules, bool(page_blocks(text.splitlines())), nav_text,
-                                             roles_all, text + "\n" + flows_text)
-    if args.users_sign_in and own_modules and nav_text:
-        failures += admin_home_findings(nav_text, roles_all, own_modules)
+        failures += template_module_findings(own_modules, bool(page_blocks(lines)), navigation,
+                                             roles, text + "\n" + flows)
+    if args.users_sign_in and own_modules and navigation:
+        failures += admin_home_findings(navigation, roles, own_modules)
     if args.users_sign_in:
-        snippets_all, _ = collect(args.sign_out_sources) if args.sign_out_sources else ("", [])
-        layouts_all, _ = collect(args.layouts) if args.layouts else ("", [])
-        failures += current_user_findings(text.splitlines(), snippets_all, nav_text, layouts_all)
-    if args.users_sign_in and args.admin_module and args.navigation and args.navigation.exists():
-        roles_text = (args.user_roles.read_text(encoding="utf-8", errors="replace")
-                      if args.user_roles and args.user_roles.exists() else "")
-        failures += account_findings(args.navigation.read_text(encoding="utf-8", errors="replace"),
-                                     roles_text, args.guest_role)
-    if args.navigation and args.navigation.exists():
-        failures += menu_icon_findings(args.navigation.read_text(encoding="utf-8", errors="replace"))
-    navigation_text = (args.navigation.read_text(encoding="utf-8", errors="replace")
-                       if args.navigation and args.navigation.exists() else "")
-    layouts_text, _ = collect(args.layouts) if args.layouts else ("", [])
-    failures += one_layout_findings(text.splitlines(), navigation_text, layouts_text)
-    snippets_text, _ = collect(args.sign_out_sources) if args.sign_out_sources else ("", [])
-    failures += button_icon_findings(text.splitlines() + snippets_text.splitlines())
-    opened, _ = collect(args.opened_from) if args.opened_from else ("", [])
-    failures += back_button_findings(text.splitlines(), opened, navigation_text)
+        failures += current_user_findings(lines, snippets, navigation, layouts)
+    if args.users_sign_in and args.admin_module and has_navigation:
+        failures += account_findings(navigation, roles, args.guest_role)
+    if has_navigation:
+        failures += menu_icon_findings(navigation)
+    failures += one_layout_findings(lines, navigation, layouts)
+    failures += button_icon_findings(lines + snippets.splitlines())
+    failures += back_button_findings(lines, flows, navigation)
     if args.layouts:
-        layouts, _ = collect(args.layouts)
         failures += layout_menu_findings(layouts)
     report = {
         "verdict": "PASS" if not failures else "FAIL",
