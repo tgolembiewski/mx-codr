@@ -10,7 +10,10 @@ both on `mxcli init`, so anything written there is lost on the next tooling upda
 ## What is in here
 
 ```
-install.sh        copies the payload into a Mendix project
+install.sh        copies the payload into a Mendix project; the entry, ~90 lines -- it sources
+install/          the rest in order: 8 files of helpers (ui, prereqs, postgres, docker, windows,
+                  mxcli, studio_pro, toolchain), then the steps (target, step_prereqs, step_app,
+                  step_skills, step_hosts, step_harness, summary). Its header lists which is which
 bootstrap.ps1     Windows only: gets Git Bash, Python and Node, then hands over to install.sh
 VERSION           date-based version, copied to tools/mdl-checks/VERSION in the target
 MXCLI_TESTED      the mxcli build this bundle was verified against; orient.sh warns when the
@@ -21,7 +24,8 @@ hooks/            host-specific prompt/PostToolUse adapters plus the Codex and C
 plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js (Pi) -- the same
                   three jobs as the hooks, in each host's own event API
 tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), precheck.sh, orient.sh,
-                  diagnose.sh, peek.sh, lib.sh, portable.sh, scenario-helpers.js — the harness,
+                  diagnose.sh, peek.sh, lib.sh + lib/ (timeout, sessions, scenario, results),
+                  portable.sh, scenario-helpers.js — the harness,
                   upgraded in place on every install; run-app.sh, copied only when absent.
                   gate.sh is the done gate: tests, mx check, lint, coverage, naming, layout and
                   security. precheck.sh is what the hooks run before an exec; orient.sh and
@@ -34,7 +38,9 @@ examples/         8 verify-*.test.sh from the demo app — NOT installed; a proj
 skills/           6 × SKILL.md — the prose (test-first-delivery with a reference/ of three)
 lint-rules/       3 × *.star — MOD001, REU001, UI001 — run by `mxcli lint`, no Python needed
 checks/           *.py + fixtures/ — the checks Starlark cannot express, gate_helpers.py
-                  for the gate's JSON and digests, plus
+                  for the gate's JSON and digests; check_layout.py is the entry of the layout
+                  check and its rules are in layout_rules/ (one module per area of a page,
+                  listed at the top of check_layout.py), plus
                   record_install.py, which writes tools/mdl-checks/INSTALL.json (version,
                   date, sha256 per installed file) so the gate can tell a project running
                   last week's checkers from one running these
@@ -49,6 +55,12 @@ is the shipping container, never the place to edit:
 | `lint-rules/*.star` | `.claude/lint-rules/*.star` |
 | `checks/*.py`, `checks/fixtures/` | `tests/skills/` |
 | `rules/`, `hooks/`, `plugins/`, `tests/`, `skills/spacing-and-layout/` | authored here; no other copy in the repo |
+
+**Finding your way in a long script.** No script is longer than about 450 lines. Where one grew
+past that it became an entry plus parts: `install.sh` + `install/`, `tests/gate.sh` +
+`tests/gate/`, `tests/lib.sh` + `tests/lib/`, `checks/check_layout.py` + `checks/layout_rules/`.
+The entry keeps the name everything calls, starts with a map of its parts, and sources or
+imports them in order; each part starts with two lines saying what it holds and who reads it.
 
 ## Why the suite is written as one scenario per test
 

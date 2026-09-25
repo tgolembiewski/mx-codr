@@ -33,8 +33,15 @@ def destinations(src):
     for name in listdir(os.path.join(src, "tests", "gate"), ".sh"):
         yield os.path.join(src, "tests", "gate", name), "tests/gate/" + name
 
+    for name in listdir(os.path.join(src, "tests", "lib"), ".sh"):
+        yield os.path.join(src, "tests", "lib", name), "tests/lib/" + name
+
     for name in listdir(os.path.join(src, "checks"), ".py"):
         yield os.path.join(src, "checks", name), "tools/mdl-checks/" + name
+
+    # check_layout.py's rules, one module per area of a page.
+    for name in listdir(os.path.join(src, "checks", "layout_rules"), ".py"):
+        yield os.path.join(src, "checks", "layout_rules", name), "tools/mdl-checks/layout_rules/" + name
 
     for name in listdir(os.path.join(src, "hooks"), ".sh"):
         yield os.path.join(src, "hooks", name), "tools/mdl-checks/hooks/" + name
