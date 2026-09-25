@@ -21,7 +21,7 @@ It sits on top of [mxcli](https://github.com/mendixlabs/mxcli):
   consistency check and the rules below in about 30 seconds. Only **DONE** means done.
 - **No broken model.** The agent changes the app with small MDL scripts (text files, a
   bit like SQL for a Mendix model). Each is tested on a copy first; if Studio Pro would
-  show errors, your `.mpr` is not touched.
+  show errors, your `.mpr` is not touched. After each one the agent is told whether it applied.
 - **A proper Mendix app.** One menu for all roles, icons, one layout, Back buttons,
   "Users" and "My account" for signed-in users, no leftover `MyFirstModule`.
 - **A readable model.** Business captions, process folders, reused snippets and
@@ -62,6 +62,7 @@ what to fix. Codes in brackets are what the gate prints.
 - A failing test before each feature; a test for every page and action microflow.
 - Mendix's consistency check at 0 errors; project security at Production.
 - Only the full gate says DONE. Running one test says PASSED.
+- A microflow debugger left on stops the gate before the tests: a breakpoint would hang them.
 
 **Structure**
 - Process folders, `ACT_`/`SUB_` microflows under 15 activities, nothing at module root.
@@ -153,13 +154,14 @@ no checker to remember the arguments of, no order to run things in. After
 | The always-loaded reminder | `.claude/rules/` and `.cursor/rules/`, and Pi's system prompt through its extension, on every turn |
 | The syntax sessions look up most | a digest from the project's own mxcli, loaded into the session: `.claude/rules/`, `.cursor/rules/`, `opencode.json`, Pi's system prompt |
 | `MOD001`, `REU001`, `UI001` | `mxcli lint` discovers `.claude/lint-rules/*.star` by itself |
-| `check_mdl.py`, `check_test_coverage.py` | the skills that need them name the exact command; the gate runs them too |
+| `check_mdl.py`, `check_test_coverage.py`, `check_layout.py` | the skills that need them name the exact command; the gate runs them too |
 | The gate | host hooks fire it, and the `test-first-delivery` skill tells the agent to |
 
-The Python checkers exist because two of the rules cannot be expressed as lint
-rules — activity captions are not in the model catalog, and test coverage means
-reading `tests/` off disk. They are an implementation detail of those two rules,
-installed at `tools/mdl-checks/` so every host can cite one path. The agent calls
+The Python checkers exist because some rules cannot be expressed as lint rules —
+activity captions are not in the model catalog, test coverage means reading `tests/`
+off disk, and the layout rules read whole pages together with the navigation. They are
+an implementation detail of those rules, installed at `tools/mdl-checks/` so every host
+can cite one path. The agent calls
 them. **You never have to.**
 
 The same is true of `tests/gate.sh`. The hooks run it, and the skills tell the agent
@@ -182,7 +184,7 @@ and then working with your agent as usual.
 | **Mendix Studio Pro** or a cached mxbuild | `mx check` validates the model |
 | **PostgreSQL** | the app's database, and a separate `<project>_test` one |
 | **bash** | the harness is shell scripts — Git Bash on Windows |
-| **Python 3** | for the two checkers the agent calls; you never invoke it |
+| **Python 3** | for the checkers the gate and the agent call; you never invoke it |
 | **Node + playwright-cli** | the browser tests |
 | **A JDK** | matching the Mendix version; Studio Pro installs one |
 | **Docker** | installed by default; optional: see [Running without Docker](mxcodr/README.md#running-without-docker) |
@@ -260,7 +262,9 @@ reaches an installed project is not a fix. Your own `verify-*.test.sh` and
 One command, seven checks, run concurrently — the browser suite, `mx check`, `mxcli
 lint`, test coverage, naming/captions, page layout and the security level. Every step
 runs even when another fails, so one call reports the whole picture, and a red run ends with the list of what still
-blocks DONE. Exit 0 only when all seven pass.
+blocks DONE. Exit 0 only when all seven pass. Below them come warnings that do not block
+DONE yet: how the pages rendered (`VIS`, `LOOK`), errors the server logged (`RUNTIME01`) and
+tests that were never seen to fail.
 
 ```
 == gate
@@ -297,6 +301,10 @@ The environment still wins, so any of it can be overridden for one run.
 | `MDL_DB_HOST` / `_NAME` / `_USER` / `_PASSWORD` | the database |
 | `JAVA_HOME` | a JDK on a path with **no spaces** (see below) |
 | `MDL_BOOT_COMMAND` | how the gate boots the app when nothing answers |
+| `MDL_VISUAL` / `MDL_RUNTIME_ERRORS` | the rendered-page and server-error checks: warnings by default, `error` blocks DONE, `0` turns them off |
+| `MDL_VISUAL_REVIEW` | `agent`: a model that reads images also judges a screenshot of each page |
+| `MDL_ALLOW_GREEN_FIRST` | tests that are green by nature, so the gate does not warn that they never failed |
+| `MDL_REQUIRE_PRODUCTION` | `0` for an app that deliberately has no users at all |
 
 ## Windows: what the installer repairs, and what it cannot
 

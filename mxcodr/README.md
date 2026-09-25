@@ -20,7 +20,8 @@ MXCLI_TESTED      the mxcli build this bundle was verified against; orient.sh wa
                   project's ./mxcli is older
 rules/            mdl-skills.md (Claude, OpenCode, and Pi through its extension) and
                   mdl-skills.mdc (Cursor) — the always-loaded rule
-hooks/            host-specific prompt/PostToolUse adapters plus the Codex and Cursor gates
+hooks/            host-specific prompt/PostToolUse adapters plus the Codex and Cursor gates; each
+                  runs on its own, so each carries a copy of mdl_find_python from portable.sh
 plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js (Pi) -- the same
                   three jobs as the hooks, in each host's own event API
 tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), precheck.sh, orient.sh,
@@ -28,7 +29,7 @@ tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), preche
                   portable.sh, scenario-helpers.js — the harness,
                   upgraded in place on every install; run-app.sh, copied only when absent.
                   gate.sh is the done gate: tests, mx check, lint, coverage, naming, layout and
-                  security. precheck.sh is what the hooks run before an exec; orient.sh and
+                  security, then warnings (rendered pages, server errors). precheck.sh is what the hooks run before an exec; orient.sh and
                   diagnose.sh gather facts in parallel; peek.sh looks at a page without a test;
                   portable.sh holds what differs between platforms and the environment checks
                   every script shares
@@ -56,7 +57,7 @@ is the shipping container, never the place to edit:
 | `checks/*.py`, `checks/fixtures/` | `tests/skills/` |
 | `rules/`, `hooks/`, `plugins/`, `tests/`, `skills/spacing-and-layout/` | authored here; no other copy in the repo |
 
-**Finding your way in a long script.** No script is longer than about 450 lines. Where one grew
+**Finding your way in a long script.** No script is longer than about 500 lines. Where one grew
 past that it became an entry plus parts: `install.sh` + `install/`, `tests/gate.sh` +
 `tests/gate/`, `tests/lib.sh` + `tests/lib/`, `checks/check_layout.py` + `checks/layout_rules/`.
 The entry keeps the name everything calls, starts with a map of its parts, and sources or
@@ -242,7 +243,7 @@ reaches a breakpoint waits there until its timeout, and every `--watch` rebuild 
 taken that CE0116 for a hiccup of the build. Both say `./mxcli debug disable`.
 
 After an `mxcli exec` the hook's first line says whether it applied (`exec: applied` or
-`exec: FAILED`), read from the exec's output, which the OpenCode and Pi plugins now pass on. A
+`exec: FAILED`), read from the exec's output, which the OpenCode and Pi plugins pass on too. A
 session piped exec through `grep -ci error`, counted the "0 errors" of mxcli's summary, and ran a
 clean script again twice. `diagnose.sh` takes the entity with or without its module
 (`Order` or `Sales.Order`; the second asked for `Sales.Sales.Order`). The syntax digest adds
@@ -252,7 +253,7 @@ topic list changes, not only when mxcli does.
 
 ### How the pages look
 
-The gate now looks at the rendered page, not only the MDL. At the end of every test, `look()`
+The gate looks at the rendered page, not only the MDL. At the end of every test, `look()`
 in `tests/scenario-helpers.js` measures the page the test left open: two unrelated widgets that
 overlap by 4 px or more (`VIS01`), a page that scrolls sideways (`VIS02`), text cut off
 (`VIS03`). The gate names the page from the widget names in `mdlsource/` and lists each problem
@@ -267,23 +268,22 @@ answer to every question, and a fix. A verdict is keyed on the screenshot's sha2
 page is asked again (`LOOK01`); a rejection repeats its fix (`LOOK02`).
 
 All of these are warnings for now: they do not block DONE. `MDL_VISUAL=error` makes them
-block, `MDL_VISUAL=0` turns them off. `tests/harness.env` now also accepts
-`MDL_REQUIRE_PRODUCTION` and `MDL_GATE_CACHE`, which were documented there but ignored.
+block, `MDL_VISUAL=0` turns them off.
 
 ### What the server logged while the suite ran
 
 The gate records when the suite starts and lists every distinct `ERROR`/`CRITICAL` line the
 runtime logged after it (`RUNTIME01`), leaving out what a client re-bundle or a restart logs on
 its own. A page action that throws shows the user a generic dialog, and a test that does not look
-for the dialog passes. `MDL_RUNTIME_ERRORS`.
+for the dialog passes. It is a warning for now; `MDL_RUNTIME_ERRORS=error` makes it block DONE,
+`=0` turns it off.
 
 ### Microflow tests are named, not run
 
 `mxcli test --local` boots its own runtime on port 8081, where the harness's app runs, so the gate
 does not run `*.test.mdl`. When there are any, the summary names how many and the three commands
 that run them (stop the app, `mxcli test --local`, boot again -- even when a test fails; on a
-project booted with `MDL_BOOT_COMMAND`, a pointer to the test-microflows skill instead). `RUNTIME01` is a warning for now;
-`MDL_RUNTIME_ERRORS=error` makes it block DONE, `=0` turns it off.
+project booted with `MDL_BOOT_COMMAND`, a pointer to the test-microflows skill instead).
 
 ### The syntax every session looks up
 

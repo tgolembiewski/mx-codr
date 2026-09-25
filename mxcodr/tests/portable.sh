@@ -32,6 +32,7 @@ mdl_find_python() {
     printf '%s\n' "$candidate"
     return 0
   done
+  # The python.org installer (also via winget) does not add Python to PATH; search its install dirs too.
   local local_app="${LOCALAPPDATA:-}"
   local_app="${local_app//\\//}"
   for candidate in \
