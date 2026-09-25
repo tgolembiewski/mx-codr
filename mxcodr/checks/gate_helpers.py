@@ -11,6 +11,8 @@
     gate_helpers.py missing-browser <config>      the executablePath a Playwright config names, if it is missing
     gate_helpers.py duplicate-definitions <mdl>... documents these scripts create that another script
                                                   in the same folder creates too (SCRIPT01)
+    gate_helpers.py watch-state <boot-log>        where a --watch boot is: ready, building, applied or
+                                                  failed; after failed, one line per build error
 
 Exit 0 unless noted: qualified-names exits 1 when stdin is not a JSON list.
 Warnings are printed to stdout, ready to show under the gate's output.
@@ -182,6 +184,53 @@ def duplicate_definitions(scripts):
     return 0
 
 
+# The lines a --watch boot writes, in the order they can follow one another.
+WATCH_EVENTS = (("Watching model", "ready"), ("Change detected, rebuilding", "building"),
+                ("applied via", "applied"), ("build failed", "failed"))
+
+
+def watch_state(path):
+    """The last thing a --watch boot did. A failed rebuild leaves the runtime on the previous
+    model, so a gate that waited for "applied" sat out its whole wait and then tested the old
+    app: the session saw its fix fail and went looking for a bug in the fix."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return 0
+    state, at = "", 0
+    for index, line in enumerate(lines):
+        for marker, name in WATCH_EVENTS:
+            if marker in line:
+                state, at = name, index
+    print(state)
+    if state == "failed":
+        for error in watch_build_errors(lines[at:]):
+            print(error)
+    return 0
+
+
+def watch_build_errors(lines):
+    """"CE0116 <message> (Page 'X', Action button 'y')" per error in the problems JSON under a
+    "build failed" line; the "build failed" line itself when there is no JSON to read."""
+    text = "\n".join(lines)
+    start = text.find("{")
+    try:
+        report, _ = json.JSONDecoder().raw_decode(text[start:]) if start >= 0 else (None, 0)
+    except ValueError:
+        report = None
+    problems = (report or {}).get("problems", {})
+    errors = []
+    for problem in problems.get("problems", []) if isinstance(problems, dict) else []:
+        if problem.get("severity") != "Error":
+            continue
+        where = "; ".join("%s, %s" % (place.get("document", ""), place.get("element", ""))
+                          for place in problem.get("locations", [])[:1])
+        errors.append("%s %s%s" % (problem.get("errorCode") or "", problem.get("message", "").strip(),
+                                   " (%s)" % where if where else ""))
+    return errors or [lines[0].strip()]
+
+
 def main(argv):
     if len(argv) < 2:
         print(__doc__.strip(), file=sys.stderr)
@@ -203,6 +252,8 @@ def main(argv):
         return runtime_age(*args)
     if command == "duplicate-definitions":
         return duplicate_definitions(args)
+    if command == "watch-state" and len(args) == 1:
+        return watch_state(args[0])
     if command == "missing-browser" and len(args) == 1:
         return missing_browser(args[0])
     print("unknown or incomplete command: %s" % " ".join(argv[1:]), file=sys.stderr)

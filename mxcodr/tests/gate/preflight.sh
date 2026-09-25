@@ -42,29 +42,45 @@ preflight_stale_model() {
 
 # A --watch boot rebuilds and applies every model change itself -- pages by reload, entities
 # and security by an in-place restart. Waits for that instead of warning in the middle of it;
-# true when the boot log's last line says the latest change was applied.
+# true when the boot serves the latest model: it just started on it, or the last rebuild was
+# applied. A failed rebuild stops the gate: the runtime still runs the previous model.
 watch_applied_latest_change() {
-  local boot_log="$APP_DIR/.mxcli/gate-boot.log" waited=0
+  local boot_log="$APP_DIR/.mxcli/gate-boot.log" waited=0 state
   [ -f "$boot_log" ] && grep -q 'Watching model' "$boot_log" 2>/dev/null || return 1
   # The watcher notices a change a moment after the exec: give it a few seconds to start.
   while [ "$MPR" -nt "$boot_log" ] && [ "$waited" -lt "${MDL_WATCH_SETTLE_SECONDS:-5}" ]; do
     sleep 1; waited=$((waited + 1))
   done
-  # Done means the last line says "applied" AND the log has been quiet for a few seconds: three
+  # Done means the boot serves the model AND the log has been quiet for a few seconds: three
   # execs in a row rebuild three times, and the gap between two builds looked like the end --
   # the suite then ran into a restart and a web client being re-bundled (404 on dist/index.js).
   waited=0
   local quiet="${MDL_WATCH_QUIET_SECONDS:-3}"
   while [ "$waited" -lt 120 ]; do
-    if tail -1 "$boot_log" 2>/dev/null | grep -qE 'applied via (reload|restart)' \
+    state="$(gate_py watch-state "$boot_log" | head -1)"
+    [ "$state" = "failed" ] && report_watch_build_failure "$boot_log"
+    if { [ "$state" = "ready" ] || [ "$state" = "applied" ]; } \
        && [ "$(log_age "$boot_log")" -ge "$quiet" ] && [ ! "$MPR" -nt "$boot_log" ]; then
       break
     fi
     [ "$waited" = "0" ] && echo "   (waiting for --watch to apply the latest model change)"
     sleep 1; waited=$((waited + 1))
   done
-  tail -1 "$boot_log" 2>/dev/null | grep -qE 'applied via (reload|restart)' || return 1
+  case "$(gate_py watch-state "$boot_log" | head -1)" in ready|applied) ;; *) return 1 ;; esac
   client_served
+}
+
+# The last --watch rebuild failed, so the app still runs the model from before it: tests would
+# fail on a fix that never reached the app. Names the error and stops the gate.
+report_watch_build_failure() {   # report_watch_build_failure <boot-log>
+  {
+    echo "--watch could not rebuild the app, so it still runs the model from before your last exec:"
+    gate_py watch-state "$1" | tail -n +2 | head -8 | sed 's/^/   /'
+    echo "   Fix the script and exec it again. \"Checking will resume after the next change\" is a"
+    echo "   hiccup of the incremental build: bash tests/gate.sh --restart rebuilds from scratch."
+    echo "   full log: $1"
+  } >&2
+  exit 2
 }
 
 # Seconds since <file> last changed.
