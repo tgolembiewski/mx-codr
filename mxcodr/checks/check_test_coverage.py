@@ -17,8 +17,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-# `# covers: A, B, C`; group 1 is the comma list.
-COVERS_RE = re.compile(r"^\s*#\s*covers\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+# `# covers: A, B, C`, and the `#` lines right under it that hold only more names: a long list
+# wrapped over three lines counted its first line only, and the rest showed as untested.
+# Group 1 is the comma list, continuation lines included.
+QUALIFIED_LIST = r"[\w.]+\.\w+(?:\s*,\s*[\w.]+\.\w+)*\s*,?"
+COVERS_RE = re.compile(r"^\s*#\s*covers\s*:\s*(.+(?:\n\s*#\s*" + QUALIFIED_LIST + r"\s*$)*)",
+                       re.IGNORECASE | re.MULTILINE)
 
 
 def mxcli_binary(app_dir: Path) -> str:
@@ -100,7 +104,7 @@ def covered(tests_dir: Path) -> dict[str, list[str]]:
     for script in sorted(tests_dir.glob("verify-*.test.sh")):
         text = script.read_text(encoding="utf-8", errors="replace")
         for match in COVERS_RE.finditer(text):
-            for element in match.group(1).split(","):
+            for element in re.sub(r"\n\s*#", ",", match.group(1)).split(","):
                 element = element.strip()
                 if element:
                     claims.setdefault(element, []).append(script.name)

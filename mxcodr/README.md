@@ -215,6 +215,15 @@ now stops at once and names the error (`CE0116 ... (Page 'X', Action button 'y')
 waited two minutes, then tested the model from before the exec, and a session took a fix that
 never reached the app for a fix that did not work.
 
+A `# covers:` list wrapped over several `#` lines now counts every line of names, not the first
+only: a session saw its new flows reported untested until it joined the list by hand. BACK01
+leaves alone a page that is a menu item or a home page, even when a flow shows it again (back to
+My Orders after placing an order): the menu is its way back, and a session deleted the flow's
+`show page` to quiet the rule. And `oql` writes each entity after FROM or JOIN as
+`Module."Entity"` (`"Order"` gets `$MODULE`), and when mxcli still refuses a query it shows how an
+entity and an association are written: a session spent five queries on "'Order' is not a valid
+entity path".
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
@@ -567,7 +576,7 @@ project's own layouts:
 `ICON01` | error | a button (`actionbutton`, `linkbutton`, on a page or in a snippet) without an icon; the message suggests an Atlas_Filled icon from its action and caption |
 `LAYOUT01` | error | the app's pages use more than one layout (pop-ups, the login page and phone/tablet layouts aside), so the menu changes between pages |
 `USER01` | error | users sign in, and a page (pop-ups and the login page aside) does not open with `<Module>.SNIPPET_CurrentUser` on the right of its top row, after Back if there is one: the user icon and e-mail, top right, the same place on every page |
-`BACK01` | error | a page another page or a flow opens (`show_page`) does not start with a Back button: `close_page`, icon `chevron-left`, top left. Pop-ups are exempt |
+`BACK01` | error | a page another page or a flow opens (`show_page`) does not start with a Back button: `close_page`, icon `chevron-left`, top left. Pop-ups, menu pages and home pages are exempt |
 
 `GRID01` came from the same session: a customer grid showed its date column as formatted
 `Content` and dropped the column's `Attribute`, and its date filter rendered a red "Unable to
