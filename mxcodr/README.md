@@ -238,6 +238,26 @@ clean script again twice. `diagnose.sh` takes the entity with or without its mod
 session guessed `page.datagrid` and `page.widgets.datagrid`, and it is written again when its
 topic list changes, not only when mxcli does.
 
+### How the pages look
+
+The gate now looks at the rendered page, not only the MDL. At the end of every test, `look()`
+in `tests/scenario-helpers.js` measures the page the test left open: two unrelated widgets that
+overlap by 4 px or more (`VIS01`), a page that scrolls sideways (`VIS02`), text cut off
+(`VIS03`). The gate names the page from the widget names in `mdlsource/` and lists each problem
+once under `== warnings`. The layout check adds `ALERT01`: a box class (`alert`, `card`, `well`)
+on a `dynamictext`, which renders inline and draws its box over the line below. A cancellation
+notice did exactly that on an order page and the gate said DONE.
+
+With `MDL_VISUAL_REVIEW=agent` in `tests/harness.env` (for a model that reads images), `look()`
+also saves a screenshot per page. The gate writes `.mxcli/visual/review.md` with a fixed list of
+questions, and asks the agent to read each PNG and write `verdicts.json`: approve or reject, an
+answer to every question, and a fix. A verdict is keyed on the screenshot's sha256, so a changed
+page is asked again (`LOOK01`); a rejection repeats its fix (`LOOK02`).
+
+All of these are warnings for now: they do not block DONE. `MDL_VISUAL=error` makes them
+block, `MDL_VISUAL=0` turns them off. `tests/harness.env` now also accepts
+`MDL_REQUIRE_PRODUCTION` and `MDL_GATE_CACHE`, which were documented there but ignored.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per

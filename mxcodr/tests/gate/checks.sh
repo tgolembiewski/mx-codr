@@ -266,6 +266,15 @@ check_layout() {
   fi
   echo "layout: $(printf '%s\n' "$out" | head -1)" > "$WORK/layout.summary"
   printf '%s\n' "$out" | grep -E '^\s+[-!] ' | head -12 > "$WORK/layout.detail"
+  # How a page renders (ALERT01) is a warning while MDL_VISUAL=warn, a failure with MDL_VISUAL=error.
+  local look
+  look="$(printf '%s\n' "$out" | grep -E '^[[:space:]]+! \[ALERT01\]' | sed -E 's/^[[:space:]]+! /   - /')"
+  if [ -n "$look" ] && [ "${MDL_VISUAL:-warn}" = "error" ]; then
+    printf '%s\n' "$look" >> "$WORK/layout.detail"
+    gate=1
+  elif [ -n "$look" ] && [ "${MDL_VISUAL:-warn}" != "0" ]; then
+    printf '%s\n' "$look" > "$WORK/layout.warnings"
+  fi
   return "$gate"
 }
 
@@ -295,6 +304,7 @@ run_cached() {
       sed "s/\$/ (cached $(date -r "$CACHE_DIR/$name.summary" +%H:%M 2>/dev/null || echo earlier))/" \
         "$CACHE_DIR/$name.summary" > "$WORK/$name.summary"
       : > "$WORK/$name.detail"
+      [ -f "$CACHE_DIR/$name.warnings" ] && cp "$CACHE_DIR/$name.warnings" "$WORK/$name.warnings"
       echo 0 > "$WORK/$name.status"
       return 0
     fi
@@ -305,6 +315,9 @@ run_cached() {
   echo "$status" > "$WORK/$name.status"
   if [ "$status" = "0" ] && [ -n "$key" ] && mkdir -p "$CACHE_DIR" 2>/dev/null; then
     cp "$WORK/$name.summary" "$CACHE_DIR/$name.summary" 2>/dev/null && echo "$key" > "$CACHE_DIR/$name.key"
+    # A pass can carry warnings; a replayed pass shows them again.
+    rm -f "$CACHE_DIR/$name.warnings"
+    [ -s "$WORK/$name.warnings" ] && cp "$WORK/$name.warnings" "$CACHE_DIR/$name.warnings"
   fi
   return "$status"
 }
@@ -318,7 +331,7 @@ start_model_checks() {
   ( run_cached lint     check_lint     "${cache_inputs[@]}" .claude/lint-rules ) &
   ( run_cached coverage check_coverage "${cache_inputs[@]}" tests tools/mdl-checks/check_test_coverage.py ) &
   ( run_cached naming   check_naming   "${cache_inputs[@]}" tools/mdl-checks/check_mdl.py ) &
-  ( run_cached layout   check_layout   "${cache_inputs[@]}" tools/mdl-checks/check_layout.py ) &
+  ( run_cached layout   check_layout   "${cache_inputs[@]}" tools/mdl-checks/check_layout.py "env:MDL_VISUAL=${MDL_VISUAL:-}" ) &
   ( run_cached security check_security "${cache_inputs[@]}" "env:MDL_REQUIRE_PRODUCTION=${MDL_REQUIRE_PRODUCTION:-}" ) &
   echo "== mx check, lint, coverage, naming, layout and security started (they need no app; running while the suite does)"
 }

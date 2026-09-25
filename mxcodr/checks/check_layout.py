@@ -44,6 +44,8 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #   NAV05    FAIL  a menu item or sub-menu with no icon (the message suggests one for its caption)
 #   NAV04    FAIL  one of the project's own layouts opens two or more pages from buttons: a menu
 #                  built by hand, with no hamburger, no active item and no phone view
+#   ALERT01  WARN  a block class (alert, alert-*, card, well) on a dynamictext or text: it renders
+#                  as an inline <span>, so its padding and border overlap the widgets around it
 
 from __future__ import annotations
 
@@ -991,6 +993,32 @@ def layout_menu_findings(layouts: str) -> list[dict]:
         })
     return failures
 
+# Atlas classes that draw a box around their content: they need a block element to hold it.
+BLOCK_CLASS_RE = re.compile(r"Class:\s*'(?P<classes>[^']*\b(?:alert(?:-[\w-]+)?|card|well)\b[^']*)'")
+
+
+def block_class_findings(widgets: list[Widget]) -> list[dict]:
+    """ALERT01: a box class on an inline text widget. A cancellation notice written as
+    `dynamictext (Class: 'alert alert-danger')` drew its red box over the line below it and
+    the status badge beside it; the gate saw nothing, because the MDL was valid."""
+    warnings = []
+    for widget in widgets:
+        if widget.type not in ("dynamictext", "text"):
+            continue
+        found = BLOCK_CLASS_RE.search(widget.text)
+        if not found:
+            continue
+        warnings.append({
+            "check": "ALERT01",
+            "line": widget.line,
+            "message": (f"{widget.page}: {widget.name} carries '{found.group('classes')}' on a {widget.type},"
+                        f" which renders inline, so the box overlaps what is around it -- put the class on a"
+                        f" container and the text inside it: container ctNotice (Class: '{found.group('classes')}')"
+                        f" {{ {widget.type} {widget.name} (...) }} (skill spacing-and-layout, 'Alerts and notices')"),
+        })
+    return warnings
+
+
 def check(lines: list[str]) -> tuple[list[dict], list[dict], int]:
     """Return (failures, warnings, page count)."""
     widgets = parse(lines)
@@ -1009,7 +1037,7 @@ def check(lines: list[str]) -> tuple[list[dict], list[dict], int]:
     failures.extend(column_filter_findings(lines))
 
     headed = headed_pages(widgets)
-    return failures, missing_heading_warnings(headed), len(headed)
+    return failures, missing_heading_warnings(headed) + block_class_findings(widgets), len(headed)
 
 
 def collect(sources: list[Path]) -> tuple[str, list[Path]]:

@@ -12,6 +12,8 @@
 //   await_message(/regex/[, ms])       wait for an app message; returns the page text
 //   dismiss_dialog()                   click OK on an open dialog
 //   page_text()                        all visible page text
+//   look('label')                      measure the page as it renders now (VIS01-03); lib.sh
+//                                      calls look('end') after every scenario body by itself
 // Also in scope: page (Playwright), and BASE, USER, PASSWORD, ACTION_TIMEOUT from the settings.
 // Indented two spaces: the code runs inside the scenario's async function.
 // ---- helpers (lib.sh copies from the next line on) ----
@@ -225,3 +227,115 @@
     if (await ok.count()) await ok.first().click();
   };
   const page_text = async () => (await page.locator('body').innerText());
+
+  // ---- visual_findings (pure; the audit tests run it on made-up boxes) ----
+  // boxes: [{id, name, layer, leaf, text, x, y, w, h, clipped, rects?}]; only leaves (widgets with
+  // no named widget inside) are compared, so a container never 'overlaps' what it holds. rects:
+  // one box per rendered line of an inline widget -- a span that wraps onto a second line has a
+  // bounding box over both, which 'overlapped' its neighbours on the first line.
+  // viewport: {width, scrollWidth}. Returns [{code, widgets, px, message}].
+  const visual_findings = (boxes, viewport) => {
+    const found = [];
+    const MIN = 4;   // px both ways: touching borders and 1-2 px rounding are not an overlap
+    const leaves = boxes.filter(b => b.leaf && b.w > 0 && b.h > 0);
+    const overlaps = {};
+    for (let i = 0; i < leaves.length; i++) {
+      for (let j = i + 1; j < leaves.length; j++) {
+        const a = leaves[i], b = leaves[j];
+        if (a.layer !== b.layer) continue;   // a pop-up sits over the page by design
+        let w = 0, h = 0;
+        for (const ra of (a.rects || [a])) {
+          for (const rb of (b.rects || [b])) {
+            const cw = Math.min(ra.x + ra.w, rb.x + rb.w) - Math.max(ra.x, rb.x);
+            const ch = Math.min(ra.y + ra.h, rb.y + rb.h) - Math.max(ra.y, rb.y);
+            if (Math.min(cw, ch) > Math.min(w, h)) { w = cw; h = ch; }
+          }
+        }
+        if (w < MIN || h < MIN) continue;
+        const key = a.name;
+        overlaps[key] = overlaps[key] || {others: [], px: 0};
+        overlaps[key].others.push(b.name);
+        overlaps[key].px = Math.max(overlaps[key].px, Math.round(Math.min(w, h)));
+      }
+    }
+    for (const [name, o] of Object.entries(overlaps)) {
+      found.push({code: 'VIS01', widgets: [name, ...o.others], px: o.px,
+        message: name + ' overlaps ' + o.others.join(', ') + ' by ' + o.px + ' px'});
+    }
+    if (viewport.scrollWidth > viewport.width + 1) {
+      found.push({code: 'VIS02', widgets: [], px: Math.round(viewport.scrollWidth - viewport.width),
+        message: 'the page scrolls sideways by ' + Math.round(viewport.scrollWidth - viewport.width) + ' px'});
+    }
+    for (const b of leaves) {
+      if (b.clipped) found.push({code: 'VIS03', widgets: [b.name], px: b.clipped,
+        message: b.name + ' cuts its text off (' + b.clipped + ' px hidden)'});
+    }
+    return found;
+  };
+  // ---- end visual_findings ----
+  const __mdl_visual = [];
+  const look = async (label) => {
+    if (!VISUAL) return;
+    try {
+      const snap = await page.evaluate(() => {
+        const root = document.querySelector('.mx-page') || document.body;
+        // The layout's menu and bars are not this page's: collapsed sidebar items clip their text
+        // on purpose. (A content-region selector found an empty placeholder and measured nothing.)
+        const LAYOUT_PARTS = '.mx-navigationtree, .mx-navbar, .mx-menubar, .region-sidebar, .region-topbar, nav';
+        const els = Array.from(root.querySelectorAll('[class*="mx-name-"]'));
+        const shown = el => {
+          for (let e = el; e && e !== document.body; e = e.parentElement) {
+            const st = getComputedStyle(e);
+            if (st.display === 'none' || st.visibility === 'hidden' || st.opacity === '0') return false;
+            if (st.position === 'fixed' || st.position === 'sticky') return false;
+          }
+          return true;
+        };
+        const boxes = [];
+        els.forEach((el, i) => {
+          const m = /(?:^|\s)mx-name-(\S+)/.exec(typeof el.className === 'string' ? el.className : '');   // an SVG's is an object
+          if (!m || el.closest(LAYOUT_PARTS) || !shown(el)) return;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          const dialog = el.closest('.modal-dialog, .mx-dialog, .popupcontent');
+          const leaf = !el.querySelector('[class*="mx-name-"]');
+          const st = getComputedStyle(el);
+          const text = (el.innerText || '').trim().length > 0;
+          const hidden = el.scrollWidth - el.clientWidth;
+          const clipped = leaf && text && st.overflowX !== 'visible' && st.textOverflow !== 'ellipsis' && hidden > 1 ? hidden : 0;
+          const lines = st.display === 'inline' ? Array.from(el.getClientRects())
+            .filter(q => q.width && q.height).map(q => ({x: q.x, y: q.y, w: q.width, h: q.height})) : null;
+          boxes.push({id: i, name: m[1], layer: dialog ? 'dialog' : 'page', leaf, text,
+            x: r.x, y: r.y, w: r.width, h: r.height, clipped, rects: lines && lines.length ? lines : undefined});
+        });
+        // Atlas scrolls the content inside its own container, not the document: measure both.
+        const scrollers = [document.documentElement, root].concat(Array.from(root.querySelectorAll('*'))
+          .filter(e => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)));
+        const doc = document.documentElement;
+        const sideways = Math.max(doc.scrollWidth - doc.clientWidth, root.scrollWidth - root.clientWidth, 0);
+        return {boxes, viewport: {width: doc.clientWidth, scrollWidth: doc.clientWidth + sideways},
+          fullHeight: Math.max(...scrollers.map(e => e.scrollHeight - e.clientHeight)) + window.innerHeight,
+          title: document.title};
+      });
+      const findings = visual_findings(snap.boxes, snap.viewport);
+      let shot = '';
+      if (VISUAL_DIR) {
+        shot = VISUAL_DIR + '/' + TEST_NAME + '-' + (__mdl_visual.length + 1) + '.png';
+        // The whole page: a viewport as tall as the content, since the layout scrolls inside itself.
+        const size = page.viewportSize();
+        try {
+          if (size) await page.setViewportSize({width: size.width, height: Math.min(Math.ceil(snap.fullHeight), 8000)});
+          await page.waitForTimeout(300);
+          await page.screenshot({path: shot});
+        } catch (e) { shot = ''; }
+        if (size) await page.setViewportSize(size).catch(() => {});
+      }
+      __mdl_visual.push({label: String(label || ''), title: snap.title, findings, shot,
+        widgets: snap.boxes.map(b => b.name)});
+    } catch (e) {}   // measuring must never fail a test
+  };
+  // The scenario's value with what look() saw, for lib.sh to file and strip again.
+  const __mdl_attach_visual = (value) => {
+    if (!__mdl_visual.length || !value || typeof value !== 'object' || Array.isArray(value)) return value;
+    return Object.assign({}, value, {__visual: __mdl_visual});
+  };
