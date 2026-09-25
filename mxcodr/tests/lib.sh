@@ -257,7 +257,11 @@ _mdl_scenario_js() {
   _mdl_js_helpers
   # verify shows only the last stderr line, so the catch adds url and user to the error.
   printf '  try {\n'
-  printf '%s\n' "$body"
+  # The body runs as its own function so its `return` comes back here: then the page it ended
+  # on is measured (look), whatever the test checked, and the measurement rides on the result.
+  printf '  const __mdl_value = await (async () => {\n%s\n  })();\n' "$body"
+  printf '  await look("end");\n'
+  printf '  return __mdl_attach_visual(__mdl_value);\n'
   _mdl_js_catch_and_sign_out
   printf '}\n'
 }
@@ -273,6 +277,24 @@ _mdl_js_settings() {
   printf '  const ACTION_TIMEOUT = %s;\n' "$(mdl_json_number "${ACTION_TIMEOUT_MS:-8000}" 8000)"
   printf '  const RELEASE = %s;\n' "$_MDL_RELEASE"
   printf '  const REUSE = %s;\n' "$_MDL_REUSE"
+  # look(): MDL_VISUAL=0 turns the measuring off; MDL_VISUAL_REVIEW=agent adds screenshots.
+  printf '  const VISUAL = %s;\n' "$([ "${MDL_VISUAL:-warn}" = "0" ] && echo false || echo true)"
+  printf '  const VISUAL_DIR = %s;\n' "$(mdl_json_string "$(_mdl_visual_dir)")"
+  printf '  const TEST_NAME = %s;\n' "$(mdl_json_string "$(_mdl_test_name)")"
+}
+
+# Where look() saves screenshots; empty unless MDL_VISUAL_REVIEW=agent.
+_mdl_visual_dir() {
+  [ "${MDL_VISUAL_REVIEW:-}" = "agent" ] && [ "${MDL_VISUAL:-warn}" != "0" ] || return 0
+  mkdir -p "$APP_DIR/.mxcli/visual" 2>/dev/null && printf '%s' "$APP_DIR/.mxcli/visual"
+}
+
+# The running test's name: verify-050-customer-order for tests/verify-050-customer-order.test.sh.
+_mdl_test_name() {
+  local name
+  name="$(basename "${0:-scenario}")"
+  name="${name%.test.sh}"
+  printf '%s' "${name//[^A-Za-z0-9_-]/_}"
 }
 
 # The JS helpers a body calls, from tests/scenario-helpers.js.
@@ -360,7 +382,34 @@ _mdl_error_summary() {
 
 # _mdl_scenario_result <output> -- print the "### Result" section without blank lines.
 _mdl_scenario_result() {
-  printf '%s' "$1" | awk '/^### Result/{flag=1; next} /^### /{flag=0} flag' | sed '/^$/d'
+  local raw
+  raw="$(printf '%s' "$1" | awk '/^### Result/{flag=1; next} /^### /{flag=0} flag' | sed '/^$/d')"
+  case "$raw" in *__visual*) ;; *) printf '%s\n' "$raw"; return 0 ;; esac
+  # What look() measured goes to .mxcli/visual/findings.jsonl for the gate; the test gets its own value.
+  mkdir -p "$APP_DIR/.mxcli/visual" 2>/dev/null
+  printf '%s' "$raw" | "$PY" -c '
+import json, sys
+raw = sys.stdin.read().strip()
+try:
+    value = json.loads(raw)
+    if isinstance(value, str):
+        value = json.loads(value)
+except ValueError:
+    print(raw)
+    sys.exit()
+if not isinstance(value, dict) or "__visual" not in value:
+    print(raw)
+    sys.exit()
+seen = value.pop("__visual")
+try:
+    with open(sys.argv[1], "a", encoding="utf-8") as out:
+        for look in seen:
+            look["test"] = sys.argv[2]
+            out.write(json.dumps(look) + "\n")
+except OSError:
+    pass
+print(json.dumps(value))
+' "$APP_DIR/.mxcli/visual/findings.jsonl" "$(_mdl_test_name)"
 }
 
 # --- 8. Reading the result ---

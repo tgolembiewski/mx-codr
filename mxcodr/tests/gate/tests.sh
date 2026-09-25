@@ -76,6 +76,9 @@ step_tests() {
   local -a targets
   local out status environment started=$SECONDS
   select_test_targets
+  # look() appends to findings.jsonl in every scenario; this run's pages only. The screenshots
+  # go too; review.md and verdicts.json stay, a verdict is keyed on a screenshot's bytes.
+  rm -f .mxcli/visual/findings.jsonl .mxcli/visual/*.png 2>/dev/null
   echo "== tests: ${targets[*]}"
   out="$(run_suite "${targets[@]}")"
   status=$?
@@ -158,5 +161,31 @@ record_suite_result() {
   if [ -z "$environment" ] && [ -x tests/diagnose.sh ]; then
     echo "== facts (tests/diagnose.sh)"
     bash tests/diagnose.sh 2>&1 | sed 's/^/   /' | head -40
+  fi
+}
+
+# What the pages looked like when the tests left them (look() in scenario-helpers.js): overlapping
+# widgets, sideways scroll, cut-off text -- and, with MDL_VISUAL_REVIEW=agent, screenshots the
+# agent must judge. Warnings by default (MDL_VISUAL=warn); MDL_VISUAL=error makes them block DONE.
+# A cancellation notice drew its red box over the order summary and the gate said DONE.
+step_visual() {
+  local mode="${MDL_VISUAL:-warn}" out
+  [ "$mode" = "0" ] && return 0
+  [ -z "${ONLY:-}" ] && [ "${TESTS_ONLY:-0}" != "1" ] || return 0
+  local -a review=()
+  [ "${MDL_VISUAL_REVIEW:-}" = "agent" ] && review=(--review "$APP_DIR/.mxcli/visual")
+  out="$(gate_py visual-report .mxcli/visual/findings.jsonl mdlsource ${review[@]+"${review[@]}"} 2>/dev/null)"
+  if [ -z "$out" ]; then
+    summary+=("visual: nothing overlaps, scrolls sideways or is cut off on the pages the tests reached")
+    return 0
+  fi
+  if [ "$mode" = "error" ]; then
+    printf '%s\n' "$out" > "$WORK/visual.detail"
+    echo "visual: $(printf '%s\n' "$out" | grep -c .) finding(s) on the pages the tests reached" > "$WORK/visual.summary"
+    echo 1 > "$WORK/visual.status"
+    collect visual "visual"
+  else
+    printf '%s\n' "$out" > "$WORK/visual.warnings"
+    summary+=("visual: $(printf '%s\n' "$out" | grep -c .) warning(s) -- see == warnings (MDL_VISUAL=error makes them block DONE)")
   fi
 }

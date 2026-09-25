@@ -51,11 +51,17 @@ the gate, `--only` runs and the boot carry their own limits. Never hand-roll a w
 or for a reload either (`for i in $(seq 1 30); do sleep 5; grep … gate-boot.log`): `gate.sh`
 and `gate.sh --only` wait for the runtime and for `--watch` to apply the latest change, and say so.
 
+The gate also measures the page each test ends on and lists, under `== warnings`, widgets that
+overlap (`VIS01`), a page that scrolls sideways (`VIS02`) and cut-off text (`VIS03`), with the
+page and widget names: fix them like any finding. With `MDL_VISUAL_REVIEW=agent` it also saves a
+screenshot per page and asks you to judge them in `.mxcli/visual/review.md` -- Read each PNG,
+answer every question, write `verdicts.json`; a page you change is asked again.
+
 **The syntax digest is already in your context** under Claude Code, Cursor, OpenCode and Pi --
 anywhere else, `cat tools/mdl-checks/syntax-digest.md` whole, once, right after orient.sh. The
 installer writes it and `tests/orient.sh` refreshes it from this project's own mxcli: the
-`Syntax:` blocks of the fourteen topics every session otherwise looks up one call at a time (entities, associations, enumerations, module and
-user roles, demo users, entity access, settings, modules, pages, page actions, snippets,
+`Syntax:` blocks of the fifteen topics every session otherwise looks up one call at a time (entities, associations, enumerations, module and
+user roles, demo users, entity access, settings, modules, pages, page actions, data sources, snippets,
 navigation, object operations) -- 22, 25 and 19 lookups in three measured sessions.
 
 For anything else, `./mxcli syntax` with no argument lists every topic. After that, **ask for the leaf

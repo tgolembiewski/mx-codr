@@ -407,6 +407,25 @@ create or modify page Sales.Order_Detail (Title: 'Order', Layout: Atlas_Core.Atl
 
 The gate fails `BACK01` for every opened page without it and says which page opens it.
 
+## Alerts and notices: the box class goes on a container
+
+`alert`, `alert-danger`, `card`, `well` draw a box with padding and a border. On a
+`dynamictext` they land on an inline `<span>`: the box is drawn, but the padding does not
+push anything down, so it lies over the line below and the badge beside it. A cancellation
+notice did exactly that over an order's summary. Put the class on a container and the text
+inside it:
+
+```sql
+container ctCancelNotice (Class: 'alert alert-danger',
+  Visible: [$currentObject/Status = Sales.OrderStatus.Cancelled],
+  DesignProperties: ['Spacing': ['margin-bottom': 'M']]) {
+  dynamictext txtCancelNotice (Content: 'This order was cancelled. Reason: {1}',
+    ContentParams: [{1} = CancelReason])
+}
+```
+
+A `badge` is inline by design and stays on the `dynamictext`.
+
 ## Headings
 
 Stock Atlas layouts render the **app** brand in the top region, not the page title,
@@ -462,13 +481,24 @@ layout: PASS  0 failure(s) over 6 page(s)
 `LAYOUT01` | error | the app's pages (pop-ups, login and phone/tablet pages aside) use more than one layout |
 `USER01` | error | users sign in, and a page (pop-ups and the login page aside) does not open with `<Module>.SNIPPET_CurrentUser` on the right of its top row (first, or right after Back in the same container) |
 `BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups, menu pages and home pages are exempt |
+`ALERT01` | warning | a box class (`alert`, `alert-*`, `card`, `well`) on a `dynamictext` or `text` |
+`VIS01` | warning | measured in the browser at the end of every test: two unrelated widgets overlap by 4 px or more |
+`VIS02` | warning | measured: the page scrolls sideways |
+`VIS03` | warning | measured: a widget cuts its text off |
+`LOOK01` | warning | with `MDL_VISUAL_REVIEW=agent`: a screenshot not reviewed yet — open `.mxcli/visual/review.md`, read each PNG, answer every question, write `verdicts.json` |
+`LOOK02` | warning | with review on: a screenshot you rejected; the line repeats your own fix |
+
+The warnings list under `== warnings` in the gate's output and do not block DONE yet;
+`MDL_VISUAL=error` in `tests/harness.env` makes them block, `MDL_VISUAL=0` turns them off.
 
 ## What this cannot see
 
-A narrow window also **cuts content off sideways** when a grid has more columns than
-fit. No margin fixes that and no read of the MDL proves it: it is a datagrid with too
-many columns for a phone, or a `layoutgrid` column that never stacks. Judge that by
-narrowing the browser.
+The browser measurement sees only the pages the tests reach, at the browser's width. A
+narrow window also **cuts content off sideways** when a grid has more columns than fit:
+a datagrid with too many columns for a phone, or a `layoutgrid` column that never
+stacks. Judge that by narrowing the browser.
 
-Nothing here judges colour, typography or contrast — those are not mechanically
-checkable, and a rule that cannot be checked is advice. Look at the screen for those.
+Colour, typography, proportion and contrast are not measured. With
+`MDL_VISUAL_REVIEW=agent` the gate saves a screenshot per page and asks you to judge
+them against a fixed list of questions (`.mxcli/visual/review.md`); without it, look at
+the screen yourself.

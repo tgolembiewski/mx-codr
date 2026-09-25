@@ -16,12 +16,12 @@
 #   NOT DONE — failed: <checks>             exit 1
 #   NOT DONE — could not run: <checks>      exit 2
 # Exit 2 also means the gate stopped early: no .mpr, bad argument, no app answering,
-# a boot that failed, or the runtime refusing sessions.
-#
+# a boot that failed, or the runtime refusing sessions. Visual findings are warnings.
 # Env: BASE_URL (else 8081 then 8080), APP_PORT (8081), SCRIPT_TIMEOUT (90s),
 #      BOOT_TIMEOUT (180s), RUNTIME_LOG, ADMIN_PORT, ADMIN_PASSWORD, SERVE_PORT,
 #      ALLOW_BUSY_SESSION=1, MDL_GATE_CACHE=0, MDL_BOOT_COMMAND (replaces mxcli run),
-#      MDL_MXBUILD_PATH, MDL_DB_*, MDL_PSQL -- MDL_* may also be set in tests/harness.env.
+#      MDL_MXBUILD_PATH, MDL_DB_*, MDL_PSQL, MDL_VISUAL=warn|error|0, MDL_VISUAL_REVIEW=agent
+#      -- MDL_* may also be set in tests/harness.env.
 # Lines 2-24 are printed by --help; keep them 23 lines.
 
 # How to read this file: main() at the bottom is the whole gate, step by step. The steps
@@ -101,13 +101,25 @@ add_red_first_notes() {
   fi
 }
 
+# What a check found that does not block DONE (yet): <check>.warnings, as `   - [CODE] ...` lines.
+print_warnings() {
+  local file shown=0
+  for file in "$WORK"/*.warnings; do
+    [ -s "$file" ] || continue
+    [ "$shown" = "0" ] && { echo; echo "== warnings (they do not block DONE; fix them anyway -- MDL_VISUAL=error makes them block)"; }
+    shown=1
+    head -12 "$file"
+  done
+}
+
 # Prints the verdict lines and exits: 1 on a failure, 2 when a check could not run, else 0.
 print_verdict_and_exit() {
   local line name timing=""
+  print_warnings
   echo
   echo "== gate"
   for line in "${summary[@]}"; do echo "   $line"; done
-  for name in tests mx lint coverage naming layout security; do
+  for name in tests mx lint coverage naming layout security visual; do
     [ -f "$WORK/$name.secs" ] && timing="$timing $name $(cat "$WORK/$name.secs")s,"
   done
   echo "   timing:${timing} wall $((SECONDS - GATE_START))s"
@@ -228,6 +240,7 @@ main() {
   preflight_environment
   preflight_stale_model
   step_tests
+  step_visual
   add_red_first_notes
   note_never_red_tests
   # 4. Wait for the model checks and collect their verdicts.

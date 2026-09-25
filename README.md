@@ -81,6 +81,10 @@ what to fix. Codes in brackets are what the gate prints.
   of the same top row, under the language selector, who is signed in: a user icon and e-mail
   that opens My account (`USER01`).
 - An icon on every button (`ICON01`); Atlas spacing, no custom CSS (`SPACE01`-`03`).
+- Pages checked as they render: after every test the gate measures the page for widgets
+  that overlap, sideways scrolling and cut-off text (`VIS01`-`03`), and flags an alert
+  class on plain text (`ALERT01`). With `MDL_VISUAL_REVIEW=agent`, a model that reads
+  images also judges a screenshot of each page (`LOOK01`-`02`). Warnings for now.
 
 The agent learns these from six *skills* (short guides) that the installer puts in
 place. You don't need to read them.

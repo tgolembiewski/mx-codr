@@ -13,6 +13,9 @@
                                                   in the same folder creates too (SCRIPT01)
     gate_helpers.py watch-state <boot-log>        where a --watch boot is: ready, building, applied or
                                                   failed; after failed, one line per build error
+    gate_helpers.py visual-report <findings.jsonl> [<scripts-dir>] [--review <dir>]
+                                                  one warning line per page problem look() measured;
+                                                  with --review, the screenshots still to be judged
 
 Exit 0 unless noted: qualified-names exits 1 when stdin is not a JSON list.
 Warnings are printed to stdout, ready to show under the gate's output.
@@ -231,6 +234,148 @@ def watch_build_errors(lines):
     return errors or [lines[0].strip()]
 
 
+# The widget names a script declares, per page: `create ... page Module.Name` up to the next create.
+PAGE_START_RE = re.compile(r"^\s*create\s+(?:or\s+(?:modify|replace)\s+)?page\s+(?P<name>[\w.\"]+)",
+                           re.IGNORECASE | re.MULTILINE)
+WIDGET_NAME_RE = re.compile(r"^\s*[a-z][a-z0-9_]*\s+(?P<name>[A-Za-z_]\w*)\s*[({]", re.MULTILINE)
+
+VISUAL_FIX = {
+    "VIS01": "a box class on inline text (alert, card) or a negative margin is the usual cause",
+    "VIS02": "a fixed width or a long unbroken value is the usual cause; check the page at phone width",
+    "VIS03": "the text needs room: a wider column, wrapping, or an ellipsis on purpose",
+}
+
+RUBRIC = [
+    "Does anything overlap or sit on top of something else?",
+    "Is everything aligned to the grid: left edges, columns, the top row (Back and the user)?",
+    "Is the spacing between blocks even, with no cramped or oversized gaps?",
+    "Is any text, button or value cut off, wrapped badly or truncated?",
+    "Do badges, alerts and buttons sit where a user expects them, in the right size?",
+    "Does the heading hierarchy read right (page title, section headings)?",
+    "Are empty, zero or odd states shown sensibly (empty grids, 0.00, missing values)?",
+    "Is all text readable (contrast, size) against its background?",
+]
+
+
+def pages_by_widgets(folder):
+    """{page: set(widget names)} from the .mdl scripts in folder."""
+    found = {}
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return found
+    for name in names:
+        if not name.endswith(".mdl"):
+            continue
+        try:
+            with open(os.path.join(folder, name), encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        except OSError:
+            continue
+        starts = list(PAGE_START_RE.finditer(text))
+        for index, start in enumerate(starts):
+            end = starts[index + 1].start() if index + 1 < len(starts) else len(text)
+            block = text[start.end():end]
+            nxt = re.search(r"^\s*(?:create|grant|alter)\b", block, re.IGNORECASE | re.MULTILINE)
+            block = block[:nxt.start()] if nxt else block
+            page = start.group("name").replace('"', "")
+            found[page] = {m.group("name") for m in WIDGET_NAME_RE.finditer(block)}
+    return found
+
+
+def page_of(look, pages):
+    """The page whose widgets best match what look() saw, else the browser title."""
+    seen = set(look.get("widgets") or [])
+    ranked = sorted(((len(seen & widgets), page) for page, widgets in pages.items()), reverse=True)
+    # The page with the most of the measured widget names, when no other page ties with it.
+    if ranked and ranked[0][0] >= 2 and (len(ranked) == 1 or ranked[1][0] < ranked[0][0]):
+        return ranked[0][1]
+    return 'page "%s"' % (look.get("title") or "?").replace("Mendix - ", "")
+
+
+def file_sha(path):
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return ""
+
+
+def visual_report(findings_path, scripts_dir="", review_dir=""):
+    """One line per distinct page problem; with review_dir, writes review.md and reports the
+    screenshots without an approving verdict for their current bytes."""
+    looks = []
+    try:
+        with open(findings_path, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    looks.append(json.loads(line))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    pages = pages_by_widgets(scripts_dir) if scripts_dir else {}
+    seen = set()
+    for look in looks:
+        where = page_of(look, pages)
+        for finding in look.get("findings") or []:
+            key = (where, finding.get("code"), tuple(sorted(finding.get("widgets") or [])))
+            if key in seen:
+                continue
+            seen.add(key)
+            code = finding.get("code", "VIS")
+            print("   - [%s] %s (%s): %s -- %s" % (code, where, look.get("test", "?"), finding.get("message", ""),
+                                                 VISUAL_FIX.get(code, "")))
+    if review_dir:
+        review_screenshots(looks, pages, review_dir)
+    return 0
+
+
+def review_screenshots(looks, pages, folder):
+    """Writes <folder>/review.md; prints a line per screenshot not approved in verdicts.json."""
+    shots, listed = [], set()
+    for look in looks:
+        shot = look.get("shot") or ""
+        if shot and shot not in listed and os.path.exists(shot):
+            listed.add(shot)
+            shots.append((shot, file_sha(shot), page_of(look, pages), look))
+    if not shots:
+        return
+    verdicts_path = os.path.join(folder, "verdicts.json")
+    try:
+        with open(verdicts_path, encoding="utf-8") as f:
+            verdicts = json.load(f)
+    except (OSError, ValueError):
+        verdicts = {}
+    lines = ["# Screenshots to review", "",
+             "Open each PNG (Read it), answer every question for it, then write verdicts.json in this",
+             "folder: {\"<sha256>\": {\"verdict\": \"approve\" | \"reject\", \"answers\": {\"1\": \"...\", ...},",
+             "\"fix\": \"what to change, if rejected\"}}. A changed page has a new sha256 and is asked again.",
+             "", "Questions:"] + ["%d. %s" % (i, q) for i, q in enumerate(RUBRIC, 1)] + [""]
+    pending = 0
+    for shot, sha, where, look in shots:
+        verdict = verdicts.get(sha) if isinstance(verdicts, dict) else None
+        measured = "; ".join(f.get("message", "") for f in look.get("findings") or []) or "nothing measured"
+        lines += ["## %s (%s)" % (where, look.get("test", "?")), "", "- file: %s" % shot, "- sha256: %s" % sha,
+                  "- measured: %s" % measured, ""]
+        answers = verdict.get("answers") if isinstance(verdict, dict) else None
+        complete = isinstance(answers, dict) and all(str(answers.get(str(i), "")).strip()
+                                                     for i in range(1, len(RUBRIC) + 1))
+        if not isinstance(verdict, dict) or verdict.get("verdict") not in ("approve", "reject") or not complete:
+            pending += 1
+        elif verdict.get("verdict") == "reject":
+            print("   - [LOOK02] %s (%s): rejected in review -- %s" % (where, look.get("test", "?"),
+                                                                     str(verdict.get("fix") or "no fix given")[:200]))
+    try:
+        with open(os.path.join(folder, "review.md"), "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    except OSError:
+        pass
+    if pending:
+        print("   - [LOOK01] %d screenshot(s) not reviewed yet: open %s, read each PNG, answer every"
+              " question and write verdicts.json there" % (pending, os.path.join(folder, "review.md")))
+
+
 def main(argv):
     if len(argv) < 2:
         print(__doc__.strip(), file=sys.stderr)
@@ -252,6 +397,13 @@ def main(argv):
         return runtime_age(*args)
     if command == "duplicate-definitions":
         return duplicate_definitions(args)
+    if command == "visual-report" and args:
+        review = ""
+        if "--review" in args:
+            at = args.index("--review")
+            review = args[at + 1] if at + 1 < len(args) else ""
+            args = args[:at] + args[at + 2:]
+        return visual_report(args[0], args[1] if len(args) > 1 else "", review)
     if command == "watch-state" and len(args) == 1:
         return watch_state(args[0])
     if command == "missing-browser" and len(args) == 1:
