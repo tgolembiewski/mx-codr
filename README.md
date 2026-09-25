@@ -85,6 +85,9 @@ what to fix. Codes in brackets are what the gate prints.
   that overlap, sideways scrolling and cut-off text (`VIS01`-`03`), and flags an alert
   class on plain text (`ALERT01`). With `MDL_VISUAL_REVIEW=agent`, a model that reads
   images also judges a screenshot of each page (`LOOK01`-`02`). Warnings for now.
+- Server errors logged while the tests ran are listed (`RUNTIME01`): a test can pass while the
+  page behind it threw. Microflow tests (`*.test.mdl`) are named, with the command that runs
+  them, since the gate cannot run them next to the app.
 
 The agent learns these from six *skills* (short guides) that the installer puts in
 place. You don't need to read them.

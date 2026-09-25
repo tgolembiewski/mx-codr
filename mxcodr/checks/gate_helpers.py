@@ -13,6 +13,9 @@
                                                   in the same folder creates too (SCRIPT01)
     gate_helpers.py watch-state <boot-log>        where a --watch boot is: ready, building, applied or
                                                   failed; after failed, one line per build error
+    gate_helpers.py runtime-errors <runtime.log> <since>
+                                                  the ERROR/CRITICAL lines logged at or after <since>
+                                                  ('YYYY-MM-DD HH:MM:SS'), one per distinct message
     gate_helpers.py visual-report <findings.jsonl> [<scripts-dir>] [--review <dir>]
                                                   one warning line per page problem look() measured;
                                                   with --review, the screenshots still to be judged
@@ -234,6 +237,49 @@ def watch_build_errors(lines):
     return errors or [lines[0].strip()]
 
 
+# --- runtime-errors: what the server logged while the tests ran --------------------------------
+
+LOG_LINE_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\.\d+ (ERROR|CRITICAL) - (.*)$")
+# What a restart or a client re-bundle logs on its own, not something a test did.
+LOG_NOISE_RE = re.compile(r"Connector: 404 - file not found for file: dist|M2EE: An error occurred while "
+                          r"executing action 'shutdown'|M2EE: An exception occurred during Runtime shutdown|"
+                          r"Maximum number of sessions exceeded")
+# "LivePreview: null" is an OQL query over the admin API (mxcli oql, a test's data check) that
+# failed; the query itself is on a following line, and says more than the header.
+OQL_REQUEST_RE = re.compile(r"GetRequest \(depth = -?\d+\): (.*)$")
+
+
+def runtime_errors(path, since):
+    """A page action that throws shows the user a generic dialog; the test that clicked it can
+    still pass. The runtime log has the error: every distinct one logged from `since` on."""
+    seen, order = {}, []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return 0
+    for index, line in enumerate(lines):
+        found = LOG_LINE_RE.match(line.rstrip())
+        if not found or found.group(1) < since or LOG_NOISE_RE.search(found.group(3)):
+            continue
+        message = found.group(3)
+        if message.strip() == "LivePreview: null":
+            query = next((OQL_REQUEST_RE.search(l).group(1) for l in lines[index + 1:index + 4]
+                          if OQL_REQUEST_RE.search(l)), "")
+            message = "an OQL query over the admin API failed (mxcli oql, a test's data check)" + (
+                ": " + query if query else "")
+        message = re.sub(r"\s+", " ", message)[:200]
+        if message not in seen:
+            order.append(message)
+        seen[message] = seen.get(message, 0) + 1
+    for message in order[:6]:
+        times = " (%d times)" % seen[message] if seen[message] > 1 else ""
+        print("   - [RUNTIME01] the server logged while the tests ran: %s%s" % (message, times))
+    if len(order) > 6:
+        print("   - [RUNTIME01] ... and %d more distinct errors in the runtime log" % (len(order) - 6))
+    return 0
+
+
 # The widget names a script declares, per page: `create ... page Module.Name` up to the next create.
 PAGE_START_RE = re.compile(r"^\s*create\s+(?:or\s+(?:modify|replace)\s+)?page\s+(?P<name>[\w.\"]+)",
                            re.IGNORECASE | re.MULTILINE)
@@ -397,6 +443,8 @@ def main(argv):
         return runtime_age(*args)
     if command == "duplicate-definitions":
         return duplicate_definitions(args)
+    if command == "runtime-errors" and len(args) == 2:
+        return runtime_errors(*args)
     if command == "visual-report" and args:
         review = ""
         if "--review" in args:
