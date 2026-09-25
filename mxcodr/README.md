@@ -56,7 +56,7 @@ is the shipping container, never the place to edit:
 | `checks/*.py`, `checks/fixtures/` | `tests/skills/` |
 | `rules/`, `hooks/`, `plugins/`, `tests/`, `skills/spacing-and-layout/` | authored here; no other copy in the repo |
 
-**Finding your way in a long script.** No script is longer than about 450 lines. Where one grew
+**Finding your way in a long script.** No script is longer than about 500 lines. Where one grew
 past that it became an entry plus parts: `install.sh` + `install/`, `tests/gate.sh` +
 `tests/gate/`, `tests/lib.sh` + `tests/lib/`, `checks/check_layout.py` + `checks/layout_rules/`.
 The entry keeps the name everything calls, starts with a map of its parts, and sources or
