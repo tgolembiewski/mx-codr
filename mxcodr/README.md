@@ -208,6 +208,13 @@ the gap between two builds ran the suite into a restart that was re-bundling the
 line each with the code to paste, after a session read `check_layout.py` three times to
 understand them.
 
+The wait also ends where there is nothing to wait for. Right after `tests/gate.sh --restart` the
+boot log ends with "Watching model ... (serving build #1)" rather than "applied", and every gate
+sat out the full two minutes before its first test. And when a `--watch` rebuild fails, the gate
+now stops at once and names the error (`CE0116 ... (Page 'X', Action button 'y')`): before, it
+waited two minutes, then tested the model from before the exec, and a session took a fix that
+never reached the app for a fix that did not work.
+
 ### The syntax every session looks up
 
 Three measured sessions asked `./mxcli syntax <topic>` 22, 25 and 19 times each, one topic per
