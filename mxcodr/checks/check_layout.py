@@ -625,9 +625,14 @@ def is_back_button(wtype: str, props: str) -> bool:
             and "chevron-left" in props)
 
 
-def back_button_findings(lines: list[str], opened_from: str) -> list[dict]:
-    """BACK01: every page reached from another page or a flow starts with a way back."""
+def back_button_findings(lines: list[str], opened_from: str, navigation: str = "") -> list[dict]:
+    """BACK01: every page reached from another page or a flow starts with a way back. A menu item
+    or home page is a top-level page even when a flow shows it again (back to My Orders after
+    placing an order): a Back there leads nowhere, and a session deleted the flow's `show page`
+    to quiet the rule."""
     blocks = page_blocks(lines)
+    top_level = {found.group("page").lower() for line in navigation.splitlines()
+                 for found in (MENU_PAGE_RE.match(line), HOME_RE.match(line)) if found}
     openers: dict[str, list[str]] = {}
     for page, block in blocks.items():
         for hit in SHOW_PAGE_ANY_RE.finditer("\n".join(block[1:])):
@@ -646,6 +651,8 @@ def back_button_findings(lines: list[str], opened_from: str) -> list[dict]:
         block = blocks.get(page)
         if not block:
             continue  # not one of this project's pages
+        if page.lower() in top_level:
+            continue  # reached from the menu: the menu is the way back
         layout = PAGE_LAYOUT_RE.search("\n".join(block[:8]))
         if layout and "popup" in layout.group("layout").lower():
             continue  # a pop-up closes with its own X
@@ -1078,7 +1085,7 @@ def main() -> int:
     snippets_text, _ = collect(args.sign_out_sources) if args.sign_out_sources else ("", [])
     failures += button_icon_findings(text.splitlines() + snippets_text.splitlines())
     opened, _ = collect(args.opened_from) if args.opened_from else ("", [])
-    failures += back_button_findings(text.splitlines(), opened)
+    failures += back_button_findings(text.splitlines(), opened, navigation_text)
     if args.layouts:
         layouts, _ = collect(args.layouts)
         failures += layout_menu_findings(layouts)

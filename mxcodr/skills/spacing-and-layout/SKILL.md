@@ -379,7 +379,8 @@ The gate fails `USER01` for every page that does not start with the snippet.
 A page that another page or a microflow opens (`show_page`, `show page`) starts with a
 **Back** button, top left, above its heading. Without one, the only way back is the
 browser's own button or the menu, and a detail page reached from a list becomes a dead
-end — a Pi session built three of those.
+end — a Pi session built three of those. A menu page or a home page needs none, even when a
+microflow shows it again after an action: the menu is its way back.
 
 ```sql
 create or modify page Sales.Order_Detail (Title: 'Order', Layout: Atlas_Core.Atlas_Default,
@@ -460,7 +461,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `ICON01` | error | a button (`actionbutton`, `linkbutton`) without an icon; the message suggests one from its action and caption |
 `LAYOUT01` | error | the app's pages (pop-ups, login and phone/tablet pages aside) use more than one layout |
 `USER01` | error | users sign in, and a page (pop-ups and the login page aside) does not open with `<Module>.SNIPPET_CurrentUser` on the right of its top row (first, or right after Back in the same container) |
-`BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups are exempt |
+`BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups, menu pages and home pages are exempt |
 
 ## What this cannot see
 

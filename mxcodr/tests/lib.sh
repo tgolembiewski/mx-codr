@@ -403,13 +403,17 @@ for key in keys:
 }
 
 # --- 9. Data assertions (~0.03s each) ---
-# oql "<query>" -- rows as JSON, or fail with mxcli's own error. Qualify entities: $MODULE.Invoice.
+# oql "<query>" -- rows as JSON, or fail with mxcli's own error. An entity after FROM or JOIN
+# is written Module."Entity"; one written without its module gets $MODULE.
 oql() {
-  local query="$1" output
+  local query output
+  query="$(oql_qualified "$1")"
   # `if !` keeps the output and stops set -e exiting before the error is reported.
   if ! output="$("$MXCLI" oql -p "$APP_DIR/$MPR" --host "${ADMIN_HOST:-localhost}" \
                  --port "${ADMIN_PORT:-8090}" --json "$query" 2>&1)"; then
-    fail "OQL failed: $(printf '%s' "$output" | grep -v '^$' | head -2 | tr '\n' ' ')"
+    fail "OQL failed: $(printf '%s' "$output" | grep -v '^$' | grep -v 'vibe-coded PoC' | head -2 | tr '\n' ' ')
+   (write an entity as Module.\"Entity\", e.g. ${MODULE:-MyModule}.\"Order\"; reach an association with
+   JOIN o/Module.Assoc/Module.Entity AS x; or count with oql_count <Entity> \"<where>\")"
   fi
   # mxcli appends a "(n rows)" line, so decode only the first JSON value.
   local json
@@ -426,6 +430,27 @@ except ValueError:
 print(json.dumps(value))
 ")" || fail "OQL returned nothing to parse: $(printf '%s' "$output" | grep -v '^$' | head -2 | tr '\n' ' ')"
   printf '%s' "$json"
+}
+
+# The query with each entity after FROM or JOIN written Module."Entity": `"Order"` and `Order`
+# take $MODULE, `"Sales.Order"` and `Sales.Order` become Sales."Order". A session spent five
+# queries on "'Order' is not a valid entity path". Association paths (o/...) and subqueries pass.
+oql_qualified() {   # oql_qualified <query>
+  MODULE="${MODULE:-}" "$PY" -c '
+import os, re, sys
+module = os.environ["MODULE"]
+def entity(found):
+    keyword, name = found.group(1), found.group(2).replace("\"", "")
+    if "." in name:
+        owner, name = name.rsplit(".", 1)
+    elif module:
+        owner = module
+    else:
+        return found.group(0)
+    return "%s %s.\"%s\"" % (keyword, owner, name)
+query = sys.argv[1]
+print(re.sub(r"\b(FROM|JOIN)\s+(\"[\w.]+\"|[A-Za-z_][\w.]*(?![\w.\"/]))", entity, query, flags=re.IGNORECASE))
+' "$1"
 }
 
 # The entity as OQL reads it: quoted, so one named Order (or another reserved word) parses.
