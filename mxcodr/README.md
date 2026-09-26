@@ -793,7 +793,9 @@ Three things it deliberately does not do:
   WSL2 backend) and then waits with you for the daemon — up to `DOCKER_WAIT`
   seconds, default 180, and Ctrl-C stops the waiting without stopping the install.
   With no console it falls back to printing the command. `MDL_ASSUME_YES=1` answers
-  the prompts for an unattended run.
+  the prompts for an unattended run. When Virtual Machine Platform and Hyper-V are
+  both off, Docker Desktop cannot start at all: the installer does not wait, and
+  says `wsl --install --no-distribution` plus a reboot, or `MDL_RUN_MODE=local`.
 - **The JDK is found, not demanded.** Studio Pro installs one as its own
   prerequisite, so a machine that can open the project usually has a usable JDK
   already — on the Windows test machine there were *three*, and none on the PATH.
