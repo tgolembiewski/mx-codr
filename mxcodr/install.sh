@@ -32,7 +32,23 @@
 #   install/step_harness.sh  15-16. the test harness, record the install, check the environment
 #   install/summary.sh       17. summary
 
-set -euo pipefail
+set -Eeuo pipefail
+
+# No silent exits. A command that fails outside an if / || / && ends the install (set -e); the
+# ERR trap notes where, and the EXIT trap says so. ERR fires only on such a failure, so a
+# deliberate stop (ui_fail) keeps its own message alone.
+# A missing shasum on Windows once ended the install with no word at all.
+MDL_STOPPED_AT=""
+trap 'MDL_STOPPED_AT="${BASH_SOURCE[0]##*/mxcodr/}:${LINENO}: ${BASH_COMMAND}"' ERR
+mdl_install_exit() {
+  local code=$?
+  [ -n "${MDL_EXIT_EXTRA:-}" ] && eval "$MDL_EXIT_EXTRA"
+  if [ "$code" -ne 0 ] && [ -n "$MDL_STOPPED_AT" ]; then
+    printf '\r\033[K\n  x The installer stopped unexpectedly (exit %s) at %s\n' "$code" "$MDL_STOPPED_AT" >&2
+    printf '    Nothing after this step was done. Please report this line.\n\n' >&2
+  fi
+}
+trap mdl_install_exit EXIT
 
 # --- Constants ---
 DEFAULT_MX_VERSION="11.12.1"               # Mendix version for a new app when MX_VERSION is unset

@@ -42,9 +42,9 @@ create_app() {
   ui_begin "creating $app_name (Mendix $mx_version)"
   # --theme/--layout none: stock Atlas (mxcli's theme follows the OS dark mode).
   # mxcli new needs an empty --output-dir: create in a temp dir, then move in.
-  # tmp_app stays global: the EXIT trap reads it after this function has returned.
+  # tmp_app stays global: install.sh's EXIT trap runs MDL_EXIT_EXTRA after this function has returned.
   tmp_app="$(mktemp -d "${TMPDIR:-/tmp}/mdl-skills-new.XXXXXX")"
-  trap 'rm -rf "$tmp_app"' EXIT
+  MDL_EXIT_EXTRA='rm -rf "$tmp_app"'
   # Stash the running mxcli: on Windows copying over a running .exe deletes it.
   stash_mxcli="$tmp_app/mxcli-host$EXE"
   cp "$creator_mxcli" "$stash_mxcli" 2>/dev/null || stash_mxcli="$creator_mxcli"
@@ -99,7 +99,7 @@ create_app() {
     [ -f "$APP/mxcli.linux" ] && swapped_mxcli=1
   fi
   rm -rf "$tmp_app"
-  trap - EXIT
+  MDL_EXIT_EXTRA=''
   created_app="$app_name.mpr"
   ui_done "Mendix app created" "$created_app"
   [ -n "${swapped_mxcli:-}" ] && ui_note "./mxcli$EXE swapped for this machine's binary (Linux one kept as mxcli.linux)"

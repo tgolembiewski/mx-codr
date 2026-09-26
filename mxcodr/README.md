@@ -447,6 +447,9 @@ which was the clone itself when the repo was cloned.
 `--no-app` declines app creation; `--help` lists the arguments, `MX_VERSION` and
 `APP_NAME` override what gets created.
 
+It never stops without saying why: an unexpected failure prints the file, line and command
+it stopped at.
+
 ## Running without Docker
 
 Docker turned out to be needed for far less than this file used to claim. **`mx check`
