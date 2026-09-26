@@ -116,6 +116,28 @@ if is_bundle_or_repo "$APP"; then
           "  bash $SRC/install.sh /path/to/project --with-deps"
 fi
 
+# Windows: without Studio Pro nothing here works -- creating the app, mx check and the build all
+# run the mx.exe / mxbuild.exe it installs (Mendix publishes them separately for Linux only).
+# Say so first, before minutes of other installs, rather than when the app is created.
+if [ "$IS_WINDOWS" = "1" ] && [ -z "$(studio_pro_versions)" ] && [ -z "${MDL_SKIP_STUDIO_PRO_CHECK:-}" ]; then
+  wanted_mx="${MX_VERSION:-}"
+  mpr_file="$(find "$APP" -maxdepth 1 -name '*.mpr' -print -quit 2>/dev/null)"
+  if [ -z "$wanted_mx" ] && [ -n "$mpr_file" ] && [ -n "${PY:-}" ]; then
+    wanted_mx="$("$PY" -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select _ProductVersion from _MetaData").fetchone()[0])' "$mpr_file" 2>/dev/null || true)"
+  fi
+  wanted_mx="${wanted_mx:-$DEFAULT_MX_VERSION}"
+  ui_fail "Mendix Studio Pro is not installed. Install it first, then run the installer again." \
+          "" \
+          "On Windows the harness cannot work without it: creating the app, mx check and" \
+          "building the app all use the mx.exe and mxbuild.exe that come with Studio Pro." \
+          "Docker does not replace it." \
+          "" \
+          "  1. Install Mendix Studio Pro $wanted_mx:" \
+          "     https://marketplace.mendix.com/link/studiopro/" \
+          "  2. Run this again:" \
+          "     bash $SRC/install.sh \"$APP\" --with-deps"
+fi
+
 # No .mpr: create an app (MX_VERSION, APP_NAME) unless --no-app.
 mpr_count=$(find "$APP" -maxdepth 1 -name '*.mpr' | wc -l | tr -d ' ')
 if [ "$mpr_count" = "0" ] && [ "$CREATE_APP" = "0" ]; then
