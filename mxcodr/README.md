@@ -26,7 +26,7 @@ plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js 
                   three jobs as the hooks, in each host's own event API
 tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), precheck.sh, orient.sh,
                   diagnose.sh, peek.sh, lib.sh + lib/ (timeout, sessions, scenario, results),
-                  portable.sh, scenario-helpers.js — the harness,
+                  portable.sh, scenario-helpers.js, run-docker.sh (Docker mode) — the harness,
                   upgraded in place on every install; run-app.sh, copied only when absent.
                   gate.sh is the done gate: tests, mx check, lint, coverage, naming, layout and
                   security, then warnings (rendered pages, server errors). precheck.sh is what the hooks run before an exec; orient.sh and
@@ -450,52 +450,38 @@ which was the clone itself when the repo was cloned.
 It never stops without saying why: an unexpected failure prints the file, line and command
 it stopped at.
 
-## Running without Docker
+## Local mode and Docker mode
 
-Docker turned out to be needed for far less than this file used to claim. **`mx check`
-never needed it**: `mxcli docker check` runs Mendix's own `mx` from an installed
-Studio Pro or a cached mxbuild — the command name is misleading, and
-`--mxbuild-path <dir>` points it at one explicitly. What actually wanted a container
-was the **database**.
+The installer asks which one; the answer is `MDL_RUN_MODE` in `tests/harness.env`, and a
+re-run offers it again. `MDL_RUN_MODE=local|docker` answers without asking; with no terminal
+the default, local, is taken.
 
-So the harness has a no-Docker mode. `install.sh` offers it whenever Docker is not
-running and a Mendix installation is present, and records the answer in
-`tests/harness.env`:
+**Local (the default).** The runtime runs on the computer through `mxcli run --local` (on
+Windows `tests/run-app.sh`, since `run --local` cannot boot there), with a local PostgreSQL.
+A model change is live in about a second through `--watch`. The installer sets PostgreSQL up
+and writes `MDL_DB_*`, `MDL_MXBUILD_PATH` and, on Windows, `MDL_BOOT_COMMAND`. `mxcli run
+--local` is PostgreSQL-only; where PostgreSQL runs but no login works, the installer asks for
+a superuser once, creates the `mendix` role and the app's database, and stores only the app's
+own credentials.
 
-```sh
-MDL_NO_DOCKER=1
-MDL_MXBUILD_PATH="C:/Program Files/Mendix/9.24.37.77045"
-MDL_DB_HOST="127.0.0.1"
-MDL_DB_NAME="invoicedesk"
-MDL_DB_USER="mendix"
-MDL_DB_PASSWORD="mendix"
-MDL_PSQL="/c/Program Files/PostgreSQL/17/bin/psql.exe"
-```
+**Docker.** The runtime and its database run in containers (`mxcli docker run`), started by
+`tests/run-docker.sh`:
+- every port is shifted by `APP_PORT-8080` (8081, admin 8091, database 5433);
+- the runtime log is followed into `.mxcli/runtime.log`;
+- `gate.sh` rebuilds and restarts the app before the tests whenever the model changed, about
+  40 s, and `--stop` removes the containers. A model reload alone (`mxcli docker reload`,
+  about 25 s) was measured to miss a new attribute, so the gate always restarts;
+- the first start downloads images and takes about a minute, and Docker Desktop must be
+  running whenever the app does.
 
-`tests/portable.sh` sources that file, so every harness script sees it at once, and
-the environment still wins — `MDL_MXBUILD_PATH=… bash tests/gate.sh` overrides it for
-one run. What changes:
+Measured on the same app: local mode, a model change live in about 1 s; Docker, about 40 s.
 
-- `gate.sh`'s `mx check` gains `--mxbuild-path`, so it runs Studio Pro's `mx`;
-- `gate.sh --boot-if-needed` creates the database with `psql` instead of
-  `--ensure-db`, and passes `--db-host/--db-name/--db-user/--db-password` to
-  `mxcli run --local`, which has always been Docker-free.
+Neither mode puts `mx check` in a container: `mxcli docker check` runs `mx` from Studio Pro
+or a cached mxbuild, whatever its name says. So on Windows Studio Pro is needed in both
+modes, and `mx check` runs at the installed version.
 
-**The database still has to be PostgreSQL.** `mxcli run --local` is Postgres-only in
-code — it rejects anything else outright ("`--ensure-db only supports PostgreSQL`") —
-so HSQLDB is not an option however the project's settings are configured. The
-installer will install one where it can, and where PostgreSQL is already running but
-no login works it asks for a superuser **once**, creates the `mendix` role and the
-app's database with it, and writes only the app's own credentials to
-`tests/harness.env`. That superuser password is never stored.
-
-**The limit worth knowing:** `mx check` runs at *Studio Pro's* version. A project
-built at 9.24 is checked by 9.24's `mx`, which is correct — but the mode cannot check
-a project whose Mendix version is not installed. The gate says so rather than
-checking with the wrong binary.
-
-`tests/harness.env` holds a database password in plain text. It belongs beside
-`tests/credentials.env` and, like it, should stay out of any repository you push.
+`tests/harness.env` can hold a database password. Like `tests/credentials.env`, it stays out
+of any repository you push.
 
 ## Faster without being weaker
 
@@ -826,7 +812,7 @@ The manual route, if you would rather do it yourself:
    already installed without PATH, the harness finds it anyway — see below.)
 3. **Docker Desktop** — *optional*. Only the app's PostgreSQL ever needed a
    container, and a native PostgreSQL replaces it; `mx check` runs from Studio Pro.
-   See **Running without Docker** above.
+   See **Local mode and Docker mode** above.
 4. **mxcli** — `mxcli.exe` in the project root. On a fresh app `mxcli new` writes
    a *Linux* binary there for the devcontainer; the installer swaps in the Windows
    one and keeps the other as `mxcli.linux`.

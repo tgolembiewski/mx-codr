@@ -94,8 +94,12 @@ docker_install_command() {
 # docker_start_command -- start Docker detached: Docker Desktop in the foreground never returns.
 docker_start_command() {
   if [ "$IS_WINDOWS" = "1" ]; then
-    local program_files="${PROGRAMFILES:-C:\\Program Files}"
-    echo "cmd //c start \"\" \"${program_files//\\//}/Docker/Docker/Docker Desktop.exe\""
+    # Docker Desktop installs per machine (Program Files) or, lately, per user (LOCALAPPDATA).
+    local program_files="${PROGRAMFILES:-C:\\Program Files}" local_app="${LOCALAPPDATA:-}" exe
+    exe="${program_files//\\//}/Docker/Docker/Docker Desktop.exe"
+    [ -n "$local_app" ] && [ -f "${local_app//\\//}/Programs/DockerDesktop/Docker Desktop.exe" ] \
+      && exe="${local_app//\\//}/Programs/DockerDesktop/Docker Desktop.exe"
+    echo "cmd //c start \"\" \"$exe\""
   elif [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
     echo "open -a Docker"
   else

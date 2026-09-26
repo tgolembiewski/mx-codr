@@ -39,6 +39,9 @@ fi
 if [ "$DEPS_INSTALLED" -gt 0 ]; then
   ui_row "deps"     "$DEPS_INSTALLED" "prerequisites installed  ${C_GREY}(log: $DEPS_LOG)${C_RESET}"
 fi
+if [ "${RUN_MODE:-local}" = "docker" ]; then
+  ui_row "runs in" "1"                "Docker  ${C_GREY}(tests/run-docker.sh; a model change is rebuilt, ~40s)${C_RESET}"
+fi
 if [ -n "${no_docker_mode:-}" ]; then
   ui_row "mx check" "1"               "local  ${C_GREY}($no_docker_mode + PostgreSQL, tests/harness.env)${C_RESET}"
 fi

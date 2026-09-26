@@ -156,12 +156,6 @@ setup_local_build() {
     fi
   fi
 
-  # Docker is installed whenever missing; a local mxbuild only covers mx check.
-  if have docker; then
-    docker_ready || DEPS_MISSING+=("Docker -- installed but the daemon is not running: $(docker_start_command)")
-  else
-    docker_walkthrough || true
-  fi
 }
 
 # check_jdk -- report a JDK for want_mx that is missing or off the PATH (often on Windows); never installs one.

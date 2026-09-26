@@ -42,10 +42,13 @@ if [ -n "$setup_mxcli" ]; then
   fi
 fi
 
-# Docker or no-Docker mode: mx check needs no container, only the database does. No-Docker mode is written to tests/harness.env.
+# The run mode the user chose (target.sh): locally with PostgreSQL, or everything in Docker.
+# Either way it is written to tests/harness.env.
 no_docker_mode=""
 ensure_windows_studio_repairs "${want_mx:-}"
-if ! docker_ready; then
+if [ "$RUN_MODE" = "docker" ]; then
+  setup_docker_mode
+else
   setup_local_build
 fi
 check_jdk

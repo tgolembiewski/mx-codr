@@ -102,6 +102,11 @@ orphan_mxbuild_pids() {
 # mxbuild. SIGTERM, up to 15s for a clean stop, then SIGKILL. Other projects are never touched.
 stop_project_app() {
   local victims="" pid waited=0
+  if [ "${MDL_RUN_MODE:-}" = "docker" ]; then
+    "$MXCLI" docker down -p "$MPR" >/dev/null 2>&1 && echo "   stopped this project's Docker containers" \
+      || echo "   nothing of this project was running in Docker"
+    return 0
+  fi
   for pid in $(project_pids) $(orphan_mxbuild_pids); do
     victims="$victims $(descendants "$pid" | tr '\n' ' ') $pid"
   done
@@ -187,7 +192,7 @@ ensure_app() {
     sleep 1
   fi
   # An orphaned `mxbuild --serve` of ANOTHER project holds port 6543 and makes the boot fail.
-  if command -v pgrep >/dev/null 2>&1 && pgrep -f 'mxbuild' >/dev/null 2>&1; then
+  if [ "${MDL_RUN_MODE:-}" != "docker" ] && command -v pgrep >/dev/null 2>&1 && pgrep -f 'mxbuild' >/dev/null 2>&1; then
     echo "   !! an mxbuild process is already running. If this boot fails on"
     echo "      'port 6543 (mxbuild serve) is already in use', it is an orphan:"
     echo "      pgrep -af 'mxbuild|runtimelauncher'   then kill that pid"

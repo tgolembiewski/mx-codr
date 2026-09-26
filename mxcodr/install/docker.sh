@@ -41,6 +41,12 @@ docker_walkthrough() {
   fi
   printf '\n'
 
+  docker_start_and_wait
+}
+
+# docker_start_and_wait -- start Docker detached and wait for its daemon; say what is left if it
+# does not answer. Returns 0 once `docker info` answers.
+docker_start_and_wait() {
   if [ "$IS_WINDOWS" = "1" ] || [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
     # Detached and time-boxed so a launcher that stays in the foreground cannot hang the install.
     ui_sub "starting Docker Desktop"
@@ -80,3 +86,66 @@ docker_walkthrough() {
   DEPS_MISSING+=("          Start Docker Desktop, accept the licence, then: docker info")
   return 1
 }
+
+# --- The run mode: locally (the default) or everything in Docker ---
+# choose_run_mode -- sets RUN_MODE to local or docker. MDL_RUN_MODE picks it without asking; a
+# re-run offers the mode tests/harness.env recorded; with no terminal the default is taken.
+choose_run_mode() {
+  local default=1 recorded reply
+  case "${MDL_RUN_MODE:-}" in local|docker) RUN_MODE="$MDL_RUN_MODE"; return 0 ;; esac
+  recorded="$(sed -n 's/^MDL_RUN_MODE=//p' "$APP/tests/harness.env" 2>/dev/null | tr -d '"' | head -1)" || recorded=""
+  [ "$recorded" = "docker" ] && default=2
+  RUN_MODE=local; [ "$default" = 2 ] && RUN_MODE=docker
+  if [ ! -t 0 ] || [ -n "${MDL_ASSUME_YES:-}" ]; then return 0; fi
+  printf '  How should the app run while you and the agent build it?\n\n'
+  printf '    %s1) Locally, without Docker%s  (recommended)\n' "$C_BOLD" "$C_RESET"
+  printf '       The Mendix runtime and PostgreSQL run directly on this computer.\n'
+  printf '       + A model change is live in about a second (hot reload), so the agent'"'"'s\n'
+  printf '         build-and-test loop stays fast\n'
+  printf '       + Nothing has to be kept running in the background\n'
+  printf '       - PostgreSQL is installed on this computer\n\n'
+  printf '    %s2) In Docker, everything inside containers%s\n' "$C_BOLD" "$C_RESET"
+  printf '       The Mendix runtime and its database run in Docker containers.\n'
+  printf '       + Nothing but Docker is installed; remove the containers and it is gone\n'
+  printf '       + Close to how the app runs on a server\n'
+  printf '       - Slower: every model change is rebuilt and the app restarted -- about\n'
+  printf '         40 seconds, against about 1 locally -- and the first start downloads images\n'
+  printf '       - Docker Desktop must be running whenever you or the agent work\n'
+  printf '       - Heavier on the computer (Docker Desktop; WSL2 on Windows)\n'
+  if [ "$IS_WINDOWS" = "1" ]; then
+    printf '       - Studio Pro is still needed: the app is built on this computer\n'
+  fi
+  printf '\n  Choice [%s]: ' "$default"
+  read -r reply
+  case "${reply:-$default}" in
+    2|d|D|docker|Docker) RUN_MODE=docker ;;
+    *)                   RUN_MODE=local ;;
+  esac
+  printf '\n'
+}
+
+# setup_docker_mode -- Docker installed and answering, and tests/harness.env saying the gate
+# runs the app through tests/run-docker.sh.
+setup_docker_mode() {
+  if ! have docker; then
+    docker_walkthrough || true
+  elif ! docker_ready; then
+    ui_clear
+    printf '  %s%s%s Docker is installed but not running. Starting it.\n' "$C_YELLOW" "$I_WARN" "$C_RESET"
+    docker_start_and_wait || true
+  fi
+  mkdir -p "$APP/tests"
+  {
+    printf '# Written by install.sh -- how this project is built and run.\n'
+    printf '# Read by tests/portable.sh as DATA -- KEY=value, one layer of quotes, no\n'
+    printf '# shell. Only the keys it lists are honoured, and this file wins over the\n'
+    printf '# environment for them.\n'
+    printf 'MDL_RUN_MODE=docker\n'
+    printf '\n# The app and its database run in Docker. tests/run-docker.sh builds and\n'
+    printf '# starts them (mxcli docker run); the gate runs it again after a model change.\n'
+    printf 'MDL_BOOT_COMMAND="bash tests/run-docker.sh"\n'
+  } > "$APP/tests/harness.env"
+  chmod 600 "$APP/tests/harness.env" 2>/dev/null || true
+  ignore_credential_files
+}
+
