@@ -68,6 +68,11 @@ Widgets belong inside a `layoutgrid` / `row` / `column`, not loose in a containe
 the grid is what makes a screen responsive, and column widths are how two things sit
 side by side on a desktop and stack on a phone.
 
+The grid is also the page's side margin. The Atlas_Core layouts add none, so a heading, a
+Back button or the signed-in row placed straight on the page sits against the menu on the
+left and the window on the right. Everything on a page, the top row and the heading
+included, goes inside one `layoutgrid` (`EDGE01`). Pop-ups are framed by their own padding.
+
 ```
 layoutgrid pageGrid {
   row headerRow {
@@ -349,17 +354,25 @@ Then every page opens with one row. The row, not the snippet, decides where the 
 
 ```sql
   -- a page opened from another page: Back on the left, the user on the right
-  container ctPageTop (DesignProperties: ['Flex container': 'Horizontal (row)',
-      'Align items X': 'Space between (only for horizontal containers)', 'Align items Y': 'Center', 'Spacing': ['margin-bottom': 'M']]) {
-    actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: 'Atlas_Core.Atlas_Filled.chevron-left')
-    snippetcall scCurrentUser (Snippet: Shop.SNIPPET_CurrentUser)
+  layoutgrid pageGrid {
+    row rowTop {
+      column colTop (DesktopWidth: 12) {
+        container ctPageTop (DesignProperties: ['Flex container': 'Horizontal (row)',
+            'Align items X': 'Space between (only for horizontal containers)', 'Align items Y': 'Center', 'Spacing': ['margin-bottom': 'M']]) {
+          actionbutton btnBack (Caption: 'Back', Action: CLOSE_PAGE, Icon: 'Atlas_Core.Atlas_Filled.chevron-left')
+          snippetcall scCurrentUser (Snippet: Shop.SNIPPET_CurrentUser)
+        }
+        dynamictext heading (Content: 'Order', RenderMode: H1, DesignProperties: ['Spacing': ['margin-bottom': 'M']])
+      }
+    }
+    -- the page's other rows follow here, in the same grid
   }
 
-  -- any other page: the user on the right
-  container ctPageTop (DesignProperties: ['Flex container': 'Horizontal (row)',
-      'Align items X': 'Right', 'Align items Y': 'Center', 'Spacing': ['margin-bottom': 'M']]) {
-    snippetcall scCurrentUser (Snippet: Shop.SNIPPET_CurrentUser)
-  }
+  -- any other page: the user on the right, the same way inside the grid
+        container ctPageTop (DesignProperties: ['Flex container': 'Horizontal (row)',
+            'Align items X': 'Right', 'Align items Y': 'Center', 'Spacing': ['margin-bottom': 'M']]) {
+          snippetcall scCurrentUser (Snippet: Shop.SNIPPET_CurrentUser)
+        }
 ```
 
 - `Align items X` is Atlas's `justify-content`, and it only works together with
@@ -482,6 +495,7 @@ layout: PASS  0 failure(s) over 6 page(s)
 `USER01` | error | users sign in, and a page (pop-ups and the login page aside) does not open with `<Module>.SNIPPET_CurrentUser` on the right of its top row (first, or right after Back in the same container) |
 `BACK01` | error | a page another page or a flow opens does not start with a Back button (`close_page`, icon `chevron-left`); pop-ups, menu pages and home pages are exempt |
 `ALERT01` | warning | a box class (`alert`, `alert-*`, `card`, `well`) on a `dynamictext` or `text` |
+`EDGE01` | error | a page on an Atlas_Core layout (pop-ups and the login page aside) has a widget outside a `layoutgrid` at its top level: it touches the edge of the window |
 `VIS01` | warning | measured in the browser at the end of every test: two unrelated widgets overlap by 4 px or more |
 `VIS02` | warning | measured: the page scrolls sideways |
 `VIS03` | warning | measured: a widget cuts its text off |

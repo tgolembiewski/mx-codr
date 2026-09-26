@@ -96,6 +96,9 @@ DesignProperties: ['Spacing': ['margin-right': 'S', 'margin-bottom': 'S']]
   -- sides margin-|padding- top|right|bottom|left · values None S M L and NOTHING else
   -- two inline widgets side by side (label+button, button+button) collide without it;
   --   the gate's `layout` verdict fails on it. Never a Class: or custom CSS for spacing
+layoutgrid pageGrid { row rowTop { column colTop (DesktopWidth: 12) { ... } } }
+  -- everything on a page goes inside one layoutgrid, the Back / signed-in row and the heading
+  --   too: Atlas layouts add no side margin, so a widget outside it touches the window (EDGE01)
 datagrid dg (...) { column colStatus (attribute: "Status") { dropdownfilter fltStatus } }
   -- a data grid filters itself, one filter inside the column it belongs to: textfilter on a
   --   String, numberfilter on a number, datefilter on a date (FilterType: between for a
