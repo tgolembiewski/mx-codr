@@ -33,14 +33,24 @@ mxcli_release_url() {
 }
 
 # ui_fail when the sha256 differs from MXCLI_SHA256; with it unset the download is only reported.
+# sha256_of <file> -- the file's SHA-256, or nothing; never fails. Git for Windows has
+# sha256sum but no shasum, macOS the other way round. Under set -e and pipefail the missing one
+# ended the install silently, right after the mxcli download.
+sha256_of() {
+  local sum=""
+  sum="$(sha256sum "$1" 2>/dev/null | cut -d" " -f1)" || sum=""
+  [ -n "$sum" ] || sum="$(shasum -a 256 "$1" 2>/dev/null | cut -d" " -f1)" || sum=""
+  [ -n "$sum" ] || sum="$("${PY:-python3}" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1" 2>/dev/null)" || sum=""
+  printf '%s\n' "$sum"
+}
+
 mxcli_verify_download() {   # mxcli_verify_download <file>
   local want="${MXCLI_SHA256:-}" got
   if [ -z "$want" ]; then
     ui_note "mxcli came from the ${MXCLI_TAG:-nightly} release and is not checksum-verified (set MXCLI_SHA256 to pin it)"
     return 0
   fi
-  got="$(shasum -a 256 "$1" 2>/dev/null | cut -d" " -f1)"
-  [ -n "$got" ] || got="$(sha256sum "$1" 2>/dev/null | cut -d" " -f1)"
+  got="$(sha256_of "$1")"
   if [ "$got" != "$want" ]; then
     rm -f "$1"
     ui_fail "The mxcli download does not match MXCLI_SHA256." "  expected $want" "  got      ${got:-nothing}"
@@ -151,8 +161,7 @@ mxcli_offer_update() {
       elif ask "$prompt" y; then
         tmp="$(mktemp "${TMPDIR:-/tmp}/mxcli-download.XXXXXX")"
         if curl -fsSL -m 600 -o "$tmp" "$url" 2>/dev/null; then
-          got="$(shasum -a 256 "$tmp" 2>/dev/null | cut -d" " -f1)"
-          [ -n "$got" ] || got="$(sha256sum "$tmp" 2>/dev/null | cut -d" " -f1)"
+          got="$(sha256_of "$tmp")"
           if [ "$got" = "$sha" ] && mxcli_put_in_project "$tmp"; then
             ui_note "./mxcli$EXE updated to $tag (checksum verified against the release)"
           else
