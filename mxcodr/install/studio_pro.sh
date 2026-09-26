@@ -52,6 +52,7 @@ offer_studio_pro_junction() {   # <version> <path-to-per-user-mx.exe>
   printf '    but %srunning%s it does not -- mxcli resolves mxbuild on its own there.\n\n' \
     "$C_BOLD" "$C_RESET"
   printf '    A directory junction fixes it permanently. No copy, no disk used:\n'
+  printf '      %smkdir "C:\\Program Files\\Mendix"%s   (when it is not there yet)\n' "$C_CYAN" "$C_RESET"
   printf '      %smklink /J "%s" "%s"%s\n\n' "$C_CYAN" "$link_win" "$target_win" "$C_RESET"
   printf '    It needs administrator rights, so Windows will ask you to confirm.\n\n'
 
@@ -60,7 +61,7 @@ offer_studio_pro_junction() {   # <version> <path-to-per-user-mx.exe>
   fi
   if ! ask "    Create it now? [Y/n] " y; then
     DEPS_MISSING+=("Studio Pro $version -- not visible to mxcli, so the app cannot be booted.")
-    DEPS_MISSING+=("                 mklink /J \"$link_win\" \"$target_win\"   (as administrator)")
+    DEPS_MISSING+=("                 mkdir \"C:\\Program Files\\Mendix\" & mklink /J \"$link_win\" \"$target_win\"   (as administrator)")
     return 1
   fi
 
@@ -72,15 +73,22 @@ offer_studio_pro_junction() {   # <version> <path-to-per-user-mx.exe>
       return 1 ;;
   esac
   ui_sub "asking Windows for permission"
+  # One elevated PowerShell makes the parent folder (mklink needs it, and a machine with only a
+  # per-user Studio Pro has no C:\Program Files\Mendix) and then the junction. The script goes
+  # in as -EncodedCommand, so no quoting passes through bash, PowerShell and cmd.
+  local elevated encoded
+  elevated="New-Item -ItemType Directory -Force -Path 'C:\\Program Files\\Mendix' | Out-Null; "
+  elevated+="New-Item -ItemType Junction -Path '$link_win' -Target '$target_win' | Out-Null"
+  encoded="$("$PY" -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-16-le")).decode())' "$elevated")"
   powershell.exe -NoProfile -Command \
-    "Start-Process cmd.exe -Verb RunAs -Wait -ArgumentList '/c','mklink','/J','\"$link_win\"','\"$target_win\"'" \
+    "Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '-NoProfile','-EncodedCommand','$encoded'" \
     >> "$DEPS_LOG" 2>&1 || true
   if [ -e "/c/Program Files/Mendix/$version" ]; then
     ui_note "Studio Pro $version linked into Program Files; mxcli can see it now"
     return 0
   fi
   DEPS_MISSING+=("Studio Pro $version -- the junction was not created, so the app cannot boot.")
-  DEPS_MISSING+=("                 mklink /J \"$link_win\" \"$target_win\"   (as administrator)")
+  DEPS_MISSING+=("                 mkdir \"C:\\Program Files\\Mendix\" & mklink /J \"$link_win\" \"$target_win\"   (as administrator)")
   return 1
 }
 

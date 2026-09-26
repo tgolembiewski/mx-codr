@@ -36,7 +36,8 @@ create_app() {
   if [ "$IS_WINDOWS" = "1" ] && ! studio_pro_mx_visible_to_mxcli "$mx_version" >/dev/null; then
     direct_mx="$(studio_pro_mx "$mx_version" 2>/dev/null || true)"
     # mxcli run --local cannot see per-user installs either; offer a junction.
-    [ -n "$direct_mx" ] && offer_studio_pro_junction "$mx_version" "$direct_mx"
+    # A junction that could not be made is listed as missing; creating the app goes on.
+    if [ -n "$direct_mx" ]; then offer_studio_pro_junction "$mx_version" "$direct_mx" || true; fi
   fi
 
   ui_begin "creating $app_name (Mendix $mx_version)"
