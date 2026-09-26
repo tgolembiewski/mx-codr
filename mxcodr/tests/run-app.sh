@@ -64,9 +64,17 @@ admin() {                                   # admin <json-body>
     -H 'Content-Type: application/json' -d "$1" "http://127.0.0.1:$ADMIN_PORT/"
 }
 
-# Kill every Mendix runtime java process (Windows/PowerShell).
+# Stop this project's Mendix runtime (Windows/PowerShell): the java runtimelauncher whose last
+# argument is this project's deployment folder. Every runtime used to go, so booting a second
+# project killed the first one's app.
 stop_runtime() {
-  powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { \$_.CommandLine -like '*runtimelauncher*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" >/dev/null 2>&1 || true
+  MDL_DEPLOYMENT="$(cygpath -w "$DEPLOYMENT" 2>/dev/null || printf '%s' "$DEPLOYMENT")" \
+    powershell -NoProfile -Command '
+      $d = $env:MDL_DEPLOYMENT
+      Get-CimInstance Win32_Process |
+        Where-Object { $_.Name -eq "java.exe" -and $_.CommandLine -and $_.CommandLine.Contains("runtimelauncher") } |
+        Where-Object { $c = $_.CommandLine.TrimEnd(); $c.EndsWith($d) -or $c.Contains($d + [char]34) -or $c.Contains($d + " ") } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }' >/dev/null 2>&1 || true
   sleep 2
 }
 

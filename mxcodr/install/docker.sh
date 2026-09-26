@@ -44,9 +44,34 @@ docker_walkthrough() {
   docker_start_and_wait
 }
 
+# windows_docker_blocked -- on Windows, why Docker Desktop cannot start at all: its WSL 2 backend
+# needs the Virtual Machine Platform feature, and its Hyper-V backend needs Hyper-V. Prints the
+# reason when both are off; nothing when either is on or dism cannot tell (not elevated).
+windows_docker_blocked() {
+  [ "$IS_WINDOWS" = "1" ] || return 0
+  local vmp hyperv
+  vmp="$(windows_feature_state VirtualMachinePlatform)"
+  hyperv="$(windows_feature_state Microsoft-Hyper-V)"
+  [ "$vmp" = "Disabled" ] && [ "$hyperv" != "Enabled" ] || return 0
+  echo "the Windows features Virtual Machine Platform and Windows Subsystem for Linux are off, and Docker Desktop needs WSL 2"
+}
+windows_feature_state() {   # windows_feature_state <feature> -- Enabled, Disabled or empty
+  dism.exe //online //get-featureinfo "//featurename:$1" 2>/dev/null | tr -d '\r' \
+    | sed -n 's/^State : //p' | head -1 || true
+}
+
 # docker_start_and_wait -- start Docker detached and wait for its daemon; say what is left if it
 # does not answer. Returns 0 once `docker info` answers.
 docker_start_and_wait() {
+  # A Docker that cannot start is not waited for: 3 minutes, then advice that could not help.
+  local blocked
+  blocked="$(windows_docker_blocked)"
+  if [ -n "$blocked" ]; then
+    DEPS_MISSING+=("Docker -- cannot start on this computer: $blocked.")
+    DEPS_MISSING+=("          As administrator: wsl --install --no-distribution, reboot, start Docker Desktop, then re-run this installer")
+    DEPS_MISSING+=("          -- or re-run it with MDL_RUN_MODE=local: the app then runs without Docker")
+    return 1
+  fi
   if [ "$IS_WINDOWS" = "1" ] || [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
     # Detached and time-boxed so a launcher that stays in the foreground cannot hang the install.
     ui_sub "starting Docker Desktop"
@@ -131,7 +156,7 @@ setup_docker_mode() {
     docker_walkthrough || true
   elif ! docker_ready; then
     ui_clear
-    printf '  %s%s%s Docker is installed but not running. Starting it.\n' "$C_YELLOW" "$I_WARN" "$C_RESET"
+    printf '  %s%s%s Docker is installed but not running.\n' "$C_YELLOW" "$I_WARN" "$C_RESET"
     docker_start_and_wait || true
   fi
   mkdir -p "$APP/tests"

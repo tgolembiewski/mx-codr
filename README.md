@@ -107,7 +107,7 @@ fetches what is missing, and tells you plainly about anything it could not do.
 |---|---|
 | **Your Mendix app** | Creates one with `mxcli new` if the folder has none (Mendix 11.12.1 unless you set `MX_VERSION`) |
 | **mxcli** | Uses the newest mxcli on the machine, offers the latest release when it is newer, and verifies the download's checksum |
-| **Docker** | Only in Docker mode: installs Docker Desktop when missing and waits for it |
+| **Docker** | Only in Docker mode: installs Docker Desktop when missing and waits for it; with WSL off it says so at once |
 | **Python, Node, Playwright and its browser** | Installs them with `--with-deps` — the checkers and browser tests run on them |
 | **MxBuild** | Downloads the one for your Mendix version with `--with-deps`, so `mx check` runs |
 | **PostgreSQL** | Local mode (the default): sets it up with `--with-deps` |
@@ -296,6 +296,7 @@ The environment still wins, so any of it can be overridden for one run.
 | `MDL_VISUAL_REVIEW` | `agent`: a model that reads images also judges a screenshot of each page |
 | `MDL_ALLOW_GREEN_FIRST` | tests that are green by nature, so the gate does not warn that they never failed |
 | `MDL_REQUIRE_PRODUCTION` | `0` for an app that deliberately has no users at all |
+| `APP_PORT` | the app's port, 8081 by default; a second project running beside the first needs its own, e.g. `8082` (the admin API follows at +9). The gate refuses to test another project's app on its port |
 
 ## Windows: what the installer repairs, and what it cannot
 

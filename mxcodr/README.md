@@ -745,6 +745,11 @@ MDL_BOOT_COMMAND="bash tests/run-app.sh"
 and still bounded by `BOOT_TIMEOUT`. Anything that ends with an app answering on
 `$APP_PORT` will do.
 
+Two projects run side by side when the second sets `APP_PORT=8082` in its
+`tests/harness.env` (locally the admin API follows, at `APP_PORT+9`). The gate checks that
+the runtime answering on its port names this project's `deployment` folder, and exits 2
+naming the other project when it does not; `run-app.sh` stops only its own runtime.
+
 A boot script written this way has to do three things `mxcli run --local` would
 otherwise have done, each of which is easy to miss:
 
@@ -793,7 +798,9 @@ Three things it deliberately does not do:
   WSL2 backend) and then waits with you for the daemon — up to `DOCKER_WAIT`
   seconds, default 180, and Ctrl-C stops the waiting without stopping the install.
   With no console it falls back to printing the command. `MDL_ASSUME_YES=1` answers
-  the prompts for an unattended run.
+  the prompts for an unattended run. When Virtual Machine Platform and Hyper-V are
+  both off, Docker Desktop cannot start at all: the installer does not wait, and
+  says `wsl --install --no-distribution` plus a reboot, or `MDL_RUN_MODE=local`.
 - **The JDK is found, not demanded.** Studio Pro installs one as its own
   prerequisite, so a machine that can open the project usually has a usable JDK
   already — on the Windows test machine there were *three*, and none on the PATH.
