@@ -216,6 +216,8 @@ Docker Desktop install needs it.
 **Studio Pro is required on Windows.** `mx check` and the app build use the `mx.exe` and
 `mxbuild.exe` that come with it; Mendix publishes them separately for Linux only. Docker
 only gives the database, which PostgreSQL can too.
+Without it the installer stops at once, before installing anything, and says where to
+get it.
 
 ### What lands in the project, and who reads it
 

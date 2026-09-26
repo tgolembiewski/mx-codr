@@ -112,6 +112,29 @@ if (Test-InRepo $Target) {
 if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Force -Path $Target | Out-Null }
 $Target = (Resolve-Path -LiteralPath $Target).Path
 
+# Without Studio Pro nothing works on Windows: creating the app, mx check and the build all use
+# the mx.exe / mxbuild.exe it installs. Say so now, before minutes of winget installs.
+$studioPro = @("$env:ProgramFiles\Mendix", "${env:ProgramFiles(x86)}\Mendix", "$env:LOCALAPPDATA\Programs\Mendix") |
+             Where-Object { $_ -and (Test-Path $_) } |
+             ForEach-Object { Get-ChildItem -Path $_ -Filter 'mx.exe' -Recurse -Depth 3 -ErrorAction SilentlyContinue } |
+             Select-Object -First 1
+if (-not $studioPro -and -not $env:MDL_SKIP_STUDIO_PRO_CHECK) {
+  Write-Host ''
+  Write-Host '  Mendix Studio Pro is not installed. Install it first, then run this again.' -ForegroundColor Red
+  Write-Host ''
+  Write-Host '  On Windows the harness cannot work without it: creating the app, mx check and'
+  Write-Host '  building the app all use the mx.exe and mxbuild.exe that come with Studio Pro.'
+  Write-Host '  Docker does not replace it.'
+  Write-Host ''
+  Write-Host '    1. Install Mendix Studio Pro (the version of your app; a new app uses 11.12.1):'
+  Write-Host '       https://marketplace.mendix.com/link/studiopro/'
+  Write-Host '    2. Run this again:'
+  Write-Host "       powershell -ExecutionPolicy Bypass -File `"$PSCommandPath`" `"$Target`""
+  Write-Host ''
+  exit 1
+}
+Write-Ok "Studio Pro: $(Split-Path -Parent (Split-Path -Parent $studioPro.FullName))"
+
 # --- 1. winget stage ---------------------------------------------------------
 if (-not $SkipWinget) {
   if (-not (Test-Command 'winget')) {
@@ -198,21 +221,10 @@ $installExit = $LASTEXITCODE
 
 # --- 4. follow-up: the two this script does not install ----------------------
 Write-Host ''
-# On Windows mx check and the app build need Studio Pro's mx.exe and mxbuild.exe; Docker only
-# gives the database. Warn whenever no Studio Pro is installed, Docker or not.
 $harnessEnv = Join-Path $Target 'tests\harness.env'
 $noDocker = (Test-Path $harnessEnv) -and (Select-String -Path $harnessEnv -Pattern 'MDL_NO_DOCKER=1' -Quiet)
-$studioPro = @("$env:ProgramFiles\Mendix", "$env:LOCALAPPDATA\Programs\Mendix") | Where-Object { Test-Path $_ } |
-             ForEach-Object { Get-ChildItem -Path $_ -Filter 'mx.exe' -Recurse -Depth 3 -ErrorAction SilentlyContinue } |
-             Select-Object -First 1
 if ($noDocker) {
   Write-Ok 'Set up without Docker — see tests\harness.env for what it uses instead.'
-}
-if (-not $studioPro) {
-  Write-Warn 'No Mendix Studio Pro was found. On Windows it is needed: mx check and the app'
-  Write-Warn 'build use the mx.exe and mxbuild.exe that come with it. Install Studio Pro (the'
-  Write-Warn "project's Mendix version), plus PostgreSQL or Docker Desktop for the database, then run again:"
-  Write-Warn "  $PSCommandPath `"$Target`""
 }
 # Studio Pro's JDK is often installed but not on PATH, so search before advising an install.
 if (-not (Test-Command 'java')) {
