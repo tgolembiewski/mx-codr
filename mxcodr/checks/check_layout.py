@@ -46,11 +46,13 @@ Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 #                  built by hand, with no hamburger, no active item and no phone view
 #   ALERT01  WARN  a block class (alert, alert-*, card, well) on a dynamictext or text: it renders
 #                  as an inline <span>, so its padding and border overlap the widgets around it
+#   EDGE01   FAIL  a page on an Atlas_Core layout (pop-ups and the login page aside) has a widget at
+#                  its top level outside a layoutgrid: it touches the edge of the window
 #
 # Where each rule lives, in layout_rules/ next to this file (this file only reads the arguments
 # and runs them): pages.py parses the dumps; spacing.py SPACE01-03, HEAD01, ALERT01; controls.py
 # GRID01, ICON01; page_top.py BACK01, USER01; layouts.py LAYOUT01, NAV04; navigation.py NAV01-03,
-# NAV05; accounts.py ACCOUNT01-03, MODULE01, HOME01.
+# NAV05; accounts.py ACCOUNT01-03, MODULE01, HOME01; edges.py EDGE01.
 
 from __future__ import annotations
 
@@ -64,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from layout_rules.accounts import account_findings, admin_home_findings, template_module_findings  # noqa: E402
 from layout_rules.controls import button_icon_findings  # noqa: E402
+from layout_rules.edges import edge_findings  # noqa: E402
 from layout_rules.layouts import layout_menu_findings, one_layout_findings  # noqa: E402
 from layout_rules.navigation import menu_icon_findings, role_home_findings, sign_out_findings  # noqa: E402
 from layout_rules.page_top import back_button_findings, current_user_findings  # noqa: E402
@@ -144,6 +147,7 @@ def main() -> int:
     failures += one_layout_findings(lines, navigation, layouts)
     failures += button_icon_findings(lines + snippets.splitlines())
     failures += back_button_findings(lines, flows, navigation)
+    failures += edge_findings(lines, snippets, navigation)
     if args.layouts:
         failures += layout_menu_findings(layouts)
     report = {

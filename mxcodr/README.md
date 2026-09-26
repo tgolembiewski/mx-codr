@@ -261,6 +261,13 @@ once under `== warnings`. The layout check adds `ALERT01`: a box class (`alert`,
 on a `dynamictext`, which renders inline and draws its box over the line below. A cancellation
 notice did exactly that on an order page and the gate said DONE.
 
+`EDGE01` (an error) fails a page on an Atlas_Core layout that has a widget outside a
+`layoutgrid` at its top level. Those layouts add no side margin, so the heading sat against the
+menu and the signed-in name ran off the right edge: a session had built its title and its Back /
+signed-in row straight on the page, copying the skill's own example, which now sits in the grid.
+The rule looks inside the snippets a page calls; pop-ups and pages on the project's own layouts
+are not judged.
+
 With `MDL_VISUAL_REVIEW=agent` in `tests/harness.env` (for a model that reads images), `look()`
 also saves a screenshot per page. The gate writes `.mxcli/visual/review.md` with a fixed list of
 questions, and asks the agent to read each PNG and write `verdicts.json`: approve or reject, an
