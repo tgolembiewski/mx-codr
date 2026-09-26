@@ -5,7 +5,7 @@ answers() { [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$1" 2>/dev
 
 # The boot log lines that mean the boot failed (mxcli, mxbuild and the runtime).
 boot_error_re() {
-  printf '%s' '^Error:|initial build failed|cannot be deployed, because it contains errors|is already in use|exited during startup|BUILD FAILED'
+  printf '%s' '^Error:|initial build failed|cannot be deployed, because it contains errors|is already in use|exited during startup|BUILD FAILED|== start FAILED'
 }
 # True when the boot log already shows a failure, so the wait loop stops early.
 boot_failed() {   # boot_failed <log>
