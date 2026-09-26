@@ -191,6 +191,10 @@ once and watch that one test go red (`bash tests/gate.sh --only <feature>` recor
 test in `MDL_ALLOW_GREEN_FIRST` in `tests/harness.env` when it is green by nature, such as a
 seeding reset.
 
+A test that `set -e` ends on a command that printed nothing (say `x=$(oql_count ... 2>/dev/null
+|| echo "")`, where the exit inside `$(...)` skips the fallback) no longer shows a bare `FAIL`: its
+last line names the test's line and command.
+
 Each boot empties `.mxcli/gate-boot.log` and keeps the one before it as
 `.mxcli/gate-boot.prev.log`, so a failure that a later boot overwrote can still be read.
 

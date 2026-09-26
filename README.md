@@ -279,6 +279,8 @@ bash tests/orient.sh                  # what is in this project
 bash tests/diagnose.sh                # why is the app not answering
 ```
 
+A failing test always says why: one that stops on a silent command names its line and command.
+
 ## Configuration
 
 `tests/harness.env` is written by the installer and read by every harness script.

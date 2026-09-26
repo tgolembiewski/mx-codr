@@ -101,6 +101,10 @@ oql_entity() {   # oql_entity <Entity>
 oql_count() {
   local entity="$1" where="${2:-}"
   [ -n "${MODULE:-}" ] || fail "oql_count needs a module: set MODULE=<YourModule> or run through tests/gate.sh"
+  # One line: the runner shows only a test's last stderr line.
+  case "$where" in
+    \[*) fail "oql_count takes an OQL WHERE, not XPath: $where -- drop the brackets (Status = 'Paid'); across an association use oql \"SELECT COUNT(*) AS Total FROM ... AS i JOIN i/Module.Assoc/Module.Entity AS c WHERE c.Attr = 'x'\"" ;;
+  esac
   local query="SELECT COUNT(*) AS Total FROM $(oql_entity "$entity")"
   # Not `[ -n "$where" ] && ...`: with set -e, the false test ends the function.
   if [ -n "$where" ]; then
