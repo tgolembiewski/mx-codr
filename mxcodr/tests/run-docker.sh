@@ -4,7 +4,8 @@
 # gate.sh --boot-if-needed runs it (MDL_BOOT_COMMAND in tests/harness.env) and waits for the app.
 # `mxcli docker run` builds the model into a package and starts the Mendix and PostgreSQL
 # containers, every port shifted by APP_PORT-8080 (8081 -> admin 8091, database 5433). The
-# runtime log is then followed into .mxcli/runtime.log, for the gate's server-error check. A
+# runtime log is then followed into .mxcli/runtime.log, for the gate's server-error check. The
+# containers are this app's own (COMPOSE_PROJECT_NAME, set by portable.sh). A
 # model change is applied by running this again -- a rebuild and a restart, about 40 seconds
 # (the gate does it before the tests); a model reload alone misses entity changes.
 set -euo pipefail

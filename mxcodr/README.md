@@ -467,6 +467,8 @@ own credentials.
 **Docker.** The runtime and its database run in containers (`mxcli docker run`), started by
 `tests/run-docker.sh`:
 - every port is shifted by `APP_PORT-8080` (8081, admin 8091, database 5433);
+- each app gets its own containers and database volume (`COMPOSE_PROJECT_NAME`, from the
+  app's folder); mxcli alone names every stack `docker`, so all apps shared one;
 - the runtime log is followed into `.mxcli/runtime.log`;
 - `gate.sh` rebuilds and restarts the app before the tests whenever the model changed, about
   40 s, and `--stop` removes the containers. A model reload alone (`mxcli docker reload`,

@@ -100,7 +100,13 @@ if [ "${MDL_RUN_MODE:-}" = "docker" ]; then
     ADMIN_PASSWORD="${ADMIN_PASSWORD:-AdminPassword1!}"
   fi
   BOOT_TIMEOUT="${BOOT_TIMEOUT:-600}"
-  export ADMIN_PORT ADMIN_PASSWORD
+  # mxcli names the compose project after the .docker folder, so every app shared one set of
+  # containers and one database volume. Name it after this app instead.
+  if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+    COMPOSE_PROJECT_NAME="mx-$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" \
+      | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')"
+  fi
+  export ADMIN_PORT ADMIN_PASSWORD COMPOSE_PROJECT_NAME
 fi
 
 # --- 4. Quoting helpers: keep values from becoming code in generated JSON, JS or regex ---
