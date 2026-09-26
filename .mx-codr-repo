@@ -1,0 +1,2 @@
+Marks the root of the mx-codr repo. The installer never installs into a folder that has it
+(or into the mxcodr/ bundle): the project it installs into is the one the user names.

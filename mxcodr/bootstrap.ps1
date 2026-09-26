@@ -3,7 +3,8 @@
   Windows bootstrap: installs Git, Python and Node with winget, then runs install.sh --with-deps in Git Bash.
 
 .PARAMETER Target
-  Mendix project to install into (created if missing). Default: parent of the bundle folder.
+  Mendix project to install into (created if missing). Default: asked for, with the current
+  folder offered unless it is the mx-codr folder that was cloned.
 
 .PARAMETER SkipWinget
   Skip the winget stage.
@@ -12,13 +13,14 @@
   Exit 1 when winget or Git Bash is missing; otherwise install.sh's exit code.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File mxcodr\bootstrap.ps1 C:\Mendix\MyApp
+  powershell -ExecutionPolicy Bypass -File mx-codr\mxcodr\bootstrap.ps1
+  powershell -ExecutionPolicy Bypass -File mx-codr\mxcodr\bootstrap.ps1 C:\Mendix\MyApp
 #>
 
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [string]$Target = (Split-Path -Parent $PSScriptRoot),
+  [string]$Target = '',
 
   [switch]$SkipWinget
 )
@@ -77,6 +79,38 @@ Write-Host ''
 Write-Host '  MX-CODR  ' -ForegroundColor White -NoNewline
 Write-Host 'Windows bootstrap' -ForegroundColor DarkGray
 Write-Host ''
+
+# --- 0. the project folder, asked first so the rest runs unattended --------
+# The project folder: named, or asked for with the current folder as the default. The cloned
+# mx-codr folder (the bundle's parent, marked .mx-codr-repo) is never the project.
+$repoRoot = Split-Path -Parent $PSScriptRoot
+function Test-InRepo($path) {
+  $full = [IO.Path]::GetFullPath($path).TrimEnd('\')
+  foreach ($root in @($PSScriptRoot, $repoRoot)) {
+    if (-not (Test-Path (Join-Path $repoRoot '.mx-codr-repo')) -and $root -eq $repoRoot) { continue }
+    $r = [IO.Path]::GetFullPath($root).TrimEnd('\')
+    if ($full -eq $r -or $full.StartsWith($r + '\')) { return $true }
+  }
+  $false
+}
+if (-not $Target) {
+  $here = (Get-Location).Path
+  $default = if (Test-InRepo $here) { '' } else { $here }
+  Write-Host ''
+  Write-Host '  Where is your Mendix project? A folder with an app in it, or a new or empty folder'
+  Write-Host '  for a new app -- not the mx-codr folder you cloned.'
+  Write-Host ''
+  $answer = if ($default) { Read-Host "  Project folder [$default]" } else { Read-Host '  Project folder' }
+  $Target = if ($answer) { $answer.Trim('"') } else { $default }
+  if (-not $Target) { Write-Warn 'Nothing installed: no project folder given.'; exit 1 }
+}
+if (Test-InRepo $Target) {
+  Write-Warn "Nothing installed: $Target is the mx-codr folder, not a Mendix project."
+  Write-Warn 'Give the folder of your Mendix app, or a new folder for a new app, outside it.'
+  exit 1
+}
+if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Force -Path $Target | Out-Null }
+$Target = (Resolve-Path -LiteralPath $Target).Path
 
 # --- 1. winget stage ---------------------------------------------------------
 if (-not $SkipWinget) {
@@ -154,7 +188,6 @@ function ConvertTo-BashPath($path) {
   '/' + $full.Substring(0, 1).ToLower() + $full.Substring(2).Replace('\', '/')
 }
 
-if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Force -Path $Target | Out-Null }
 $bundlePath = ConvertTo-BashPath $PSScriptRoot
 $targetPath = ConvertTo-BashPath $Target
 
@@ -165,16 +198,21 @@ $installExit = $LASTEXITCODE
 
 # --- 4. follow-up: the two this script does not install ----------------------
 Write-Host ''
-# install.sh installs Docker; only warn if it neither did nor chose no-Docker mode.
+# On Windows mx check and the app build need Studio Pro's mx.exe and mxbuild.exe; Docker only
+# gives the database. Warn whenever no Studio Pro is installed, Docker or not.
 $harnessEnv = Join-Path $Target 'tests\harness.env'
 $noDocker = (Test-Path $harnessEnv) -and (Select-String -Path $harnessEnv -Pattern 'MDL_NO_DOCKER=1' -Quiet)
+$studioPro = @("$env:ProgramFiles\Mendix", "$env:LOCALAPPDATA\Programs\Mendix") | Where-Object { Test-Path $_ } |
+             ForEach-Object { Get-ChildItem -Path $_ -Filter 'mx.exe' -Recurse -Depth 3 -ErrorAction SilentlyContinue } |
+             Select-Object -First 1
 if ($noDocker) {
   Write-Ok 'Set up without Docker — see tests\harness.env for what it uses instead.'
-} elseif (-not (Test-Command 'docker')) {
-  Write-Warn 'No Docker and no local Mendix installation were found, so the app has'
-  Write-Warn 'no database to run against. Install Docker Desktop, or install Mendix'
-  Write-Warn 'Studio Pro and a PostgreSQL, then re-run:'
-  Write-Warn '  bash mxcodr/install.sh . --with-deps'
+}
+if (-not $studioPro) {
+  Write-Warn 'No Mendix Studio Pro was found. On Windows it is needed: mx check and the app'
+  Write-Warn 'build use the mx.exe and mxbuild.exe that come with it. Install Studio Pro (the'
+  Write-Warn "project's Mendix version), plus PostgreSQL or Docker Desktop for the database, then run again:"
+  Write-Warn "  $PSCommandPath `"$Target`""
 }
 # Studio Pro's JDK is often installed but not on PATH, so search before advising an install.
 if (-not (Test-Command 'java')) {
@@ -196,4 +234,10 @@ if (-not (Test-Command 'java')) {
   }
 }
 
+if ($installExit -eq 0) {
+  Write-Host ''
+  Write-Ok 'Open your agent in the project folder and ask it for a feature:'
+  Write-Host "      cd `"$Target`""
+  Write-Host '      claude      (or codex, cursor, opencode, pi)'
+}
 exit $installExit

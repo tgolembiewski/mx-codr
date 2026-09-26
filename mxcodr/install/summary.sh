@@ -58,6 +58,14 @@ if [ "${#DEPS_MISSING[@]}" -gt 0 ]; then
   fi
 fi
 
+# The one thing to do now, first: the agent works in the project folder, not in the clone.
+app_shown="$APP"
+command -v cygpath >/dev/null 2>&1 && app_shown="$(cygpath -w "$APP")"
+ui_head "$I_PLAY" "Now"
+printf '     %sOpen your agent in the project folder and ask it for a feature:%s\n' "$C_BOLD" "$C_RESET"
+printf '       cd "%s"\n' "$app_shown"
+printf '       claude      %s(or codex, cursor, opencode, pi)%s\n' "$C_GREY" "$C_RESET"
+
 ui_head "$I_PLAY" "Next"
 printf '     %-38s %s%s%s\n' "bash tests/orient.sh" "$C_GREY" "what is in this app, and its state" "$C_RESET"
 printf '     %-38s %s%s%s\n' "bash tests/gate.sh --boot-if-needed" "$C_GREY" "suite + mx check, lint, coverage, naming, layout" "$C_RESET"
@@ -75,5 +83,5 @@ printf '     %s\n' "Cursor needs hooks enabled for this workspace before ${C_BOL
 printf '     %s\n' "OpenCode loads ${C_BOLD}.opencode/plugin/${C_RESET} at startup; restart an open session to pick it up."
 printf '     %s\n' "Pi loads ${C_BOLD}.pi/extensions/${C_RESET} once the project is trusted; restart an open session to pick it up."
 printf '     %s\n' "Write your own tests/verify-<feature>.test.sh -- the ${C_BOLD}test-first-delivery${C_RESET} skill has a"
-printf '     %s\n' "complete example, and $SRC/examples/ holds eight from the demo app."
+printf '     %s\n' "complete example, and mxcodr/examples/ holds eight from the demo app."
 printf '\n'

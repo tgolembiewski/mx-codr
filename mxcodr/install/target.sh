@@ -11,12 +11,11 @@ for arg in "$@"; do
     --with-deps) WITH_DEPS=1 ;;
     -h|--help)
       printf 'bash mxcodr/install.sh [path-to-project] [--no-app] [--with-deps]\n\n'
-      printf '  Run it from the project folder, one level above mxcodr/:\n'
-      printf '    cd <app> && bash mxcodr/install.sh --with-deps\n'
-      printf '  not from inside mxcodr/ (cd mxcodr && bash install.sh): that still installs into\n'
-      printf '  the folder above, but the target is guessed instead of named.\n\n'
-      printf '  path-to-project  where to install (default: the current directory,\n'
-      printf '                   or the parent project when run from inside the bundle)\n'
+      printf '  Run it from the mx-codr folder you cloned; it asks for the Mendix project folder,\n'
+      printf '  copies mxcodr/ there and installs:\n'
+      printf '    bash mx-codr/mxcodr/install.sh --with-deps\n\n'
+      printf '  path-to-project  the Mendix project (default: asked for, or the current folder\n'
+      printf '                   when it holds a *.mpr). Never the mx-codr folder itself\n'
       printf '  --no-app         never create a Mendix app; require one to be there already\n'
       printf '  --with-deps      install missing prerequisites (Python, Node, playwright-cli,\n'
       printf '                   its browser, mxcli, MxBuild) with this machine'"'"'s package manager.\n'
@@ -35,8 +34,72 @@ done
 
 ui_banner "$version"
 
-if [ -n "$APP_ARG" ]; then APP="$APP_ARG"; else APP="$PWD"; fi
-[ -d "$APP" ] || ui_fail "No such directory: $APP"
+# The project folder: the one named on the command line, or the one asked for here. Running
+# from inside a Mendix app (a *.mpr next to you) counts as naming it. The bundle and the mx-codr
+# repo it was cloned with are never the project: guessing "the folder above the bundle" put two
+# installs into the repo clone.
+# Paths are compared physically (pwd -P): on macOS /tmp is a link to /private/tmp.
+SRC_REAL="$(cd "$SRC" && pwd -P)"
+REPO_ROOT=""
+[ -e "$SRC/../.mx-codr-repo" ] && REPO_ROOT="$(cd "$SRC/.." && pwd -P)"
+is_bundle_or_repo() {   # is_bundle_or_repo <path>
+  local real
+  real="$(cd "$1" 2>/dev/null && pwd -P)" || real="$1"
+  case "$real" in
+    "$SRC_REAL"|"$SRC_REAL"/*) return 0 ;;
+  esac
+  if [ -n "$REPO_ROOT" ]; then
+    case "$real" in "$REPO_ROOT"|"$REPO_ROOT"/*) return 0 ;; esac
+  fi
+  return 1
+}
+to_unix_path() {        # C:\Mendix\App or ~/App -> an absolute path bash can use
+  local path="$1"
+  path="${path%\"}"; path="${path#\"}"
+  case "$path" in "~"|"~/"*) path="$HOME${path#\~}" ;; esac
+  if command -v cygpath >/dev/null 2>&1; then path="$(cygpath -u "$path")"; fi
+  printf '%s\n' "$path"
+}
+project_state() {       # project_state <dir> -- one line saying what the install will do there
+  local mpr
+  mpr="$(find "$1" -maxdepth 1 -name '*.mpr' -print -quit 2>/dev/null)"
+  if [ -n "$mpr" ]; then
+    printf 'the Mendix app %s' "$(basename "$mpr")"
+  elif [ "$CREATE_APP" = "1" ]; then
+    printf 'no Mendix app yet: a new one (Mendix %s) is created there' "${MX_VERSION:-$DEFAULT_MX_VERSION}"
+  else
+    printf 'no Mendix app, and --no-app was given'
+  fi
+}
+
+if [ -n "$APP_ARG" ]; then
+  APP="$(to_unix_path "$APP_ARG")"
+elif [ -t 0 ] && [ -z "${MDL_ASSUME_YES:-}" ]; then
+  # Asked, with the current folder as the default unless it is the mx-codr clone.
+  default_app=""
+  is_bundle_or_repo "$PWD" || default_app="$PWD"
+  default_shown="$default_app"
+  command -v cygpath >/dev/null 2>&1 && [ -n "$default_app" ] && default_shown="$(cygpath -w "$default_app")"
+  printf '  Where is your Mendix project? A folder with an app in it, or a new or empty folder\n'
+  printf '  for a new app -- not the mx-codr folder you cloned.\n\n'
+  if [ -n "$default_app" ]; then
+    printf '  Project folder [%s]: ' "$default_shown"
+  else
+    printf '  Project folder: '
+  fi
+  read -r reply
+  [ -n "$reply" ] || reply="$default_app"
+  [ -n "$reply" ] || ui_fail "Nothing installed: no project folder given."
+  APP="$(to_unix_path "$reply")"
+elif [ -n "$(find "$PWD" -maxdepth 1 -name '*.mpr' -print -quit 2>/dev/null)" ] && ! is_bundle_or_repo "$PWD"; then
+  APP="$PWD"   # not interactive, run from inside an app: that app
+else
+  ui_fail "Nothing installed: name the Mendix project folder." \
+          "" \
+          "  bash $SRC/install.sh /path/to/project --with-deps"
+fi
+case "$APP" in /*) ;; *) APP="$PWD/$APP" ;; esac
+mkdir -p "$APP" 2>/dev/null || ui_fail "Cannot create the project folder: $APP"
 APP="$(cd "$APP" && pwd)"
 # $APP is interpolated into eval'd commands: reject shell metacharacters.
 case "$APP" in
@@ -45,47 +108,13 @@ case "$APP" in
             "  $APP" \
             "Rename the directory (or move the project) and run the installer again." ;;
 esac
-
-# With no path named, running from inside the bundle targets the directory it sits in.
-target_inferred=0
-looks_like_project() {
-  local marker
-  [ -n "$(find "$1" -maxdepth 1 -name '*.mpr' -print -quit 2>/dev/null)" ] && return 0
-  for marker in CLAUDE.md AGENTS.md .ai-context .claude mxcli; do
-    [ -e "$1/$marker" ] && return 0
-  done
-  return 1
-}
-
-case "$APP" in
-  "$SRC"|"$SRC"/*)
-    if [ -n "$APP_ARG" ]; then
-      ui_fail "install.sh installs INTO a Mendix project; that path is the bundle itself." \
-              "$APP" \
-              "" \
-              "Name the project instead:" \
-              "  bash $SRC/install.sh /path/to/project"
-    fi
-    parent="$(cd "$SRC/.." && pwd)"
-    if [ "$parent" = "/" ] || [ "$parent" = "$HOME" ]; then
-      ui_fail "Nothing installed: $parent is not a project folder." \
-              "" \
-              "Copy $(basename "$SRC")/ into your Mendix project (or an empty folder for a new app), then run this:" \
-              "" \
-              "  cd /path/to/project && bash $(basename "$SRC")/install.sh --with-deps"
-    fi
-    if ! looks_like_project "$parent"; then
-      ui_fail "Nothing installed: run the installer from the project folder, not from inside $(basename "$SRC")/." \
-              "" \
-              "To install, run this:" \
-              "" \
-              "  cd $parent && bash $(basename "$SRC")/install.sh --with-deps" \
-              "" \
-              "There is no Mendix app in $parent yet, so that creates one first."
-    fi
-    APP="$parent"
-    target_inferred=1 ;;
-esac
+if is_bundle_or_repo "$APP"; then
+  ui_fail "Nothing installed: $APP is the mx-codr folder, not a Mendix project." \
+          "" \
+          "Give the folder of your Mendix app, or a new folder for a new app, outside it:" \
+          "" \
+          "  bash $SRC/install.sh /path/to/project --with-deps"
+fi
 
 # No .mpr: create an app (MX_VERSION, APP_NAME) unless --no-app.
 mpr_count=$(find "$APP" -maxdepth 1 -name '*.mpr' | wc -l | tr -d ' ')
@@ -94,35 +123,12 @@ if [ "$mpr_count" = "0" ] && [ "$CREATE_APP" = "0" ]; then
           "Point this at a Mendix project, or drop --no-app to have one created here."
 fi
 
-if [ "$target_inferred" = 1 ]; then
-  printf '  %s%s target%s %s  %s(the project this bundle sits in)%s\n' \
-    "$C_GREY" "$I_BOX" "$C_RESET" "$APP" "$C_GREY" "$C_RESET"
-  printf '  %s  next time run it from the project folder: cd %s && bash %s/install.sh%s\n' \
-    "$C_GREY" "$APP" "$(basename "$SRC")" "$C_RESET"
-else
-  printf '  %s%s target%s %s\n' "$C_GREY" "$I_BOX" "$C_RESET" "$APP"
-fi
-printf '\n'
-
-# Ask before creating an app in a directory the caller did not name.
-if [ "$target_inferred" = 1 ] && [ "$mpr_count" = "0" ] && [ "$CREATE_APP" = "1" ]; then
-  if [ -t 0 ] && [ "$UI_TTY" = 1 ]; then
-    printf '  %s%s%s There is no Mendix app in %s.\n' "$C_YELLOW" "$I_WARN" "$C_RESET" "$APP"
-    printf '    Create an empty one there now? [y/N] '
-    read -r reply
-    case "$reply" in
-      y|Y|yes|YES) printf '\n' ;;
-      *) ui_fail "Nothing installed." "Name a project with an app, or pass --no-app to install without creating one." ;;
-    esac
-  else
-    ui_fail "Nothing installed: run the installer from the project folder, not from inside $(basename "$SRC")/." \
-            "" \
-            "To install, run this:" \
-            "" \
-            "  cd $APP && bash $(basename "$SRC")/install.sh --with-deps" \
-            "" \
-            "There is no Mendix app in $APP yet, so that creates one first."
-  fi
+printf '  %s%s target%s %s  %s(%s)%s\n\n' "$C_GREY" "$I_BOX" "$C_RESET" "$APP" "$C_GREY" "$(project_state "$APP")" "$C_RESET"
+# A copy of the bundle goes into the project, so it can be re-run from there.
+if [ "$SRC_REAL" != "$(cd "$APP" && pwd -P)/mxcodr" ]; then
+  rm -rf "$APP/mxcodr" && cp -R "$SRC" "$APP/mxcodr" \
+    || ui_fail "Could not copy the bundle into $APP/mxcodr"
+  find "$APP/mxcodr" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null
 fi
 
 # NOTE: there are 12 ui_done steps (13 with a new app), so these totals are one short.
