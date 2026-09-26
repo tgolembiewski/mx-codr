@@ -224,7 +224,7 @@ Write-Host ''
 $harnessEnv = Join-Path $Target 'tests\harness.env'
 $noDocker = (Test-Path $harnessEnv) -and (Select-String -Path $harnessEnv -Pattern 'MDL_NO_DOCKER=1' -Quiet)
 if ($noDocker) {
-  Write-Ok 'Set up without Docker — see tests\harness.env for what it uses instead.'
+  Write-Ok 'Set up without Docker -- see tests\harness.env for what it uses instead.'
 }
 # Studio Pro's JDK is often installed but not on PATH, so search before advising an install.
 if (-not (Test-Command 'java')) {

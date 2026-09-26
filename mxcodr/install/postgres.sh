@@ -103,8 +103,8 @@ ensure_postgres_role() {
 # ignore_credential_files -- gitignore tests/harness.env and credentials.env; make them owner-only.
 ignore_credential_files() {
   local entry
-  [ -f "$APP/tests/credentials.env" ] && chmod 600 "$APP/tests/credentials.env" 2>/dev/null
-  [ -f "$APP/tests/harness.env" ] && chmod 600 "$APP/tests/harness.env" 2>/dev/null
+  [ -f "$APP/tests/credentials.env" ] && chmod 600 "$APP/tests/credentials.env" 2>/dev/null || true
+  [ -f "$APP/tests/harness.env" ] && chmod 600 "$APP/tests/harness.env" 2>/dev/null || true
   [ -d "$APP/.git" ] || [ -f "$APP/.gitignore" ] || return 0
   for entry in "tests/harness.env" "tests/credentials.env"; do
     grep -qxF "$entry" "$APP/.gitignore" 2>/dev/null && continue
