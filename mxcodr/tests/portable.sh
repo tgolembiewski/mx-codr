@@ -70,7 +70,8 @@ mdl_load_harness_env() {
     case "$key" in
       MDL_NO_DOCKER|MDL_MXBUILD_PATH|MDL_DB_HOST|MDL_DB_NAME|MDL_DB_USER|MDL_DB_PASSWORD| \
       MDL_PSQL|MDL_BOOT_COMMAND|MDL_PRECHECK|MDL_ALLOW_GREEN_FIRST|JAVA_HOME|MX_VERSION| \
-      MDL_REQUIRE_PRODUCTION|MDL_GATE_CACHE|MDL_VISUAL|MDL_VISUAL_REVIEW|MDL_RUNTIME_ERRORS) ;;
+      MDL_REQUIRE_PRODUCTION|MDL_GATE_CACHE|MDL_VISUAL|MDL_VISUAL_REVIEW|MDL_RUNTIME_ERRORS| \
+      MDL_RUN_MODE) ;;
       *) continue ;;
     esac
     case "$value" in
@@ -88,6 +89,25 @@ mdl_load_harness_env() {
 _mdl_harness_env="$(dirname "${BASH_SOURCE[0]}")/harness.env"
 mdl_load_harness_env "$_mdl_harness_env"
 unset _mdl_harness_env
+
+# Docker mode (MDL_RUN_MODE=docker, tests/run-docker.sh): every port is shifted by APP_PORT-8080,
+# so the containers' admin API is APP_PORT+10, with the password of the stack mxcli wrote. A
+# build can take minutes on the first start (images are downloaded), so the boot waits longer.
+if [ "${MDL_RUN_MODE:-}" = "docker" ]; then
+  ADMIN_PORT="${ADMIN_PORT:-$(( ${APP_PORT:-8081} + 10 ))}"
+  if [ -z "${ADMIN_PASSWORD:-}" ]; then
+    ADMIN_PASSWORD="$(sed -n 's/^M2EE_ADMIN_PASS=//p' "$(dirname "${BASH_SOURCE[0]}")/../.docker/.env" 2>/dev/null | head -1)"
+    ADMIN_PASSWORD="${ADMIN_PASSWORD:-AdminPassword1!}"
+  fi
+  BOOT_TIMEOUT="${BOOT_TIMEOUT:-600}"
+  # mxcli names the compose project after the .docker folder, so every app shared one set of
+  # containers and one database volume. Name it after this app instead.
+  if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+    COMPOSE_PROJECT_NAME="mx-$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" \
+      | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')"
+  fi
+  export ADMIN_PORT ADMIN_PASSWORD COMPOSE_PROJECT_NAME
+fi
 
 # --- 4. Quoting helpers: keep values from becoming code in generated JSON, JS or regex ---
 mdl_json_object() {   # mdl_json_object k1 v1 k2 v2 ... -> {"k1":"v1",...}

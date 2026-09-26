@@ -35,6 +35,11 @@ Clone this repo anywhere, then run the installer. It asks for your Mendix projec
 (Enter takes the folder you are in), copies `mxcodr/` there and installs. An empty or new
 folder gets a new Mendix app.
 
+It also asks how the app should run. **Locally** (the default) the runtime and PostgreSQL run
+on your computer, and a model change is live in about a second. **In Docker** everything runs
+in containers: nothing else is installed, but every model change is rebuilt and the app
+restarted, about 40 seconds (measured), and Docker Desktop must be running.
+
 **macOS and Linux**
 
 ```bash
@@ -102,10 +107,10 @@ fetches what is missing, and tells you plainly about anything it could not do.
 |---|---|
 | **Your Mendix app** | Creates one with `mxcli new` if the folder has none (Mendix 11.12.1 unless you set `MX_VERSION`) |
 | **mxcli** | Uses the newest mxcli on the machine, offers the latest release when it is newer, and verifies the download's checksum |
-| **Docker** | Installs it when it is missing. It is optional: see [Running without Docker](mxcodr/README.md#running-without-docker) |
+| **Docker** | Only in Docker mode: installs Docker Desktop when missing and waits for it |
 | **Python, Node, Playwright and its browser** | Installs them with `--with-deps` — the checkers and browser tests run on them |
 | **MxBuild** | Downloads the one for your Mendix version with `--with-deps`, so `mx check` runs |
-| **PostgreSQL** | Sets it up when you work without Docker, with `--with-deps` |
+| **PostgreSQL** | Local mode (the default): sets it up with `--with-deps` |
 | **Skills, lint rules, checkers, hooks** | Puts them where each of the five agents looks for them |
 | **Windows** | Applies the junctions and ARM64 fixes that Studio Pro's mxbuild needs |
 
@@ -187,7 +192,7 @@ and then working with your agent as usual.
 | **Python 3** | for the checkers the gate and the agent call; you never invoke it |
 | **Node + playwright-cli** | the browser tests |
 | **A JDK** | matching the Mendix version; Studio Pro installs one |
-| **Docker** | installed by default; optional: see [Running without Docker](mxcodr/README.md#running-without-docker) |
+| **Docker** | only if you choose Docker mode |
 
 `--with-deps` installs the ones that can be installed unattended. It never installs
 a JDK — that wants a licence click.
@@ -210,12 +215,12 @@ The installer copies `mxcodr/` into the project, so it can be run again from the
 ### Windows
 
 `bootstrap.ps1` asks for the project folder first, installs Git for Windows, Python and
-Node with winget, then runs `install.sh --with-deps`. Run it as administrator: winget's
-Docker Desktop install needs it.
+Node with winget, then runs `install.sh --with-deps`. Run it as administrator: winget
+needs it.
 
 **Studio Pro is required on Windows.** `mx check` and the app build use the `mx.exe` and
-`mxbuild.exe` that come with it; Mendix publishes them separately for Linux only. Docker
-only gives the database, which PostgreSQL can too.
+`mxbuild.exe` that come with it; Mendix publishes them separately for Linux only. That
+holds in Docker mode too: the app is built on the computer.
 Without it the installer stops at once, before installing anything, and says where to
 get it.
 

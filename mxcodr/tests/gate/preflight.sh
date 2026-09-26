@@ -35,6 +35,7 @@ MSG
 # Warns when the runtime serves an older model: security and entity changes do not hot-apply.
 # The warning also goes to $WORK/stale.note, so record_red_first ignores this run.
 preflight_stale_model() {
+  if [ "${MDL_RUN_MODE:-}" = "docker" ]; then docker_apply_latest_model; return 0; fi
   watch_applied_latest_change && return 0
   warn_if_deployment_older
   warn_if_runtime_older
@@ -183,4 +184,17 @@ preflight_environment() {
          echo "      fail on the login page. Create it: TEST_USER=... and TEST_PASSWORD=..." ;;
     esac
   fi
+}
+
+
+# Docker mode: there is no --watch. When the model changed since the containers were built, the
+# app is rebuilt and restarted (tests/run-docker.sh, about 40s) before the tests: a model reload
+# alone was measured to miss a new attribute.
+docker_apply_latest_model() {
+  local stamp="$APP_DIR/.mxcli/docker-model.stamp"
+  [ -f "$stamp" ] && [ ! "$MPR" -nt "$stamp" ] && return 0
+  echo "== the model changed: rebuilding and restarting the app in Docker (about 40s)"
+  stop_project_app >/dev/null
+  BASE_URL=""
+  boot_with_command
 }

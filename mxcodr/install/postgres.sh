@@ -131,6 +131,7 @@ write_harness_env() {    # write_harness_env <mendix-install-dir>
     printf '# Read by tests/portable.sh as DATA -- KEY=value, one layer of quotes, no\n'
     printf '# shell. Only the keys it lists are honoured, and this file wins over the\n'
     printf '# environment for them. It holds a database password: keep it out of git.\n'
+    printf 'MDL_RUN_MODE=local\n'
     printf 'MDL_NO_DOCKER=1\n'
     [ -n "$mxbuild" ] && printf 'MDL_MXBUILD_PATH="%s"\n' "$mxbuild"
     # mxcli's --db-host needs host:port.
