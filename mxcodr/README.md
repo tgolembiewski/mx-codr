@@ -518,7 +518,9 @@ Three more things the session showed and the harness now answers:
 
 - `bash tests/gate.sh --restart` stops this project's runtime -- the process tree
   under `mxcli run`, so mxbuild and the Java runtime go with it -- boots it again
-  and runs the gate. The stale-model warning names it.
+  and runs the gate. The stale-model warning names it. Git Bash on Windows has no
+  `pgrep`, so there it asks PowerShell for the processes that name the project's
+  folder and stops them with `taskkill`.
 - The first red `--only` run of a script is recorded in `.mxcli/red-first/`. A
   script that goes green with no such record is named once, and that is the only
   test worth breaking the feature for. The session had broken every feature for
