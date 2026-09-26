@@ -429,33 +429,23 @@ delete skills mxcli never shipped.
 
 ## Running it
 
-Run it from the project folder, one level above the bundle -- not from inside
-`mxcodr/`:
+Run it from the mx-codr clone. It asks for the Mendix project folder, with the folder you
+are in as the default, copies `mxcodr/` into the project and installs there:
 
 ```bash
-cd <app> && bash mxcodr/install.sh     # the way to run it: the target is the folder you are in
+bash mx-codr/mxcodr/install.sh --with-deps          # asks
+bash mx-codr/mxcodr/install.sh ~/Apps/MyApp          # named
+cd ~/Apps/MyApp && bash mxcodr/install.sh            # again, from the copy in the project
 ```
 
-Running it from inside the bundle is still accepted, because people do it right
-after copying the folder in:
+It never installs into the clone or the bundle: the repo root carries `.mx-codr-repo`, and
+a target inside either is refused. With no terminal to ask, it needs the folder named, or
+must be run from inside an app (a `*.mpr` in the current folder). `bootstrap.ps1` asks
+the same question before its winget stage. It used to guess "the folder above the bundle",
+which was the clone itself when the repo was cloned.
 
-```bash
-cd <app>/mxcodr && bash install.sh     # works, but the target is guessed
-```
-
-That second form infers the target: the bundle cannot install into itself, so with no
-path named it installs into the directory the bundle sits in. The target is
-printed before any work starts, and the run is identical either way.
-
-Two things that inference deliberately will not do. A path named on the command
-line is never second-guessed -- `install.sh mxcodr` still fails, because that is a
-mistake rather than a shorthand. And an inferred target with no `.mpr` asks
-before creating an app (`[y/N]`), or refuses outright when nothing can answer,
-because `mxcli new` writes a few hundred files into a directory the caller never
-named. Naming the target restores the old behaviour of just creating it.
-
-`--no-app` declines app creation entirely; `--help` lists the arguments,
-`MX_VERSION` and `APP_NAME` override what gets created.
+`--no-app` declines app creation; `--help` lists the arguments, `MX_VERSION` and
+`APP_NAME` override what gets created.
 
 ## Running without Docker
 

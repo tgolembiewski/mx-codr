@@ -31,27 +31,25 @@ It sits on top of [mxcli](https://github.com/mendixlabs/mxcli):
 
 ## Get started
 
-Copy the `mxcodr/` folder into your Mendix project — or into an empty folder, and the
-installer creates the app for you. Then, from that folder:
+Clone this repo anywhere, then run the installer. It asks for your Mendix project folder
+(Enter takes the folder you are in), copies `mxcodr/` there and installs. An empty or new
+folder gets a new Mendix app.
 
 **macOS and Linux**
 
 ```bash
-bash mxcodr/install.sh --with-deps
+git clone https://github.com/tgolembiewski/mx-codr.git
+bash mx-codr/mxcodr/install.sh --with-deps
 ```
 
-**Windows** — open PowerShell **as administrator** and run:
+**Windows**: PowerShell **as administrator**, with Mendix Studio Pro installed:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File mxcodr\bootstrap.ps1
+git clone https://github.com/tgolembiewski/mx-codr.git
+powershell -ExecutionPolicy Bypass -File mx-codr\mxcodr\bootstrap.ps1
 ```
 
-Windows has no bash out of the box, so `bootstrap.ps1` first installs Git for Windows
-(which brings Git Bash), Python and Node with winget, then runs the same installer.
-Administrator rights are needed because winget installs Docker Desktop. Already have
-Git Bash? Run `bash mxcodr/install.sh --with-deps` from Git Bash instead.
-
-Start a new agent session and ask for a feature. That's it.
+When it is done, open your agent **in the project folder** and ask for a feature.
 
 ## What it enforces
 
@@ -183,7 +181,7 @@ and then working with your agent as usual.
 | | Why |
 |---|---|
 | **mxcli** | everything runs through it |
-| **Mendix Studio Pro** or a cached mxbuild | `mx check` validates the model |
+| **Mendix Studio Pro** or a cached mxbuild | `mx check` validates the model; on Windows only Studio Pro |
 | **PostgreSQL** | the app's database, and a separate `<project>_test` one |
 | **bash** | the harness is shell scripts — Git Bash on Windows |
 | **Python 3** | for the checkers the gate and the agent call; you never invoke it |
@@ -196,46 +194,28 @@ a JDK — that wants a licence click.
 
 ## Install
 
-Copy `mxcodr/` into your Mendix project and run the installer **from the project
-folder, one level above `mxcodr/`** — not from inside `mxcodr/`:
-
-```bash
-cd MyApp                              # the folder with MyApp.mpr and mxcodr/
-bash mxcodr/install.sh --with-deps
 ```
+bash mx-codr/mxcodr/install.sh [project-folder] [--no-app] [--with-deps]
 
-`cd mxcodr && bash install.sh` still installs into the folder above, but then the
-target is guessed rather than named, and with no app there it stops to ask.
-
-```
-bash mxcodr/install.sh [path-to-project] [--no-app] [--with-deps]
-
-  path-to-project  where to install (default: the current directory, or the
-                   parent project when run from inside the bundle)
+  project-folder   the Mendix project; asked for when not given (the current folder is the
+                   default). Never the mx-codr clone itself
   --no-app         never create a Mendix app; require one to be there already
-  --with-deps      install missing prerequisites with this machine's package
-                   manager. Without it they are only reported.
+  --with-deps      install missing prerequisites with this machine's package manager.
+                   Without it they are only reported.
 ```
 
-With no `.mpr` in the target and `--with-deps`, it creates a Mendix app for you.
+The installer copies `mxcodr/` into the project, so it can be run again from there:
+`bash mxcodr/install.sh`.
 
 ### Windows
 
-There is no bash on Windows until something installs it, so there is a second
-entry point for that one job:
+`bootstrap.ps1` asks for the project folder first, installs Git for Windows, Python and
+Node with winget, then runs `install.sh --with-deps`. Run it as administrator: winget's
+Docker Desktop install needs it.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File mxcodr\bootstrap.ps1     # from the project folder
-```
-
-It installs Git for Windows, Python and Node with winget, then hands over to
-`bash install.sh --with-deps`.
-
-**Run it from an elevated terminal.** winget's Docker Desktop install asks for
-administrator rights, and unelevated it fails with `exit code: 4294967291` and is
-reported as missing.
-
-If you already have Git Bash, skip `bootstrap.ps1` and run `bash mxcodr/install.sh` from the project folder.
+**Studio Pro is required on Windows.** `mx check` and the app build use the `mx.exe` and
+`mxbuild.exe` that come with it; Mendix publishes them separately for Linux only. Docker
+only gives the database, which PostgreSQL can too.
 
 ### What lands in the project, and who reads it
 
