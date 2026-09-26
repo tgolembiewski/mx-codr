@@ -23,9 +23,17 @@ if [ -z "$MX_VERSION" ] || [ ! -d "$HOME/.mxcli/mxbuild/$MX_VERSION" ]; then
   for _d in "$HOME"/.mxcli/mxbuild/*/; do [ -d "$_d" ] && MX_VERSION="$(basename "$_d")"; done
 fi
 MXCACHE="${MXCACHE:-$HOME/.mxcli/mxbuild/$MX_VERSION}"
-MXBUILD="${MXBUILD:-$MXCACHE/modeler/mxbuild$EXE_SUFFIX}"
-MXBUILD_TOOLS="${MXBUILD_TOOLS:-$MXCACHE/modeler/tools/node}"
-RUNTIME="${RUNTIME:-$HOME/.mxcli/runtime/$MX_VERSION}"
+# The mxbuild cache first, else the Studio Pro install tests/harness.env names: with a per-user
+# Studio Pro the installer filled the cache with gradle and the JDK only, and every boot failed
+# on "mxbuild.exe: No such file or directory".
+STUDIO="${MDL_MXBUILD_PATH:-}"
+pick() {   # pick <cache-path> <studio-path> -- the first that exists, else the cache path
+  if [ -e "$1" ] || [ -z "$STUDIO" ] || [ ! -e "$2" ]; then printf '%s\n' "$1"; else printf '%s\n' "$2"; fi
+}
+MXBUILD="${MXBUILD:-$(pick "$MXCACHE/modeler/mxbuild$EXE_SUFFIX" "$STUDIO/modeler/mxbuild$EXE_SUFFIX")}"
+MXBUILD_TOOLS="${MXBUILD_TOOLS:-$(pick "$MXCACHE/modeler/tools/node" "$STUDIO/modeler/tools/node")}"
+RUNTIME="${RUNTIME:-$(dirname "$(dirname "$(dirname "$(pick "$HOME/.mxcli/runtime/$MX_VERSION/runtime/launcher/runtimelauncher.jar" \
+  "$STUDIO/runtime/launcher/runtimelauncher.jar")")")")}"
 # JAVA_HOME must be space-free: mxbuild splits its arguments on spaces.
 JAVA_DIR="${JAVA_HOME:-}"
 JAVA="${JAVA:-$JAVA_DIR/bin/java$EXE_SUFFIX}"

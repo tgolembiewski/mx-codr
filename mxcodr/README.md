@@ -26,8 +26,8 @@ plugins/          mendix-mdl-harness.js (OpenCode) and mendix-mdl-harness.pi.js 
                   three jobs as the hooks, in each host's own event API
 tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), precheck.sh, orient.sh,
                   diagnose.sh, peek.sh, lib.sh + lib/ (timeout, sessions, scenario, results),
-                  portable.sh, scenario-helpers.js, run-docker.sh (Docker mode) — the harness,
-                  upgraded in place on every install; run-app.sh, copied only when absent.
+                  portable.sh, scenario-helpers.js, run-app.sh (Windows), run-docker.sh (Docker
+                  mode) — the harness, upgraded in place on every install.
                   gate.sh is the done gate: tests, mx check, lint, coverage, naming, layout and
                   security, then warnings (rendered pages, server errors). precheck.sh is what the hooks run before an exec; orient.sh and
                   diagnose.sh gather facts in parallel; peek.sh looks at a page without a test;
