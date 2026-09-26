@@ -98,6 +98,22 @@ orphan_mxbuild_pids() {
   done
 }
 
+# Windows (Git Bash) has no pgrep: ask PowerShell for the java/mxcli/mxbuild processes whose
+# command line names this project's directory (the runtime gets <dir>\deployment). Prints
+# Windows PIDs, for taskkill. The directory must be followed by a separator or a quote, so
+# C:\apps\Invoice never matches C:\apps\Invoice2.
+windows_project_pids() {
+  command -v powershell.exe >/dev/null 2>&1 || return 0
+  local dir
+  dir="$(cygpath -w "$APP_DIR" 2>/dev/null)" || return 0
+  MDL_WIN_DIR="${dir%\\}" powershell.exe -NoProfile -Command '
+    $d = $env:MDL_WIN_DIR
+    Get-CimInstance Win32_Process |
+      Where-Object { @("java.exe", "mxcli.exe", "mxbuild.exe") -contains $_.Name } |
+      Where-Object { $c = $_.CommandLine; $c -and ($c.Contains($d + "\") -or $c.Contains($d + [char]34) -or $c.TrimEnd().EndsWith($d)) } |
+      ForEach-Object { $_.ProcessId }' 2>/dev/null | tr -d '\r'
+}
+
 # Stops this project's app: the runtime, `mxcli run` with everything under it, and orphaned
 # mxbuild. SIGTERM, up to 15s for a clean stop, then SIGKILL. Other projects are never touched.
 stop_project_app() {
@@ -105,6 +121,18 @@ stop_project_app() {
   if [ "${MDL_RUN_MODE:-}" = "docker" ]; then
     "$MXCLI" docker down -p "$MPR" >/dev/null 2>&1 && echo "   stopped this project's Docker containers" \
       || echo "   nothing of this project was running in Docker"
+    return 0
+  fi
+  # Without pgrep (Git Bash on Windows) the loop below finds nothing, and --restart left the old
+  # runtime serving the old model while the gate reported the restart done.
+  if ! command -v pgrep >/dev/null 2>&1 && command -v powershell.exe >/dev/null 2>&1; then
+    victims="$(windows_project_pids | tr '\n' ' ')"
+    if [ -z "${victims// /}" ]; then
+      echo "   nothing of this project was running"
+      return 0
+    fi
+    for pid in $victims; do taskkill //F //T //PID "$pid" >/dev/null 2>&1 || true; done
+    echo "   stopped (Windows PIDs):$(echo $victims)"
     return 0
   fi
   for pid in $(project_pids) $(orphan_mxbuild_pids); do

@@ -191,6 +191,10 @@ once and watch that one test go red (`bash tests/gate.sh --only <feature>` recor
 test in `MDL_ALLOW_GREEN_FIRST` in `tests/harness.env` when it is green by nature, such as a
 seeding reset.
 
+A test that `set -e` ends on a command that printed nothing (say `x=$(oql_count ... 2>/dev/null
+|| echo "")`, where the exit inside `$(...)` skips the fallback) no longer shows a bare `FAIL`: its
+last line names the test's line and command.
+
 Each boot empties `.mxcli/gate-boot.log` and keeps the one before it as
 `.mxcli/gate-boot.prev.log`, so a failure that a later boot overwrote can still be read.
 
@@ -518,7 +522,9 @@ Three more things the session showed and the harness now answers:
 
 - `bash tests/gate.sh --restart` stops this project's runtime -- the process tree
   under `mxcli run`, so mxbuild and the Java runtime go with it -- boots it again
-  and runs the gate. The stale-model warning names it.
+  and runs the gate. The stale-model warning names it. Git Bash on Windows has no
+  `pgrep`, so there it asks PowerShell for the processes that name the project's
+  folder and stops them with `taskkill`.
 - The first red `--only` run of a script is recorded in `.mxcli/red-first/`. A
   script that goes green with no such record is named once, and that is the only
   test worth breaking the feature for. The session had broken every feature for

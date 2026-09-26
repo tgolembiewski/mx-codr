@@ -273,11 +273,13 @@ Cursor, OpenCode or Pi finish a turn while it is red. When you want to look your
 ```bash
 bash tests/gate.sh                    # the done gate
 bash tests/gate.sh --boot-if-needed   # boot the app first if nothing answers
-bash tests/gate.sh --restart          # stop this project's app and boot it again
+bash tests/gate.sh --restart          # stop this project's app and boot it again (Windows too)
 bash tests/gate.sh --only <feature>   # one test, warm browser, red loop (ends PASSED, never DONE)
 bash tests/orient.sh                  # what is in this project
 bash tests/diagnose.sh                # why is the app not answering
 ```
+
+A failing test always says why: one that stops on a silent command names its line and command.
 
 ## Configuration
 

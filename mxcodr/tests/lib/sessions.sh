@@ -24,6 +24,19 @@ _release_session() {
     status=124
   fi
   rm -f "$_MDL_TIMEOUT_FLAG"
+  # set -e ended the script on a command that printed no reason: the runner showed a bare FAIL.
+  if [ "$status" != "0" ] && [ "$_MDL_TIMED_OUT" = "0" ] && [ "${_MDL_FAIL_SAID:-0}" = "0" ] \
+     && [ -n "${_MDL_ERR_LINE:-}" ]; then
+    if [ -s "$_MDL_FAIL_NOTE" ]; then
+      # A fail inside $(...): its own message, which the subshell's stderr may have lost.
+      echo "$(head -1 "$_MDL_FAIL_NOTE") (line $_MDL_ERR_LINE)" >&2
+    else
+      echo "FAIL: $(basename "$0") stopped at line $_MDL_ERR_LINE, \`${_MDL_ERR_CMD:0:120}\` (exit $status), with no message." \
+        "A function that calls exit inside \$(...) ends the whole \$(...), so an '|| fallback' in it never runs;" \
+        "call it on its own line, or drop the 2>/dev/null to see why it failed" >&2
+    fi
+  fi
+  rm -f "$_MDL_FAIL_NOTE"
   # The scenario file holds the password.
   [ -n "${_MDL_SCENARIO_FILE:-}" ] && rm -f "$_MDL_SCENARIO_FILE"
   # Only a timed-out scenario skipped its sign-out; bounded because that browser hung.
@@ -33,7 +46,10 @@ _release_session() {
   fi
   return $status
 }
+_MDL_FAIL_NOTE="$(mdl_tmpfile mdl-fail)"
 trap _release_session EXIT
+# Where set -e stopped the script; the EXIT trap names it when nothing else said why.
+trap '_MDL_ERR_LINE=$LINENO; _MDL_ERR_CMD=$BASH_COMMAND' ERR
 
 # release_session -- sign out within 10s, never fails; gate.sh calls it after a reuse run.
 release_session() {

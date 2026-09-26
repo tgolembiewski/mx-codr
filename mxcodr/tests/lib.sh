@@ -85,7 +85,13 @@ fi
 RUNTIME_LOG="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}"
 
 # Inside $(...) fail ends only that subshell; callers add `|| exit 1`.
-fail() { echo "FAIL: $*" >&2; exit 1; }
+# Also noted in a file: a fail inside $(...) (or behind 2>/dev/null) reaches the EXIT trap that way.
+fail() {
+  _MDL_FAIL_SAID=1
+  echo "FAIL: $*" >&2
+  [ -z "${_MDL_FAIL_NOTE:-}" ] || printf 'FAIL: %s\n' "$*" > "$_MDL_FAIL_NOTE" 2>/dev/null || true
+  exit 1
+}
 
 # --- 5-9: tests/lib/, in this order (the time limit and the sessions start as they are read) ---
 for _mdl_part in timeout sessions scenario results; do
