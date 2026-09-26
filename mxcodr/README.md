@@ -745,6 +745,11 @@ MDL_BOOT_COMMAND="bash tests/run-app.sh"
 and still bounded by `BOOT_TIMEOUT`. Anything that ends with an app answering on
 `$APP_PORT` will do.
 
+Two projects run side by side when the second sets `APP_PORT=8082` in its
+`tests/harness.env` (locally the admin API follows, at `APP_PORT+9`). The gate checks that
+the runtime answering on its port names this project's `deployment` folder, and exits 2
+naming the other project when it does not; `run-app.sh` stops only its own runtime.
+
 A boot script written this way has to do three things `mxcli run --local` would
 otherwise have done, each of which is easy to miss:
 

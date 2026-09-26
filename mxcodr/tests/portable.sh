@@ -71,7 +71,7 @@ mdl_load_harness_env() {
       MDL_NO_DOCKER|MDL_MXBUILD_PATH|MDL_DB_HOST|MDL_DB_NAME|MDL_DB_USER|MDL_DB_PASSWORD| \
       MDL_PSQL|MDL_BOOT_COMMAND|MDL_PRECHECK|MDL_ALLOW_GREEN_FIRST|JAVA_HOME|MX_VERSION| \
       MDL_REQUIRE_PRODUCTION|MDL_GATE_CACHE|MDL_VISUAL|MDL_VISUAL_REVIEW|MDL_RUNTIME_ERRORS| \
-      MDL_RUN_MODE) ;;
+      MDL_RUN_MODE|APP_PORT|ADMIN_PORT) ;;
       *) continue ;;
     esac
     case "$value" in
@@ -89,6 +89,12 @@ mdl_load_harness_env() {
 _mdl_harness_env="$(dirname "${BASH_SOURCE[0]}")/harness.env"
 mdl_load_harness_env "$_mdl_harness_env"
 unset _mdl_harness_env
+
+# A second project runs beside the first with APP_PORT=8082 in its tests/harness.env: locally its
+# admin API follows, APP_PORT+9 (8081 and 8090 by default).
+if [ "${MDL_RUN_MODE:-}" != "docker" ] && [ -n "${APP_PORT:-}" ] && [ -z "${ADMIN_PORT:-}" ]; then
+  ADMIN_PORT=$(( APP_PORT + 9 ))
+fi
 
 # Docker mode (MDL_RUN_MODE=docker, tests/run-docker.sh): every port is shifted by APP_PORT-8080,
 # so the containers' admin API is APP_PORT+10, with the password of the stack mxcli wrote. A

@@ -234,14 +234,58 @@ ensure_app() {
 }
 
 # True when BASE_URL (else $APP_PORT, then 8080) answers; sets BASE_URL to the one that did.
+# Exits 2 when what answers is another project's runtime: its tests would run on that app.
 find_running_app() {
-  local candidate
+  local candidate port other
   if [ -z "${BASE_URL:-}" ]; then
     for candidate in "http://localhost:$APP_PORT" http://localhost:8080; do
       answers "$candidate" && { BASE_URL="$candidate"; break; }
     done
   fi
-  [ -n "${BASE_URL:-}" ] && answers "$BASE_URL"
+  [ -n "${BASE_URL:-}" ] && answers "$BASE_URL" || return 1
+  port="${BASE_URL##*:}"; port="${port%%/*}"
+  other="$(foreign_runtime "$port")"
+  [ -z "$other" ] && return 0
+  cat >&2 <<MSG
+port $port answers, but with another project's app, not this one:
+  $other
+Every test and check here would run against that app. Either stop it (bash tests/gate.sh --stop
+in that project), or give this project its own port: add APP_PORT=$(( port + 1 )) to
+tests/harness.env (the admin API then moves to $(( port + 10 ))) and run this again.
+MSG
+  exit 2
+}
+
+# port_owner_command <port> -- the command line of the process listening on <port>, or nothing.
+port_owner_command() {
+  local pid
+  if command -v lsof >/dev/null 2>&1; then
+    pid="$(lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+    [ -n "$pid" ] && ps -o command= -p "$pid" 2>/dev/null
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    MDL_PORT="$1" powershell.exe -NoProfile -Command '
+      $c = Get-NetTCPConnection -LocalPort ([int]$env:MDL_PORT) -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+      if ($c) { (Get-CimInstance Win32_Process -Filter ("ProcessId=" + $c.OwningProcess)).CommandLine }' \
+      2>/dev/null | tr -d '\r'
+  fi
+  return 0
+}
+
+# foreign_runtime <port> -- the command line of a Mendix runtime on <port> that does not name this
+# project's deployment folder; nothing when it is this project's, or when that cannot be told
+# (Docker, no lsof or PowerShell, not a runtimelauncher).
+foreign_runtime() {
+  local command own
+  [ "${MDL_RUN_MODE:-}" = "docker" ] && return 0
+  command="$(port_owner_command "$1")"
+  case "$command" in *runtimelauncher*) ;; *) return 0 ;; esac
+  own="$(cygpath -w "$APP_DIR" 2>/dev/null || printf '%s' "$APP_DIR")"
+  case "$command" in
+    *"$APP_DIR/deployment"*|*"$own\deployment"*|*"$own/deployment"*) return 0 ;;
+  esac
+  # What follows the launcher jar is the deployment folder: that names the other project.
+  command="${command##*runtimelauncher.jar}"; command="${command#\"}"
+  printf '%s\n' "$(printf '%s' "${command:0:200}" | sed 's/^[[:space:]]*//')"
 }
 
 # No app and no --boot-if-needed: say how to start one, exit 2.
