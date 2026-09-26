@@ -23,9 +23,17 @@ if [ -z "$MX_VERSION" ] || [ ! -d "$HOME/.mxcli/mxbuild/$MX_VERSION" ]; then
   for _d in "$HOME"/.mxcli/mxbuild/*/; do [ -d "$_d" ] && MX_VERSION="$(basename "$_d")"; done
 fi
 MXCACHE="${MXCACHE:-$HOME/.mxcli/mxbuild/$MX_VERSION}"
-MXBUILD="${MXBUILD:-$MXCACHE/modeler/mxbuild$EXE_SUFFIX}"
-MXBUILD_TOOLS="${MXBUILD_TOOLS:-$MXCACHE/modeler/tools/node}"
-RUNTIME="${RUNTIME:-$HOME/.mxcli/runtime/$MX_VERSION}"
+# The mxbuild cache first, else the Studio Pro install tests/harness.env names: with a per-user
+# Studio Pro the installer filled the cache with gradle and the JDK only, and every boot failed
+# on "mxbuild.exe: No such file or directory".
+STUDIO="${MDL_MXBUILD_PATH:-}"
+pick() {   # pick <cache-path> <studio-path> -- the first that exists, else the cache path
+  if [ -e "$1" ] || [ -z "$STUDIO" ] || [ ! -e "$2" ]; then printf '%s\n' "$1"; else printf '%s\n' "$2"; fi
+}
+MXBUILD="${MXBUILD:-$(pick "$MXCACHE/modeler/mxbuild$EXE_SUFFIX" "$STUDIO/modeler/mxbuild$EXE_SUFFIX")}"
+MXBUILD_TOOLS="${MXBUILD_TOOLS:-$(pick "$MXCACHE/modeler/tools/node" "$STUDIO/modeler/tools/node")}"
+RUNTIME="${RUNTIME:-$(dirname "$(dirname "$(dirname "$(pick "$HOME/.mxcli/runtime/$MX_VERSION/runtime/launcher/runtimelauncher.jar" \
+  "$STUDIO/runtime/launcher/runtimelauncher.jar")")")")}"
 # JAVA_HOME must be space-free: mxbuild splits its arguments on spaces.
 JAVA_DIR="${JAVA_HOME:-}"
 JAVA="${JAVA:-$JAVA_DIR/bin/java$EXE_SUFFIX}"
@@ -79,13 +87,25 @@ build_deployment() {
     saved_db="$(mdl_tmpdir mdl-hsqldb)"
     cp -R "$HSQLDB_DIR/." "$saved_db/" 2>/dev/null || saved_db=""
   fi
+  # Output to a file, not a pipe: Gradle leaves a daemon behind that holds a pipe open, so
+  # `mxbuild | tail` waited for ever after a failed build -- the boot hung instead of failing.
+  local build_log="$APP_DIR/.mxcli/mxbuild.log" build_ok=1
+  mkdir -p "$APP_DIR/.mxcli"
   "$MXBUILD" "--java-home=$JAVA_DIR" "--java-exe-path=$JAVA" \
-    "--gradle-home=$GRADLE_HOME" --target=deploy "$MPR" 2>&1 | tail -3
+    "--gradle-home=$GRADLE_HOME" --target=deploy "$MPR" > "$build_log" 2>&1 || build_ok=0
+  tail -3 "$build_log"
   if [ -n "$saved_db" ]; then
     mkdir -p "$HSQLDB_DIR"
     cp -R "$saved_db/." "$HSQLDB_DIR/" 2>/dev/null || true
     rm -rf "$saved_db"
     echo "   (Studio Pro's local database kept across the build)"
+  fi
+  if [ "$build_ok" = "0" ]; then
+    echo "== build FAILED -- full output: $build_log"
+    # A Java compile error is in Gradle's own log; its first lines say what is missing.
+    grep -h -m5 'error:' "$DEPLOYMENT"/log/*gradle_log.txt 2>/dev/null | sed 's/^/   /'
+    echo "== start FAILED" >&2
+    exit 1
   fi
 }
 
