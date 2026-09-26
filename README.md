@@ -83,6 +83,7 @@ what to fix. Codes in brackets are what the gate prints.
   that opens My account (`USER01`).
 - An icon on every button (`ICON01`); Atlas spacing, no custom CSS (`SPACE01`-`03`).
 - Everything on a page inside a layout grid, so nothing touches the edge of the window (`EDGE01`).
+- A heading on every page (`HEAD01`, a warning).
 - Pages checked as they render: after every test the gate measures the page for widgets
   that overlap, sideways scrolling and cut-off text (`VIS01`-`03`), and flags an alert
   class on plain text (`ALERT01`). With `MDL_VISUAL_REVIEW=agent`, a model that reads
