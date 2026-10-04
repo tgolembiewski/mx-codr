@@ -621,7 +621,16 @@ the guard as a module. No rule changed.
 - A test compares the copies hooks keep of shared helpers (`mdl_find_python` in ten files, the
   Studio Pro process pattern, the module list), so a fix made in one copy and not the others fails.
 - `gate_helpers.py runtime-age` no longer stops with a traceback when the `.mpr` is gone; comments
-  that described older behaviour ("five model checks") say what the code does. The
+  that described older behaviour ("five model checks") say what the code does.
+
+Bundle 2026.10.04.17 fixes what the first real Windows run of the audit's changes showed. On
+Windows Python's `print()` ends a line with CR LF, so the entity names the gate reads into bash
+kept the CR and matched no describe file. Until the audit that failure was swallowed (`|| true`),
+so `VIEW01` and the index rules (`PERF07`, `PERF08`) never ran on Windows; once a check that
+could not run stopped counting as a pass, `security` said "could not run" there and the gate could
+not say DONE. The two inline scripts whose lines bash reads (entity names, user roles) now write
+LF, as the module list already did. Verified in the Parallels Windows 11 VM: the installer, then
+the gate with the app booted by `tests/run-app.sh`. The
 summary line about microflow tests (`*.test.mdl`, not run by the gate) is printed once the suite
 is green: while it was red, two sessions took the line as the next job and spent 20-40 minutes
 on tests that do not count for DONE. The gate's requirements themselves are unchanged.

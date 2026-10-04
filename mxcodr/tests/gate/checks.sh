@@ -322,6 +322,7 @@ layout_sign_out_inputs() {
   : > "$WORK/userroles.mdl"
   if ! roles="$("$MXCLI" -p "$MPR" --json -c "SHOW USER ROLES" 2>/dev/null)" \
      || ! roles="$(printf '%s' "$roles" | "$PY" -c 'import json, sys
+sys.stdout.reconfigure(newline="\n")      # Windows: print() would end each name with \r\n
 rows = json.load(sys.stdin)
 if not isinstance(rows, list):
     raise SystemExit(1)
@@ -489,7 +490,10 @@ entity_names() {
   local module listing status=0
   for module in $USER_MODULES; do
     listing="$("$MXCLI" -p "$MPR" --json -c "SHOW ENTITIES IN $module" 2>/dev/null)" || { status=1; continue; }
+    # newline="\n": on Windows print() writes \r\n, every name kept its \r, and no file matched it.
+    # Until 2026-10-04 that failure was swallowed, so VIEW01 and the index rules never ran there.
     printf '%s' "$listing" | "$PY" -c 'import json, re, sys
+sys.stdout.reconfigure(newline="\n")
 rows = json.load(sys.stdin)
 if not isinstance(rows, list):
     raise SystemExit(1)

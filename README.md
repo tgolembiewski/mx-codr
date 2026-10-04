@@ -308,6 +308,7 @@ inline code that writes `tests/harness.env`; the test password no longer shows i
 A checker that recognises none of the documents mxcli described (a describe format it does not
 read) says "could not run" instead of passing.
 The Cursor hook applies the same rules before an `mxcli exec` as the Claude Code hook.
+On Windows the view and index checks now run: the names the gate lists no longer end in a carriage return.
 After an exec, the agent is told when it re-created a page another script alters, or granted
 access another script revoked.
 
