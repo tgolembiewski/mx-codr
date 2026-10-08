@@ -701,6 +701,10 @@ finding said `create or modify constant` (SCRIPT01 refuses a second create) and 
 `alter constant`", which mxcli does not have. CRED01 now says to blank the default in the script that
 creates the constant (a script of its own when STALE01 refuses the re-exec); SCRIPT01 offers `alter`
 only for entity, enumeration, page, snippet, microflow, nanoflow and workflow.
+Bundle 2026.10.08.6: WRITE01 skips an attribute a nanoflow or an `@applyentityaccess` microflow sets --
+those run with the user's rights and need the write right (73 -> 70 warnings on 32 apps). Its message
+now warns that a `write (...)` list drops every association it does not name: on B2B the session
+narrowed the write lists, the order's customer picker turned read-only and nine tests failed.
 
 `FOLDER01` (`checks/check_folders.cjs`, step `folders`, bundle 2026.10.08.1): every document of the
 app's own modules sits in `<business folder>/UI` (pages, snippets, layouts), `/FNC` (microflows,
