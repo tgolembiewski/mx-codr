@@ -265,21 +265,29 @@ function findings(model, modules) {
   // Associations are left out: a page's "new" button sets one from its context, with no input on screen.
   // Non-persistent entities too: what the client writes there stays in its own session.
   const associations = new Set((model.associations || []).map(a => String(a.QualifiedName).split('.').pop().toLowerCase()));
-  const writes = {};
+  // WRITE01 is about attributes: the associations the role writes stay. A write (...) list drops what it
+  // does not name, and a picker or a "new" button that sets one from its context turns read-only (B2B,
+  // 2026-10-08: nine tests), so the finding names every association to keep in it.
+  const writes = {}, keep = {};
   for (const p of model.permissions) {
     if (p.ElementType !== 'ENTITY' || p.AccessType !== 'MEMBER_WRITE' || !mine(p.ElementName) || !mine(p.ModuleRoleName) || !p.MemberName) continue;
     if (!persistent.has(p.ElementName)) continue;
     const attr = String(p.MemberName).split('.').pop();
-    if (associations.has(attr.toLowerCase())) continue;
+    const key = p.ElementName + '|' + p.ModuleRoleName;
+    if (associations.has(attr.toLowerCase())) {
+      (keep[key] = keep[key] || []).push(attr);
+      continue;
+    }
     if (!setByFlow.has(attr.toLowerCase()) || setAsUser.has(attr.toLowerCase()) || editable(p.ModuleRoleName, attr)) continue;
-    (writes[p.ElementName + '|' + p.ModuleRoleName] = writes[p.ElementName + '|' + p.ModuleRoleName] || []).push(attr);
+    (writes[key] = writes[key] || []).push(attr);
   }
   for (const [key, attrs] of Object.entries(writes)) {
     const [entity, role] = key.split('|');
+    const kept = keep[key] || [];
     add('WRITE01', false, `${role} may write ${entity}'s ${attrs.slice(0, 6).join(', ')}${attrs.length > 6 ? ', ...' : ''}, which no page lets it edit ` +
-      'and only server-side flows set: through the client API it can set them itself. Leave them out of the rule\'s write list -- ' +
-      'and when you rewrite it as write (...), name in it every association a page of the role sets with a picker: a write list ' +
-      'drops what it does not name, and the picker turns read-only (a B2B session broke nine tests that way)');
+      'and only server-side flows set: through the client API it can set them itself. Leave them out of the rule\'s write list' +
+      (kept.length ? ` -- and a write (...) list drops what it does not name, so keep in it the associations ${kept.join(', ')}: ` +
+        'a picker or a "new" button that sets one turns read-only without it (a B2B session broke nine tests that way)' : ''));
   }
 
   // PWD01

@@ -703,8 +703,10 @@ creates the constant (a script of its own when STALE01 refuses the re-exec); SCR
 only for entity, enumeration, page, snippet, microflow, nanoflow and workflow.
 Bundle 2026.10.08.6: WRITE01 skips an attribute a nanoflow or an `@applyentityaccess` microflow sets --
 those run with the user's rights and need the write right (73 -> 70 warnings on 32 apps). Its message
-now warns that a `write (...)` list drops every association it does not name: on B2B the session
-narrowed the write lists, the order's customer picker turned read-only and nine tests failed.
+names the associations the role writes, to keep in a `write (...)` list, which drops what it does not
+name: on B2B the session narrowed the write lists, the order's customer picker turned read-only and
+nine tests failed. On a copy with the old rules put back, the list the finding names is the one the
+session reached by trial (`Order_Customer, Order_Workflow`, `OrderLine_Order, OrderLine_Product`, ...).
 
 `FOLDER01` (`checks/check_folders.cjs`, step `folders`, bundle 2026.10.08.1): every document of the
 app's own modules sits in `<business folder>/UI` (pages, snippets, layouts), `/FNC` (microflows,
