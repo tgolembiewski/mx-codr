@@ -25,7 +25,7 @@
 # Lines 2-24 are printed by --help; keep them 23 lines.
 
 # How to read this file: main() at the bottom is the whole gate, step by step. The steps
-# live in tests/gate/ -- app.sh (find, boot, stop the app), checks.sh (the five model
+# live in tests/gate/ -- app.sh (find, boot, stop the app), checks.sh (the ten model
 # checks and their cache), preflight.sh (sessions, stale model, environment) and tests.sh
 # (the suite). tools/mdl-checks/gate_helpers.cjs holds the Node they call.
 # No -e: a failing step must not end the gate.
@@ -46,7 +46,7 @@ done
 [ -f "$HARNESS_DIR/db-snapshot.sh" ] && . "$HARNESS_DIR/db-snapshot.sh"
 
 # The gate's helpers (digests, JSON, timestamps) live in tools/mdl-checks/gate_helpers.cjs.
-gate_py() {
+gate_helper() {
   "$NODE" tools/mdl-checks/gate_helpers.cjs "$@"
 }
 

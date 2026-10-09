@@ -67,7 +67,7 @@ check_mx() {
 
 # Names from a `SHOW ... --json` listing on stdin; non-zero when it is not JSON.
 qualified_names() {
-  gate_py qualified-names 2>/dev/null
+  gate_helper qualified-names 2>/dev/null
 }
 
 # 0 passed, 1 findings, 2 broken. A traceback also exits 1, so 1 needs a FAIL line first.
@@ -151,7 +151,7 @@ modules_or_status() {
 # The catalog step: the rules mxcli's catalog tables answer (tools/mdl-checks/catalog_rules.cjs) on
 # a copy of the project -- UI001 and SEC007, the two rules of mxcli lint that blocked DONE, ported
 # from their Starlark, and LINT01 (mxcli lint's own advice) when the rulebook asks for it. The gate
-# no longer runs mxcli lint itself: its other rules are advice, read on request (tests/rules.sh).
+# no longer runs mxcli lint itself: its other rules are advice, on request (LINT01 in tests/rulebook).
 check_catalog() {
   local gate found code total scratch="$WORK/catalogcheck"
   [ -f tools/mdl-checks/catalog_rules.cjs ] || {
@@ -282,9 +282,6 @@ check_naming() {
   return "$gate"
 }
 
-# Adds to nav_args (never replaces it: the caller has put --own-modules there already): the menu icons (NAV05) and the snippets' buttons (ICON01) always; the Log out and role-home rules (NAV01-NAV03) only
-# when project security is on, since only then do users sign in. Returns 1, with the summary
-# written, when security is on and the navigation cannot be read.
 # layout_unread <what> <codes> -- a describe that failed while gathering extra input for the layout
 # check. It does not stop the check (one widget mxcli cannot describe would block every DONE), but
 # the rules that read that input may have missed something, and the gate says which.
@@ -295,6 +292,9 @@ layout_unread() {
   return 0
 }
 
+# Adds to nav_args (never replaces it: the caller has put --own-modules there already): the menu icons (NAV05) and the snippets' buttons (ICON01) always; the Log out and role-home rules (NAV01-NAV03) only
+# when project security is on, since only then do users sign in. Returns 1, with the summary
+# written, when security is on and the navigation cannot be read.
 layout_sign_out_inputs() {
   local level
   level="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | grep -i 'Security Level' | head -1)"
@@ -362,7 +362,8 @@ layout_sign_out_inputs() {
   return 0
 }
 
-# Widget spacing, read from `describe page` (Starlark lint rules cannot see widgets).
+# The layout step: check_layout.cjs over every page's `describe` -- navigation, accounts, the page top,
+# spacing, grids, names, text inputs, URLs (NAV, ACCOUNT, USER, BACK, SPACE, GRID, NAME, TEXT, URL ...).
 check_layout() {
   [ -f tools/mdl-checks/check_layout.cjs ] || {
     echo "layout: could not run -- tools/mdl-checks/check_layout.cjs is missing" > "$WORK/layout.summary"
@@ -455,7 +456,7 @@ check_layout() {
 # Only passes are cached, keyed on the bytes of every input the check reads plus the .mpr
 # and mprcontents/; meta:<path> keys on size + mtime, env:NAME=value on the value.
 fingerprint() {   # fingerprint <path>... -> one digest line; meta:<path> keys on size + mtime, env:NAME=value on the value
-  gate_py fingerprint "$MPR" mprcontents "$@"
+  gate_helper fingerprint "$MPR" mprcontents "$@"
 }
 
 # The key includes a secret kept outside the project, so a forged cache entry cannot replay.
@@ -463,7 +464,7 @@ mdl_cache_secret() {
   local file="${MDL_CACHE_SECRET_FILE:-$HOME/.mxcli/gate-cache.secret}"
   if [ ! -s "$file" ]; then
     mkdir -p "$(dirname "$file")" 2>/dev/null || { echo none; return 0; }
-    ( umask 077; gate_py secret > "$file" 2>/dev/null ) \
+    ( umask 077; gate_helper secret > "$file" 2>/dev/null ) \
       || { echo none; return 0; }
   fi
   cat "$file" 2>/dev/null || echo none
@@ -496,8 +497,7 @@ run_cached() {
   return "$status"
 }
 
-# Starts the model checks in the background, each through the cache.
-# The rulebook (tests/rulebook/): copied once into $WORK so the eleven parallel steps read one
+# The rulebook (tests/rulebook/): copied once into $WORK so the ten parallel steps read one
 # version, and validated once; a broken card makes every model check "could not run" with the
 # card and line (the file is the person's, so it has to be loud). Each step's effective levels
 # and exceptions are part of its cache fingerprint (RULEBOOK_<step>).
@@ -518,6 +518,7 @@ rulebook_ok() {
 # rulebook_fingerprint <step> -- `env:RULEBOOK_<step>=<digest of its effective levels and exceptions>`.
 rulebook_fingerprint() { printf 'env:RULEBOOK_%s=%s\n' "$1" "$(mdl_rulebook digest "$1" 2>/dev/null || echo none)"; }
 
+# Starts the model checks in the background, each through the cache.
 start_model_checks() {
   rulebook_prepare
   # Upgrading the gate, its config or mxcli must not replay an old pass.
@@ -536,12 +537,6 @@ start_model_checks() {
   echo "== mx check, catalog, coverage, naming, layout, security, scope, paths, folders and unused started (they need no app; running while the suite does)"
 }
 
-# An app with sign-in is only as safe as its security level: at PROTOTYPE Mendix checks page and
-# microflow access and the read/write rights, but IGNORES the XPath constraint on an access rule --
-# the row-level rule is stored, passes mx check and lint, and lets every row through. Two sessions
-# built customer isolation on rules that did nothing. Production is therefore the level the gate
-# requires; MDL_REQUIRE_PRODUCTION=0 in tests/harness.env is for an app that deliberately has no
-# users at all.
 # Qualified entity names of the project's own modules, one per line. SHOW ENTITIES names its
 # column "Entity", not "Qualified Name", so this does not go through qualified_names.
 # False when a listing fails, is not a JSON list, or holds a name that is not Module.Entity: the
@@ -657,6 +652,12 @@ security_rules() {
   return 1
 }
 
+# An app with sign-in is only as safe as its security level: at PROTOTYPE Mendix checks page and
+# microflow access and the read/write rights, but IGNORES the XPath constraint on an access rule --
+# the row-level rule is stored, passes mx check, and lets every row through. Two sessions
+# built customer isolation on rules that did nothing. Production is therefore the level the gate
+# requires; MDL_REQUIRE_PRODUCTION=0 in tests/harness.env is for an app that deliberately has no
+# users at all.
 security_level() {
   local level rules entity views
   # PRODUCTION01 in the rulebook (tests/rulebook/PRODUCTION01.md): `off` skips the level and VIEW01,

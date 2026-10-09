@@ -24,7 +24,8 @@ else
 fi
 unset _mdl_base
 
-# --- 2. Find Python ---
+# --- 2. Find Python, Node and the rulebook ---
+# Python: older projects' own verify-*.test.sh call "$PY"; the harness itself runs on Node.
 # A candidate must actually run (the Windows Store python3 stub does not); also searches
 # the Windows install dirs, since the python.org installer leaves PATH alone.
 mdl_find_python() {
@@ -360,7 +361,7 @@ mdl_check_install_freshness() {
   "$NODE" "$MDL_SHELL_HELPERS" install-freshness "$app" "$manifest"
 }
 
-# --- 8. Temporary files (GNU and BSD mktemp both accept an XXXXXX template) ---
+# --- 8. The syntax digest, Studio Pro holding the project, temporary files ---
 # The syntax sessions look up most, from THIS project's mxcli, written once per mxcli version.
 # Measured on three sessions: 22, 25 and 19 `./mxcli syntax` calls each, the same topics every
 # time; a fourth listed the digest's table of contents and still asked 165 times, so a file to
@@ -456,6 +457,7 @@ mdl_studio_pro_warning() {   # mdl_studio_pro_warning <project dir>
   esac
 }
 
+# Temporary files: GNU and BSD mktemp both accept an XXXXXX template.
 mdl_tmpdir() {  # mdl_tmpdir <name> -- portable `mktemp -d -t <name>`
   mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX"
 }

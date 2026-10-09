@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// The catalog step: rules answered by mxcli's catalog tables on a copy of the project. The two rules
-// of mxcli lint that blocked DONE, ported one to one from their Starlark (.claude/lint-rules), so
-// the gate no longer runs mxcli lint itself:
+// The catalog step: rules answered by mxcli's catalog tables on a copy of the project. UI001 and
+// SEC007 were the two mxcli lint rules that blocked DONE, ported one to one from their Starlark
+// (.claude/lint-rules); the gate does not run mxcli lint itself:
 //   UI001   a data grid filtered by hand -- inputs bound to a non-persistent helper entity in a
 //           module whose grid has no column filter (ui001_handrolled_grid_filter.star)
 //   SEC007  an entity readable by anonymous users with no XPath constraint (DIVD-2022-00019;

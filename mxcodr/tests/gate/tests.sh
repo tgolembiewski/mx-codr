@@ -162,7 +162,7 @@ document_unit_map() {
   "$MXCLI" -p "$MPR" -c "REFRESH CATALOG" >/dev/null 2>&1 || return 0
   { for kind in PAGES MICROFLOWS NANOFLOWS; do
       "$MXCLI" -p "$MPR" --json -c "SELECT Id, QualifiedName FROM CATALOG.$kind" 2>/dev/null
-    done; } | gate_py doc-map > "$WORK/docmap.json" 2>/dev/null || echo '{}' > "$WORK/docmap.json"
+    done; } | gate_helper doc-map > "$WORK/docmap.json" 2>/dev/null || echo '{}' > "$WORK/docmap.json"
 }
 
 # record_tests_seen <target>... -- after a run that exercised the current model: remember, per test
@@ -178,7 +178,7 @@ record_tests_seen() {
   done
   [ ${#scripts[@]} -gt 0 ] || return 0
   [ -f "$WORK/docmap.json" ] || document_unit_map
-  gate_py record-tests-seen . "$WORK/docmap.json" "${scripts[@]}" >/dev/null 2>&1 || true
+  gate_helper record-tests-seen . "$WORK/docmap.json" "${scripts[@]}" >/dev/null 2>&1 || true
 }
 
 # Sets targets: tests/ for the whole suite, the scripts --only names (exit 2 when none match), or
@@ -195,7 +195,7 @@ select_test_targets() {
         "RUN "*)  line="${line#RUN }"; targets+=("tests/${line%% *}.test.sh"); echo "   $line" ;;
         "NOTE "*) echo "   ${line#NOTE }" ;;
       esac
-    done < <(gate_py changed-tests . "$WORK/docmap.json" 2>/dev/null)
+    done < <(gate_helper changed-tests . "$WORK/docmap.json" 2>/dev/null)
     if [ ${#targets[@]} -eq 0 ]; then
       echo "   nothing: every test ran on this model already -- run the full gate, bash tests/gate.sh"
       exit 0
@@ -317,7 +317,7 @@ step_visual() {
   [ -z "${ONLY:-}" ] && [ "${TESTS_ONLY:-0}" != "1" ] || return 0
   local -a review=()
   [ "${MDL_VISUAL_REVIEW:-}" = "agent" ] && review=(--review "$APP_DIR/.mxcli/visual")
-  out="$(gate_py visual-report .mxcli/visual/findings.jsonl mdlsource ${review[@]+"${review[@]}"} 2>"$WORK/visual.error")" || {
+  out="$(gate_helper visual-report .mxcli/visual/findings.jsonl mdlsource ${review[@]+"${review[@]}"} 2>"$WORK/visual.error")" || {
     # The helper crashed: empty output used to read as "nothing overlaps".
     summary+=("visual: could not run -- gate_helpers.cjs visual-report failed: $(tail -1 "$WORK/visual.error" 2>/dev/null)")
     cannot_run+=("visual")
@@ -365,7 +365,7 @@ step_runtime_errors() {
   local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}" mode="${MDL_RUNTIME_ERRORS:-$(mdl_rule_mode RUNTIME01)}" out
   [ "$mode" = "0" ] && return 0
   [ -f "$log" ] && [ -s "$WORK/tests.started" ] || return 0
-  out="$(gate_py runtime-errors "$log" "$(cat "$WORK/tests.started")" 2>"$WORK/runtime.error")" || {
+  out="$(gate_helper runtime-errors "$log" "$(cat "$WORK/tests.started")" 2>"$WORK/runtime.error")" || {
     summary+=("runtime log: could not run -- gate_helpers.cjs runtime-errors failed: $(tail -1 "$WORK/runtime.error" 2>/dev/null)")
     cannot_run+=("runtime log")
     return 0
