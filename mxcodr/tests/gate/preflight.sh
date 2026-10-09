@@ -23,13 +23,13 @@ preflight_session() {
   users="$(curl -s -m 5 -X POST "http://localhost:${ADMIN_PORT:-8090}/" \
       -H "X-M2EE-Authentication: $(printf '%s' "${ADMIN_PASSWORD:-mxcli-local-dev}" | base64)" \
       -H 'Content-Type: application/json' -d '{"action":"get_logged_in_user_names"}' 2>/dev/null \
-    | gate_py signed-in-users 2>/dev/null)"
+    | gate_helper signed-in-users 2>/dev/null)"
   [ -n "$users" ] && echo "   already signed in: $users"
 
   local refusal=""
   if [ -f "$log" ]; then
     refusal="$(tail -400 "$log" 2>/dev/null | grep 'Maximum number of sessions exceeded' | tail -1 \
-      | gate_py recent-refusal 120 2>/dev/null)"
+      | gate_helper recent-refusal 120 2>/dev/null)"
   fi
   [ -n "$refusal" ] || return 0
   if [ "${ALLOW_BUSY_SESSION:-0}" = "1" ]; then
@@ -73,7 +73,7 @@ watch_applied_latest_change() {
   waited=0
   local quiet="${MDL_WATCH_QUIET_SECONDS:-3}"
   while [ "$waited" -lt 120 ]; do
-    state="$(gate_py watch-state "$boot_log" | head -1)"
+    state="$(gate_helper watch-state "$boot_log" | head -1)"
     [ "$state" = "failed" ] && report_watch_build_failure "$boot_log"
     if { [ "$state" = "ready" ] || [ "$state" = "applied" ]; } \
        && [ "$(log_age "$boot_log")" -ge "$quiet" ] && [ ! "$MPR" -nt "$boot_log" ]; then
@@ -88,7 +88,7 @@ watch_applied_latest_change() {
     [ "$waited" = "0" ] && echo "   (waiting for --watch to apply the latest model change)"
     sleep 1; waited=$((waited + 1))
   done
-  case "$(gate_py watch-state "$boot_log" | head -1)" in ready|applied) ;; *) return 1 ;; esac
+  case "$(gate_helper watch-state "$boot_log" | head -1)" in ready|applied) ;; *) return 1 ;; esac
   client_served
 }
 
@@ -107,7 +107,7 @@ restart_after_missed_watch() {
 report_watch_build_failure() {   # report_watch_build_failure <boot-log>
   {
     echo "--watch could not rebuild the app, so it still runs the model from before your last exec:"
-    gate_py watch-state "$1" | tail -n +2 | head -8 | sed 's/^/   /'
+    gate_helper watch-state "$1" | tail -n +2 | head -8 | sed 's/^/   /'
     if debugger_enabled; then
       # A session read this CE0116 as a hiccup of the build; it was its own `mxcli debug enable`.
       echo "   The microflow debugger is on, and every rebuild fails while it is (CE0116 \"Could not"
@@ -175,7 +175,7 @@ warn_if_deployment_older() {
   local built
   for built in deployment/model/model.mdp deployment/model/metadata.json; do
     [ -f "$built" ] || continue
-    gate_py deployment-age "$MPR" "$built" | tee -a "$WORK/stale.note"
+    gate_helper deployment-age "$MPR" "$built" | tee -a "$WORK/stale.note"
     break
   done
 }
@@ -188,7 +188,7 @@ warn_if_runtime_older() {
   [ -n "$oldest" ] || return 0
   started="$(ps -o lstart= -p "$oldest" 2>/dev/null)"
   [ -n "$started" ] || return 0
-  gate_py runtime-age "$MPR" "$started" | tee -a "$WORK/stale.note"
+  gate_helper runtime-age "$MPR" "$started" | tee -a "$WORK/stale.note"
 }
 
 # Studio Pro with this project open overwrites what mxcli writes: say so up front and under the
@@ -206,7 +206,7 @@ preflight_environment() {
   local config="$APP_DIR/.playwright/cli.config.json"
   if [ -f "$config" ]; then
     local browser
-    browser="$(gate_py missing-browser "$config" 2>/dev/null)"
+    browser="$(gate_helper missing-browser "$config" 2>/dev/null)"
     if [ -n "$browser" ]; then
       echo "   !! the browser binary in .playwright/cli.config.json does not exist: $browser"
       echo "      every test will fail with 'opening browser: exit status 1' -- re-run the"

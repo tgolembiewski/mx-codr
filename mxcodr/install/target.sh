@@ -165,4 +165,4 @@ choose_run_mode
 
 # NOTE: there are 12 ui_done steps (13 with a new app), so these totals are one short.
 # A new app adds its creation; an existing one the refresh of mxcli's own skills (step_skills.sh).
-ui_plan 14
+ui_plan 15

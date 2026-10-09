@@ -5,29 +5,8 @@
 # in one day were made twice each. Provides: NODE, HOOK_TOOL, hook_sleep_message, inline_mdl,
 # steps_before_exec, hook_scripts, script_written_before_exec, hook_marketplace_wait, HOOK_VARIABLE_MESSAGE, HOOK_BLOCKED_HEAD, hook_precheck.
 
-# Prints a node that runs; inlined so the hook is self-contained (same as tests/portable.sh).
-mdl_find_node() {
-  if command -v node >/dev/null 2>&1; then
-    printf 'node\n'
-    return 0
-  fi
-  # The Node.js installer (also via winget) puts node on PATH only for shells started after it.
-  local local_app="${LOCALAPPDATA:-}" candidate
-  local_app="${local_app//\\//}"
-  for candidate in "/c/Program Files/nodejs/node.exe" "$local_app/Programs/nodejs/node.exe"; do
-    [ -x "$candidate" ] || continue
-    printf '%s\n' "$candidate"
-    return 0
-  done
-  return 1
-}
-NODE="$(mdl_find_node || true)"
-NODE="${NODE:-node}"
-# hook_tool.cjs holds the small jobs (read a field, split a command); installed one directory up
-# from this hook, in the bundle under checks/.
-# An absolute path: the Cursor hooks cd into the project after this.
-HOOK_TOOL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/hook_tool.cjs"
-[ -f "$HOOK_TOOL" ] || HOOK_TOOL="$(cd "$(dirname "${BASH_SOURCE[0]}")/../checks" 2>/dev/null && pwd)/hook_tool.cjs"
+# NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message).
+. "$(dirname "${BASH_SOURCE[0]}")/hook-env.sh"
 
 # hook_sleep_message <command> -- prints the block message when the command sleeps before the gate
 # or a log wait (`...; sleep 12; bash tests/gate.sh`): the gate waits for the runtime itself.

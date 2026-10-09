@@ -90,7 +90,7 @@ fi
 # TEST01: test first. A page or ACT_ microflow new to the model, named by no `# covers:` line of
 # tests/verify-*.test.sh, waits for its test. Then the test is red until the exec (red-first comes
 # by itself) and the tests do not pile up at the end. MDL_TEST_FIRST=0 (tests/harness.env) turns it off.
-if [ "${MDL_TEST_FIRST:-1}" != "0" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
+if [ "${MDL_TEST_FIRST:-1}" != "0" ] && [ "$(mdl_rule_level TEST01 block)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
   untested="$("$NODE" tools/mdl-checks/gate_helpers.cjs test-first . "$MPR" "$@" 2>/dev/null)"
   if [ -n "$untested" ]; then
     echo "precheck: TEST01 -- test first: these scripts create what no browser test names yet (the real model is untouched):"
@@ -125,7 +125,7 @@ stale_units() {   # stale_units <script> -- the documents a diff would write, on
   "$MXCLI" diff "$1" -p "$MPR" --format struct 2>/dev/null \
     | grep -E '^[A-Z][A-Za-z ]*: [A-Za-z_][A-Za-z0-9_]*\.[^[:space:]]+$' | sort -u
 }
-if [ -f tests/mdl-applied.sh ] && [ "${MDL_STALE_CHECK:-1}" != "0" ]; then
+if [ -f tests/mdl-applied.sh ] && [ "${MDL_STALE_CHECK:-1}" != "0" ] && [ "$(mdl_rule_level STALE01 block)" != "off" ]; then
   . tests/mdl-applied.sh
   for script in "$@"; do
     reference="$(mdl_applied_reference "$script")" || continue
@@ -148,13 +148,8 @@ fi
 scratch="$(mdl_tmpdir mdl-precheck)" || { echo "precheck: could not run -- no scratch directory"; exit 0; }
 trap 'rm -rf "$scratch"' EXIT
 
-# The same copy the gate's mx check makes: the .mpr with its units, widgets and theme.
-# `cp -Rc` clones on APFS; elsewhere plain cp -R (0.3s for a 30MB project here).
-for item in "$MPR" mprcontents widgets theme themesource javasource; do
-  [ -e "$item" ] || continue
-  cp -Rc "$item" "$scratch/" 2>/dev/null || cp -R "$item" "$scratch/" 2>/dev/null \
-    || { echo "precheck: could not run -- could not copy $item"; exit 0; }
-done
+# The same copy the gate's mx check makes (mdl_copy_model), plus the widget cache:
+mdl_copy_model "$scratch" || { echo "precheck: could not run -- could not copy $MDL_COPY_FAILED"; exit 0; }
 # .mxcli/widgets is the resolved widget-definition cache. Without it the exec below rebuilds it
 # from widgets/*.mpk on every run (measured: 0.7s against 0.2s); only that one directory is
 # copied -- the rest of .mxcli is this project's catalog, logs and records, none of it read here.
@@ -230,9 +225,7 @@ fi
 # own passes, and says what is already broken, instead of blocking every script on the same error.
 new_errors="$(printf '%s\n' "$out" | grep -E '^\[error\]')"
 base="$(mdl_tmpdir mdl-precheck-base)" && {
-  for item in "$MPR" mprcontents widgets theme themesource javasource; do
-    [ -e "$item" ] && { cp -Rc "$item" "$base/" 2>/dev/null || cp -R "$item" "$base/" 2>/dev/null; }
-  done
+  mdl_copy_model "$base" keep-going
   base_out="$("$MXCLI" docker check -p "$base/$MPR" ${MDL_MXBUILD_PATH:+--mxbuild-path "$MDL_MXBUILD_PATH"} --no-update-widgets 2>&1)"
   rm -rf "$base"
   old_errors="$(printf '%s\n' "$base_out" | grep -E '^\[error\]')"

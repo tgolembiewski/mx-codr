@@ -15,7 +15,7 @@
 //      themesource/ or tests/*.test.* -- Java, JavaScript and tests can call a document by its
 //      name (a test's `# covers:` line is not a use: it only declares what the test covers);
 //   3. Mendix: the gate drops them all on a scratch copy and mx check must still report 0 errors
-//      (tests/gate/checks.sh, check_unused). This file does proofs 1 and 2.
+//      (tests/gate/steps.sh, check_unused). This file does proofs 1 and 2.
 //
 // Usage: check_unused.cjs <app_dir> <Module> [<Module> ...] [--keep Mod.Doc,Mod.Other] [--mpr <copy.mpr>] [--no-refresh]
 // --mpr reads the model from a copy: the catalog is written beside the .mpr it reads, and the gate's
@@ -23,9 +23,10 @@
 // Prints PASS/FAIL, one `  - [UNUSED01] ...` line per document, then `drop: <statement>` lines.
 // Exit: 0 none, 1 findings, 2 the model could not be read.
 'use strict';
+const { levelArgs, levelOf } = require('./rulebook.cjs');
+const { mxcli, ModelReadError, findMpr } = require('./mxcli_client.cjs');
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
 
 // catalog table -> [kind as MDL spells it in `drop <kind>`, label]
 const TABLES = {
@@ -50,36 +51,6 @@ const MAX_FILE = 2 * 1024 * 1024;
 // The same lines check_test_coverage.cjs reads (its QUALIFIED_LIST).
 const QUALIFIED_LIST = String.raw`[\w.]+\.\w+(?:(?:[ \t]*,[ \t]*|[ \t]+)[\w.]+\.\w+)*[ \t]*,?`;
 const COVERS_LINES = new RegExp(String.raw`^[ \t]*#[ \t]*covers[ \t]*:.*(?:\n[ \t]*#[ \t]*` + QUALIFIED_LIST + String.raw`[ \t]*$)*`, 'gim');
-
-class ModelReadError extends Error {}
-
-function mxcliBinary(appDir) {
-  for (const name of ['mxcli', 'mxcli.exe']) if (fs.existsSync(path.join(appDir, name))) return './' + name;
-  return './mxcli';
-}
-
-function mxcli(appDir, mpr, command, asJson = false) {
-  const args = ['-p', mpr, ...(asJson ? ['--json'] : []), '-c', command];
-  const timeout = parseFloat(process.env.MDL_MXCLI_TIMEOUT || '120');
-  const result = spawnSync(mxcliBinary(appDir), args, { cwd: appDir, encoding: 'utf8', timeout: timeout * 1000, maxBuffer: 1 << 30, windowsHide: true });
-  if (result.error) throw new ModelReadError(`\`${command}\` could not run: ${result.error.message}`);
-  const stdout = (result.stdout || '').replace(/\r\n?/g, '\n');
-  if (result.status !== 0) {
-    const lines = ((result.stderr || '') + stdout).trim().split('\n');
-    throw new ModelReadError(`\`${command}\` exited ${result.status}: ${lines[lines.length - 1] || 'no output'}`);
-  }
-  if (!asJson) return stdout;
-  // `Found N result(s)` may come before the JSON; an empty table prints no list at all.
-  const start = stdout.indexOf('[');
-  if (start < 0) {
-    if (/Found 0 result|No results/i.test(stdout) || !stdout.trim()) return [];
-    throw new ModelReadError(`\`${command}\` did not return JSON`);
-  }
-  let rows;
-  try { rows = JSON.parse(stdout.slice(start)); } catch { throw new ModelReadError(`\`${command}\` did not return JSON`); }
-  if (!Array.isArray(rows)) throw new ModelReadError(`\`${command}\` did not return a list`);
-  return rows;
-}
 
 const shortName = name => name.split('.').pop();
 const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -191,9 +162,14 @@ function parseArgs(argv) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --levels / --except from the rulebook (tests/rulebook/app/UNUSED01.md): except: documents are kept
+  // (the same as --keep), `off` skips the check, `warn` lists instead of blocking.
+  const { levels, excepts, rest } = levelArgs(process.argv.slice(2));
+  const level = levelOf(levels, 'UNUSED01', 'block');
+  const args = parseArgs(rest);
+  args.keep = (args.keep || []).concat(excepts.UNUSED01 || []);
   let mprs = args.mpr ? [path.resolve(args.mpr)] : [];
-  try { if (!mprs.length) mprs = fs.readdirSync(args.appDir).filter(n => /\.mpr$/i.test(n)).sort(); } catch { /* none */ }
+  if (!mprs.length && findMpr(args.appDir)) mprs = [findMpr(args.appDir)];
   if (!mprs.length || (args.mpr && !fs.existsSync(mprs[0]))) { process.stdout.write(`ERROR no .mpr in ${args.mpr || args.appDir}\n`); return 2; }
   let found;
   try {
@@ -203,10 +179,11 @@ function main() {
     process.stdout.write(`ERROR could not read the model -- ${error.message}\n`);
     return 2;
   }
+  if (level === 'off') found = [];
   if (!found.length) { process.stdout.write('PASS  no unused document\n'); return 0; }
-  const lines = [`FAIL  ${found.length} document(s) nothing uses`];
-  for (const c of found) {
-    lines.push(`  - [UNUSED01] ${c.kind} ${c.name}: nothing calls, shows or names it`);
+  const lines = [`${level === 'block' ? 'FAIL' : 'WARN'}  ${found.length} document(s) nothing uses`];
+  if (level !== 'info') for (const c of found) {
+    lines.push(`  ${level === 'block' ? '-' : '~'} [UNUSED01] ${c.kind} ${c.name}: nothing calls, shows or names it`);
   }
   for (const c of found) lines.push(`drop: ${dropStatement(c)}`);
   process.stdout.write(lines.join('\n') + '\n');

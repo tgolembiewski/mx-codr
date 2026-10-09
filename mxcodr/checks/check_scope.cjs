@@ -13,6 +13,7 @@
 // Usage: check_scope.cjs <app_dir> <Module> [<Module> ...] [--json]
 // Exit: 0 no finding, 1 findings, 2 the model could not be read.
 'use strict';
+const { levelArgs, levelOf } = require('./rulebook.cjs');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -143,7 +144,11 @@ function parseArgs(argv) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --levels: the rulebook's level for SCOPE01 (tests/rulebook/app/SCOPE01.md); `block` fails the step
+  // here, which until now tests/gate/steps.sh decided from MDL_SCOPE=error.
+  const { levels, rest } = levelArgs(process.argv.slice(2));
+  const level = levelOf(levels, 'SCOPE01', 'warn');
+  const args = parseArgs(rest);
   let mprs = [];
   try {
     const rx = py.WIN ? /^.*\.mpr$/is : /^.*\.mpr$/s;
@@ -161,11 +166,12 @@ function main() {
     py.print(`could not run -- ${error.message}`);
     return 2;
   }
+  if (level === 'off') found = [];
   if (args.json) {
     py.print(py.jsonDumps({ findings: found }, { indent: 2 }));
   } else {
-    py.print(`${found.length ? 'WARN' : 'PASS'}  ${found.length} data source microflow finding(s)`);
-    for (const line of found) py.print(line);
+    py.print(`${found.length ? (level === 'block' ? 'FAIL' : 'WARN') : 'PASS'}  ${found.length} data source microflow finding(s)`);
+    if (level !== 'info') for (const line of found) py.print(line);
   }
   return found.length ? 1 : 0;
 }

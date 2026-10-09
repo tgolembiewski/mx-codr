@@ -24,7 +24,8 @@ else
 fi
 unset _mdl_base
 
-# --- 2. Find Python ---
+# --- 2. Find Python, Node and the rulebook ---
+# Python: older projects' own verify-*.test.sh call "$PY"; the harness itself runs on Node.
 # A candidate must actually run (the Windows Store python3 stub does not); also searches
 # the Windows install dirs, since the python.org installer leaves PATH alone.
 mdl_find_python() {
@@ -85,6 +86,47 @@ fi
 # `|| true`: a script under set -e must not stop when one of the two places is missing.
 MDL_SHELL_HELPERS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/mdl-checks/shell_helpers.cjs" || true
 [ -f "$MDL_SHELL_HELPERS" ] || MDL_SHELL_HELPERS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../checks" 2>/dev/null && pwd)/shell_helpers.cjs" || true
+MDL_RULEBOOK="$(dirname "$MDL_SHELL_HELPERS")/rulebook.cjs"
+
+# The rulebook: tests/rulebook/, one card per rule, the one place a rule's level (block, warn,
+# info, off) and the person's exceptions come from. The gate copies it to $WORK/rulebook so every
+# parallel step reads the same version; outside the gate (precheck, hooks) the folder itself is read.
+# An app installed before the rulebook has none: every rule then keeps its built-in level.
+mdl_rulebook_dir() {
+  if [ -n "${WORK:-}" ] && [ -d "$WORK/rulebook" ]; then printf '%s\n' "$WORK/rulebook"
+  elif [ -d tests/rulebook ]; then printf 'tests/rulebook\n'
+  else return 1; fi
+}
+mdl_rulebook() {   # mdl_rulebook <command> [arg] -- rulebook.cjs on the rulebook dir; false without one
+  local dir
+  dir="$(mdl_rulebook_dir)" || return 1
+  [ -f "$MDL_RULEBOOK" ] || return 1
+  "$NODE" "$MDL_RULEBOOK" "$dir" "$@"
+}
+mdl_rule_level() {   # mdl_rule_level <CODE> [<default>] -- the effective level, the default without a rulebook
+  local level
+  level="$(mdl_rulebook level "$1" 2>/dev/null)" && [ -n "$level" ] && { printf '%s\n' "$level"; return 0; }
+  printf '%s\n' "${2:-block}"
+}
+# mdl_rule_mode CODE... -- the old switch value for a group of codes: error when any is block, 0 when
+# every one is off, else warn (what step_visual and step_runtime_errors used to read from MDL_*).
+mdl_rule_mode() {
+  local code level any_block=0 all_off=1
+  for code in "$@"; do
+    level="$(mdl_rule_level "$code" warn)"
+    [ "$level" = "block" ] && any_block=1
+    [ "$level" = "off" ] || all_off=0
+  done
+  if [ "$any_block" = "1" ]; then echo error; elif [ "$all_off" = "1" ]; then echo 0; else echo warn; fi
+}
+# mdl_rule_args <step> -- `--levels <json> --except <json>` for a checker, one word per line (read into
+# an array); nothing without a rulebook, so the checker keeps its built-in levels.
+mdl_rule_args() {
+  local levels excepts
+  levels="$(mdl_rulebook overrides "$1" 2>/dev/null)" || return 0
+  excepts="$(mdl_rulebook excepts "$1" 2>/dev/null)" || return 0
+  printf -- '--levels\n%s\n--except\n%s\n' "${levels:-{\}}" "${excepts:-{\}}"
+}
 
 # --- 3. Load tests/harness.env ---
 # Parsed as allowlisted KEY=value, never sourced: sourcing would run shell from the project
@@ -319,7 +361,7 @@ mdl_check_install_freshness() {
   "$NODE" "$MDL_SHELL_HELPERS" install-freshness "$app" "$manifest"
 }
 
-# --- 8. Temporary files (GNU and BSD mktemp both accept an XXXXXX template) ---
+# --- 8. The syntax digest, Studio Pro holding the project, temporary files ---
 # The syntax sessions look up most, from THIS project's mxcli, written once per mxcli version.
 # Measured on three sessions: 22, 25 and 19 `./mxcli syntax` calls each, the same topics every
 # time; a fourth listed the digest's table of contents and still asked 165 times, so a file to
@@ -415,12 +457,30 @@ mdl_studio_pro_warning() {   # mdl_studio_pro_warning <project dir>
   esac
 }
 
+# Temporary files: GNU and BSD mktemp both accept an XXXXXX template.
 mdl_tmpdir() {  # mdl_tmpdir <name> -- portable `mktemp -d -t <name>`
   mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX"
 }
 
 mdl_tmpfile() {  # mdl_tmpfile <name> -- portable `mktemp -t <name>`
   mktemp "${TMPDIR:-/tmp}/$1.XXXXXX"
+}
+
+# mdl_copy_model <dir> [keep-going] -- the model into <dir>: the .mpr with its units, widgets,
+# theme and Java, what mx check needs (gate and precheck both check copies, never the project).
+# `cp -Rc` clones on APFS; elsewhere plain cp -R (0.3s for a 30MB project). A copy that fails
+# stops it, false, with the item in MDL_COPY_FAILED; with keep-going the other items are copied.
+mdl_copy_model() {
+  local item status=0
+  MDL_COPY_FAILED=""
+  for item in "$MPR" mprcontents widgets theme themesource javasource; do
+    [ -e "$item" ] || continue
+    cp -Rc "$item" "$1/" 2>/dev/null || cp -R "$item" "$1/" 2>/dev/null || {
+      MDL_COPY_FAILED="${MDL_COPY_FAILED:-$item}"; status=1
+      [ "${2:-}" = "keep-going" ] || return 1
+    }
+  done
+  return "$status"
 }
 
 # --- 9. Find the .mpr ---

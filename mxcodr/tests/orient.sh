@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# orient.sh -- app facts at session start: app state, security, tests and coverage, lint,
+# orient.sh -- app facts at session start: app state, security, tests and coverage, the rulebook,
 # navigation, module structure. Run by the agent (or you) once per session.
 #   bash tests/orient.sh        (env: APP_PORT, default 8081; MPR when there are several)
 # Lookups run in parallel into numbered files. Exit 2 without a .mpr, else 0.
@@ -58,12 +58,18 @@ tests_section() {
   fi
 }
 
-lint_section() {
-  local lint
-  echo "== lint (the project's own rules included)"
-  lint="$("$MXCLI" lint -p "$MPR" 2>&1)"
-  printf '%s\n' "$lint" | tail -1
-  printf '%s\n' "$lint" | grep -oE '\[(MOD001|REU001|SEC00[0-9]|ARCH00[0-9])\]' | sort | uniq -c | head -8
+# The rulebook: how many rules, and what the person changed (a level, an exception). mxcli lint
+# itself is no longer run here: its advice is read on request (LINT01 in tests/rulebook/).
+rulebook_section() {
+  [ -d tests/rulebook ] || return 0
+  echo "== rulebook (tests/rulebook/<group>/<CODE>.md; bash tests/rules.sh)"
+  local count changed
+  count="$(ls tests/rulebook/[A-Za-z]*.md 2>/dev/null | wc -l | tr -d ' ')"
+  if changed="$(mdl_rulebook changes 2>/dev/null)"; then
+    echo "   $count rules; changed by the person: ${changed:-none}"
+  else
+    echo "   $count cards -- $(mdl_rulebook check 2>&1 | tail -1)"
+  fi
 }
 
 app_section() {
@@ -90,7 +96,7 @@ structure_section  > "$WORK/9-structure"  2>&1 &
 security_section   > "$WORK/1-security"   2>&1 &
 navigation_section > "$WORK/4-navigation" 2>&1 &
 tests_section      > "$WORK/2-tests"      2>&1 &
-lint_section       > "$WORK/3-lint"       2>&1 &
+rulebook_section   > "$WORK/3-rulebook"   2>&1 &
 app_section        > "$WORK/0-app"        2>&1 &
 
 wait

@@ -192,11 +192,5 @@ function perfFindings(lines) {
 module.exports = {
   FLOW_HEAD, RETRIEVE, LOOP, WHILE, END_LOOP, ACCUM, TRAILING_COMMENT, SET, COMPARE, KEEP, CALL, WRITE, CONTROL,
   IF_ON_ITEM, ONE_TIME, VIEW_FIX,
-  _statements: lines => Object.fromEntries(statementsOf(lines)),
-  _db_lists: statements => Object.fromEntries(dbLists(statements)),
-  _loops: statements => [...loops(statements)],
-  _touches_db: touchesDb,
-  _keeps_extreme: keepsExtreme,
-  perf_findings: perfFindings,
-  perfFindings, rx,
+  statementsOf, perfFindings, rx,
 };

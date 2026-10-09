@@ -13,7 +13,7 @@ const path = require('path');
 // Files are listed from the bundle, not globbed in the app, so mxcli's own skills and rules are not tracked.
 const SKILL_DIRS = ['.claude/skills', '.agents/skills', '.ai-context/skills'];
 const HARNESS_SCRIPTS = ['gate.sh', 'orient.sh', 'diagnose.sh', 'precheck.sh', 'peek.sh', 'film.sh', 'db-snapshot.sh', 'mdl-applied.sh', 'theme.sh', 'lib.sh', 'portable.sh', 'scenario-helpers.js',
-  'run-docker.sh', 'run-app.sh', 'marketplace-login.sh', 'CHECKS.md'];
+  'run-docker.sh', 'run-app.sh', 'marketplace-login.sh', 'CHECKS.md', 'rules.sh'];
 
 // Sorted names ending in `suffix`; [] if the directory is missing.
 function listdir(dir, suffix) {
@@ -26,6 +26,11 @@ function listdir(dir, suffix) {
 
 const isfile = p => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 
+// The rulebook's cards, <group>/<CODE>.md (rulebook.cjs cardFiles); none when there is no rulebook.
+function rulebookCards(dir) {
+  try { return require('./rulebook.cjs').cardFiles(dir); } catch { return []; }
+}
+
 // [bundle file, app-relative destination] for everything tracked.
 function* destinations(src) {
   for (const name of HARNESS_SCRIPTS) yield [path.join(src, 'tests', name), 'tests/' + name];
@@ -35,6 +40,12 @@ function* destinations(src) {
   for (const name of listdir(path.join(src, 'tests', 'lib'), '.sh')) yield [path.join(src, 'tests', 'lib', name), 'tests/lib/' + name];
 
   for (const name of listdir(path.join(src, 'tests', 'checks'), '.md')) yield [path.join(src, 'tests', 'checks', name), 'tests/checks/' + name];
+
+  // The rulebook: one card per rule, hashed without its ## Local section (the person's levels and
+  // exceptions are theirs, not drift) -- see hashOf.
+  for (const file of rulebookCards(path.join(src, 'rulebook'))) {
+    yield [file, 'tests/rulebook/' + path.relative(path.join(src, 'rulebook'), file).split(path.sep).join('/')];
+  }
 
   for (const name of listdir(path.join(src, 'checks'), '.py')) yield [path.join(src, 'checks', name), 'tools/mdl-checks/' + name];
 
@@ -81,6 +92,13 @@ function* destinations(src) {
   }
 }
 
+// The hash the manifest records for a file: a rulebook card counts without its ## Local section
+// (tests/portable.sh install-freshness in shell_helpers.cjs compares the same way).
+function hashOf(relative, bytes) {
+  if (relative.startsWith('tests/rulebook/')) bytes = Buffer.from(require('./rulebook.cjs').withoutLocal(bytes.toString('utf8')));
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
 // time.strftime("%Y-%m-%d %H:%M:%S"): local time.
 function now() {
   const d = new Date();
@@ -100,8 +118,7 @@ function main(argv) {
     if (!isfile(source)) continue;
     // Keys stay forward-slashed so manifests are portable across Windows and macOS.
     try {
-      const bytes = fs.readFileSync(path.join(app, ...relative.split('/')));
-      files[relative] = crypto.createHash('sha256').update(bytes).digest('hex');
+      files[relative] = hashOf(relative, fs.readFileSync(path.join(app, ...relative.split('/'))));
     } catch {
       // Not installed in this project.
     }
@@ -123,3 +140,4 @@ if (require.main === module) {
   if (process.argv[2] === '--destinations') process.stdout.write(JSON.stringify([...destinations(process.argv[3])]) + '\n');
   else main(process.argv.slice(2));
 }
+module.exports = { destinations, hashOf };

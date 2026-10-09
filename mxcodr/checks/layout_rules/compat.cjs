@@ -34,15 +34,3 @@ function readTextReplace(file) {
 
 module.exports = { strRepr, readTextReplace };
 
-// Shapes for the Python-named exports: what a dict, a set or a tuple-keyed dict becomes in JSON.
-const asMap = x => (x instanceof Map ? x : new Map(Object.entries(x || {})));
-const asSet = x => (x instanceof Set ? x : new Set(x || []));
-// A Map with string keys as a plain object, values converted by fn.
-function toObject(map, fn = v => v) {
-  const out = {};
-  for (const [k, v] of map) out[k] = fn(v);
-  return out;
-}
-module.exports.asMap = asMap;
-module.exports.asSet = asSet;
-module.exports.toObject = toObject;

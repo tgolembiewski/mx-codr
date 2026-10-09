@@ -147,12 +147,3 @@ function backButtonFindings(lines, openedFrom, navigation = '') {
 }
 
 module.exports = { currentUserFindings, backButtonFindings, isBackButton, CURRENT_USER_SNIPPET };
-
-// Under the Python names.
-Object.assign(module.exports, {
-  SNIPPET_DEF_RE, BACK_ICON, BACK_BUTTON, ROW_RIGHT_PROPS,
-  row_pushes_right: rowPushesRight,
-  current_user_findings: currentUserFindings,
-  is_back_button: isBackButton,
-  back_button_findings: backButtonFindings,
-});

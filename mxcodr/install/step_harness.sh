@@ -10,7 +10,7 @@ for source_file in "$SRC"/tests/*; do
   name="$(basename "$source_file")"
   target="$APP/tests/$name"
   case "$name" in
-    theme.sh|gate.sh|film.sh|db-snapshot.sh|mdl-applied.sh|orient.sh|diagnose.sh|precheck.sh|peek.sh|lib.sh|portable.sh|scenario-helpers.js|run-docker.sh|run-app.sh|marketplace-login.sh|CHECKS.md|checks|gate|lib) ;;
+    theme.sh|gate.sh|film.sh|db-snapshot.sh|mdl-applied.sh|orient.sh|diagnose.sh|precheck.sh|peek.sh|lib.sh|portable.sh|rules.sh|scenario-helpers.js|run-docker.sh|run-app.sh|marketplace-login.sh|CHECKS.md|checks|gate|lib) ;;
     *) if [ -e "$target" ]; then continue; fi ;;
   esac
   if [ -d "$source_file" ]; then
@@ -40,7 +40,19 @@ done
 if [ ! -e "$APP/.gitattributes" ] && [ -f "$SRC/.gitattributes" ]; then
   cp "$SRC/.gitattributes" "$APP/.gitattributes"
 fi
+# tests/checks/lint.md went with the lint step (bundle 2026.10.09.2): an upgraded app does not keep it.
+rm -f "$APP/tests/checks/lint.md"
 ui_done "test harness" "$suite_written $I_ARROW tests/  (verify-*.test.sh left alone)"
+
+# The rulebook: one card per rule in tests/rulebook/. A card's text is upgraded to the bundle's;
+# its ## Local section (the person's level and exceptions) is kept word for word; a card the bundle
+# does not have (the team's own) is left alone.
+if [ -d "$SRC/rulebook" ]; then
+  ui_begin "installing the rulebook"
+  rulebook_note="$("$NODE" "$SRC/checks/rulebook.cjs" "$SRC/rulebook" merge "$APP" 2>&1 | tail -1)"
+  rulebook_note="${rulebook_note#rulebook: }"
+  ui_done "rulebook" "$rulebook_note $I_ARROW tests/rulebook/"
+fi
 
 # The syntax digest, now rather than at the first orient: Claude Code reads .claude/rules/ only
 # when a session starts, so a digest written during the first session would reach only the

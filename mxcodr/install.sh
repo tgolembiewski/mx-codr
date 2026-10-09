@@ -16,7 +16,7 @@
 #   other non-zero = unexpected command failure. Missing prerequisites do not fail the install.
 #
 # How it is laid out: this file holds the constants and finds Node, then sources install/*.sh
-# in the order below -- the first eight define functions, the rest run the install step by step.
+# in the order below -- the first nine define functions, the rest run the install step by step.
 #   install/ui.sh            terminal output (ui_*)
 #   install/prereqs.sh       prerequisite helpers (package managers, install or report)
 #   install/postgres.sh      PostgreSQL logins and tests/harness.env
@@ -25,6 +25,7 @@
 #   install/mxcli.sh         mxcli: download and update
 #   install/studio_pro.sh    finding Studio Pro (Windows)
 #   install/toolchain.sh     Playwright browser, JDK, MxBuild, no-Docker mode
+#   install/theme.sh         the app's theme (also tests/theme.sh)
 #   install/target.sh        10. arguments and the target project
 #   install/step_prereqs.sh  11. prerequisites
 #   install/step_app.sh      12. create the Mendix app

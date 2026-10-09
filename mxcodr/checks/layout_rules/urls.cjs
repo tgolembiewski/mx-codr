@@ -69,6 +69,7 @@ function urlFindings(lines, entityText) {
     found.push({
       check: 'URL01',
       line: 1,
+      document: page,
       message: `${page} has no URL: a reload lands on the home page, and the page cannot be bookmarked, shared or opened ` +
         `in a new tab. Give it one -- alter page ${page} { set Url = '${url_}' }; -- and put the same Url: in the ` +
         `script that creates it, so a re-run keeps it. Every parameter needs its segment (CE5601): {Param/Id} for an object, ` +

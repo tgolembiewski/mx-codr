@@ -89,6 +89,7 @@ const { textInputFindings, stringLengths } = require('./layout_rules/inputs.cjs'
 const { verticalFindings } = require('./layout_rules/vertical.cjs');
 const { nameFindings, documentHashes } = require('./layout_rules/names.cjs');
 const { urlFindings } = require('./layout_rules/urls.cjs');
+const { levelArgs } = require('./rulebook.cjs');
 const { layoutMenuFindings, oneLayoutFindings } = require('./layout_rules/layouts.cjs');
 const { PROFILE_RE, duplicateIconFindings, menuIconFindings, readMenuAccess, roleHomeFindings, signOutFindings } = require('./layout_rules/navigation.cjs');
 const { backButtonFindings, currentUserFindings } = require('./layout_rules/page_top.cjs');
@@ -276,7 +277,11 @@ function parseArgs(argv) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --levels / --except: what the person changed in the rulebook (tests/rulebook/): a code's level
+  // when it differs from the card's default, and the documents excepted. Every other code keeps
+  // the behaviour below, so an untouched rulebook changes nothing.
+  const { levels, excepts, rest } = levelArgs(process.argv.slice(2));
+  const args = parseArgs(rest);
 
   // mxcli v0.25 describes in mdl 1; the rules read the v0.24 spelling (layout_rules/mdl1.cjs).
   const [described, used] = collect(args.sources);
@@ -352,7 +357,7 @@ function main() {
     }
     for (const f of nameFindings(all)) {
       const fresh = baseline && f.check === 'NAME02' && baseline[f.document] !== hashes[f.document];
-      const finding = { check: f.check, line: f.line, message: f.message + (fresh ? ` -- ${f.document} is new or changed since the last DONE, so its names are required now` : '') };
+      const finding = { check: f.check, line: f.line, message: f.message + (fresh ? ` -- ${f.document} is new or changed since the last DONE, so its names are required now` : ''), document: f.document };
       (args.names === 'error' || fresh ? failures : warnings).push(finding);
     }
   }
@@ -364,6 +369,7 @@ function main() {
   // URL01 needs to know which parameter entities are persistent; without --entities only pages with
   // no parameter or value parameters are judged.
   if (!args.port_parity) failures = failures.concat(urlFindings(lines, entityText));
+  [failures, warnings] = relevel(failures, warnings, levels, excepts);
   const report = {
     verdict: !failures.length ? 'PASS' : 'FAIL',
     pages,
@@ -379,6 +385,24 @@ function main() {
     for (const w of warnings) py.print(`  ! [${w.check}] ${w.message}`);
   }
   return !failures.length ? 0 : 1;
+}
+
+// The rulebook's say: a code the person raised goes to failures, one lowered to warnings, `info`
+// and `off` leave the output, and a finding on an excepted document (NAME01/02, URL01 carry one)
+// is dropped. Findings keep their order within each list; `document` never reaches the output.
+function relevel(failures, warnings, levels, excepts) {
+  const keep = f => !(excepts[f.check] || []).includes(f.document || '');
+  const strip = f => { const { document, ...rest } = f; return rest; };
+  const out = { failures: [], warnings: [] };
+  for (const [list, kind] of [[failures, 'failures'], [warnings, 'warnings']]) {
+    for (const f of list) {
+      if (!keep(f)) continue;
+      const level = Object.prototype.hasOwnProperty.call(levels, f.check) ? levels[f.check] : null;
+      if (level === 'off' || level === 'info') continue;
+      out[level === 'block' ? 'failures' : level === 'warn' ? 'warnings' : kind].push(strip(f));
+    }
+  }
+  return [out.failures, out.warnings];
 }
 
 // Advice is printed in the spelling of the mxcli the harness is pinned to (mdl1_spelling.cjs).

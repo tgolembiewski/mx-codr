@@ -396,7 +396,10 @@ const tools = {
       const expected = files.get(relative);
       let actual;
       try {
-        actual = crypto.createHash('sha256').update(fs.readFileSync(py.join(app, ...relative.split('/')))).digest('hex');
+        // A rulebook card is hashed without its ## Local section, as record_install.cjs recorded it.
+        let bytes = fs.readFileSync(py.join(app, ...relative.split('/')));
+        if (relative.startsWith('tests/rulebook/')) bytes = Buffer.from(require('./rulebook.cjs').withoutLocal(bytes.toString('utf8')));
+        actual = crypto.createHash('sha256').update(bytes).digest('hex');
       } catch {
         missing.push(relative);
         continue;
@@ -662,13 +665,13 @@ const tools = {
     const mtime = fs.statSync(file).mtimeMs / 1000;
     print(BigInt(Math.trunc(Date.now() / 1000 - mtime)));
   },
-  // tests/gate/checks.sh: the user role names of SHOW USER ROLES --json.
+  // tests/gate/security.sh: the user role names of SHOW USER ROLES --json.
   'role-names'() {
     const rows = loadStdin();
     if (!Array.isArray(rows)) exit(1);
     for (const row of rows) print(get(row, 'Name', ''));
   },
-  // tests/gate/checks.sh entity_names: exit 1 on a name that is not Module.Entity.
+  // tests/gate/security.sh entity_names: exit 1 on a name that is not Module.Entity.
   'entity-names'() {
     const rows = loadStdin();
     if (!Array.isArray(rows)) exit(1);
@@ -682,7 +685,7 @@ const tools = {
       print(name);
     }
   },
-  // tests/gate/checks.sh describe_entities_into: one file per entity from one describe.
+  // tests/gate/security.sh describe_entities_into: one file per entity from one describe.
   'split-entities'(allPath, dir) {
     if (allPath === undefined) raise('IndexError', 'list index out of range');
     const text = readStrict(allPath);

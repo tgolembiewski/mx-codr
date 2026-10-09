@@ -303,22 +303,3 @@ module.exports = {
   roleHomeFindings, SUB_MENU_RE, suggestedIcon, menuIconFindings, menuEntries, readMenuAccess,
   duplicateIconFindings,
 };
-
-// Under the Python names, with Python's shapes: dicts as plain objects, sets as arrays, MenuEntry
-// with the dataclass's field names (caption, icon, shown_icon, target, children).
-const { toObject, asMap, asSet } = require('./compat.cjs');
-const roleSets = roles => new Map([...asMap(roles)].map(([k, v]) => [k, asSet(v)]));
-const accessSets = access => (access === null || access === undefined ? null : roleSets(access));
-Object.assign(module.exports, {
-  ICON_RE, ICON_HINTS, ICON_REF_RE, TARGET_RE, CLOSE_RE, MenuEntry,
-  menu_items: navigation => toObject(menuItems(navigation)),
-  sign_out_findings: signOutFindings,
-  role_home_findings: roleHomeFindings,
-  suggested_icon: suggestedIcon,
-  menu_icon_findings: menuIconFindings,
-  _icon: iconOf,
-  menu_entries: navigation => toObject(menuEntries(navigation)),
-  read_menu_access: text => toObject(readMenuAccess(text), v => [...v]),
-  _visible: (entry, moduleRoles, access) => visible(entry, asSet(moduleRoles), accessSets(access)),
-  duplicate_icon_findings: (navigation, roles, access) => duplicateIconFindings(navigation, roleSets(roles), accessSets(access)),
-});

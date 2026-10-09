@@ -11,7 +11,7 @@
 #   bash tests/gate.sh --no-cache         # re-run the model checks even if nothing changed
 #
 # Eleven verdicts: the suite (tests/verify-*.test.sh) and ten model checks that need no app -- mx check,
-# lint, coverage, naming, layout, security, scope, paths, folders, unused. Each runs; a pass replays while its inputs hold.
+# catalog, coverage, naming, layout, security, scope, paths, folders, unused. Each runs; a pass replays while its inputs hold.
 #   DONE — every check passed               exit 0 (--only/--tests-only print PASSED, never DONE)
 #   NOT DONE — failed: <checks>             exit 1
 #   NOT DONE — could not run: <checks>      exit 2
@@ -25,8 +25,8 @@
 # Lines 2-24 are printed by --help; keep them 23 lines.
 
 # How to read this file: main() at the bottom is the whole gate, step by step. The steps
-# live in tests/gate/ -- app.sh (find, boot, stop the app), checks.sh (the five model
-# checks and their cache), preflight.sh (sessions, stale model, environment) and tests.sh
+# live in tests/gate/ -- app.sh (find, boot, stop the app), checks.sh (how the ten model
+# checks run, and their cache), steps.sh, layout.sh and security.sh (the checks), preflight.sh (sessions, stale model, environment) and tests.sh
 # (the suite). tools/mdl-checks/gate_helpers.cjs holds the Node they call.
 # No -e: a failing step must not end the gate.
 set -uo pipefail
@@ -35,7 +35,7 @@ HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$HARNESS_DIR/.." && pwd)"
 cd "$APP_DIR"
 . "$HARNESS_DIR/portable.sh"
-for part in hints app checks preflight tests; do
+for part in hints app checks steps layout security preflight tests; do
   if [ ! -f "$HARNESS_DIR/gate/$part.sh" ]; then
     echo "tests/gate/$part.sh is missing -- re-run the installer" >&2
     exit 2
@@ -46,7 +46,7 @@ done
 [ -f "$HARNESS_DIR/db-snapshot.sh" ] && . "$HARNESS_DIR/db-snapshot.sh"
 
 # The gate's helpers (digests, JSON, timestamps) live in tools/mdl-checks/gate_helpers.cjs.
-gate_py() {
+gate_helper() {
   "$NODE" tools/mdl-checks/gate_helpers.cjs "$@"
 }
 
@@ -195,7 +195,7 @@ print_verdict_and_exit() {
   echo
   echo "== gate"
   for line in "${summary[@]}"; do echo "   $line"; done
-  for name in tests mx lint coverage naming layout security scope paths folders unused visual; do
+  for name in tests mx catalog coverage naming layout security scope paths folders unused visual; do
     [ -f "$WORK/$name.secs" ] && timing="$timing $name $(cat "$WORK/$name.secs")s,"
   done
   echo "   timing:${timing} wall $((SECONDS - GATE_START))s"
@@ -248,7 +248,7 @@ print_blockers() {
   # One file per step (tests/checks/), so a session reads the codes of what failed, not all of them.
   local guides="" guide failed
   for failed in ${failures[@]+"${failures[@]}"} ${cannot_run[@]+"${cannot_run[@]}"}; do
-    case "$failed" in layout|lint|naming|paths) guide="tests/checks/$failed.md" ;; folders) guide="tests/checks/lint.md" ;; *) guide="tests/checks/app.md" ;; esac
+    guide="tests/checks/$failed.md"; [ -f "$guide" ] || guide="tests/checks/app.md"
     case " $guides " in *" $guide "*) ;; *) guides="${guides:+$guides }$guide" ;; esac
   done
   echo "   what each code wants and its fix: ${guides:-tests/CHECKS.md} -- not the gate's source"

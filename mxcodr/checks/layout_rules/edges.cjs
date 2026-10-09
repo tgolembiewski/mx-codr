@@ -101,15 +101,3 @@ function edgeFindings(lines, snippetText, navigation) {
 }
 
 module.exports = { edgeFindings };
-
-// Under the Python names, with Python's shapes: documents() is keyed by (kind, name) tuples, so it
-// is an array of [[kind, name], [first line, lines]] pairs; snippets is a dict of widget lists.
-const { asMap } = require('./compat.cjs');
-Object.assign(module.exports, {
-  DOCUMENT_RE, SNIPPET_CALL_RE, LOGIN_PAGE_RE, FRAMED_LAYOUT_RE, WRAPPERS, GRID_WRAPPER,
-  documents,
-  top_level: topLevel,
-  children,
-  edge_safe: (widget, widgets, snippets, depth = 0) => edgeSafe(widget, widgets, asMap(snippets), depth),
-  edge_findings: edgeFindings,
-});

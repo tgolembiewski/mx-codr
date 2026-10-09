@@ -191,16 +191,3 @@ module.exports = {
   PAGE_RE, SHOW_PAGE_ANY_RE, PAGE_LAYOUT_RE, WIDGET_LINE_RE, BACK_WRAPPERS, pageBlocks, firstWidget, leadingWidgets,
   indentOf,
 };
-
-// Under the Python names, with Python's shapes: a dict is a plain object, a dict keyed by tuples an
-// array of [key, value] pairs, a tuple an array.
-const { toObject } = require('./compat.cjs');
-Object.assign(module.exports, {
-  HEADING_MODE, SPACING_RE, PAIR_RE,
-  is_heading: isHeading,
-  runs_of: runsOf,
-  spacing_of: widget => toObject(spacingOf(widget)),
-  page_blocks: lines => toObject(pageBlocks(lines)),
-  first_widget: firstWidget,
-  leading_widgets: leadingWidgets,
-});

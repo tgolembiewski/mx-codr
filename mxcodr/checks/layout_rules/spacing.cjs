@@ -173,16 +173,3 @@ function check(lines) {
 }
 
 module.exports = { check };
-
-// Under the Python names, with Python's shapes.
-const { toObject, asMap } = require('./compat.cjs');
-Object.assign(module.exports, {
-  BLOCK_CLASS_RE,
-  invalid_value_findings: invalidValueFindings,
-  heading_findings: headingFindings,
-  run_gap_findings: runGapFindings,
-  run_alignment_findings: runAlignmentFindings,
-  headed_pages: widgets => toObject(headedPages(widgets)),
-  missing_heading_warnings: headed => missingHeadingWarnings(asMap(headed)),
-  block_class_findings: blockClassFindings,
-});

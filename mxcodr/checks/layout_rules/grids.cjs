@@ -119,13 +119,3 @@ function headerButtonFindings(lines, flows) {
 }
 
 module.exports = { headerButtonFindings, flowBodies, writes };
-
-// Under the Python names, with Python's shapes (dicts as plain objects, sets as arrays).
-const { toObject, asMap } = require('./compat.cjs');
-Object.assign(module.exports, {
-  DB_SOURCE_RE, FLOW_SOURCE_RE, ACTION_RE, CREATE_OBJECT_RE, CALL_RE, BUTTONS, FLOW_HEAD_RE, RETURNS_RE, CALLS_RE, WRITE_RE,
-  flow_bodies: flows => toObject(flowBodies(flows)),
-  _typed: (body, entity) => [...typed(body, entity)],
-  writes: (flow, entity, bodies, depth = 0, seen = null) => writes(flow, entity, asMap(bodies), depth, seen),
-  header_button_findings: headerButtonFindings,
-});
