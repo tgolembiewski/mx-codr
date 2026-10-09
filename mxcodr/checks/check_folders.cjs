@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { mxcli, ModelReadError } = require('./check_unused.cjs');
+const { levelArgs, levelOf } = require('./rulebook.cjs');
 
 const KIND = {
   PAGE: 'UI', SNIPPET: 'UI', LAYOUT: 'UI', BUILDING_BLOCK: 'UI', PAGE_TEMPLATE: 'UI',
@@ -96,7 +97,11 @@ const moveStatement = f => `move ${spelled(f.type)} ${f.name} to folder '${f.tar
 const USAGE = 'usage: check_folders.cjs app_dir Module... [--mpr copy.mpr] [--no-refresh]';
 
 function main() {
-  const argv = process.argv.slice(2);
+  // --levels: the rulebook's level for FOLDER01 (block, warn, info, off); --except names documents
+  // the person leaves where they are.
+  const { levels, excepts, rest: argv } = levelArgs(process.argv.slice(2));
+  const level = levelOf(levels, 'FOLDER01', 'block');
+  const left = new Set(excepts.FOLDER01 || []);
   const positional = [];
   let mpr = '', refresh = true;
   for (let i = 0; i < argv.length; i++) {
@@ -132,10 +137,10 @@ function main() {
       if (m) o.Folder = m[1].replace(/''/g, "'");
     } catch { /* left as the catalog says */ }
   }
-  const found = findings(objects, modules);
+  const found = level === 'off' ? [] : findings(objects, modules).filter(f => !left.has(f.name));
   if (!found.length) { process.stdout.write('PASS  every document is in <business folder>/UI, FNC or ENV\n'); return 0; }
-  const lines = [`FAIL  ${found.length} document(s) outside <business folder>/UI, FNC or ENV`];
-  for (const f of found) lines.push(`  - [FOLDER01] ${f.message}`);
+  const lines = [`${level === 'block' ? 'FAIL' : 'WARN'}  ${found.length} document(s) outside <business folder>/UI, FNC or ENV`];
+  if (level !== 'info') for (const f of found) lines.push(`  ${level === 'block' ? '-' : '~'} [FOLDER01] ${f.message}`);
   for (const f of found) lines.push(`move: ${moveStatement(f)}`);
   process.stdout.write(lines.join('\n') + '\n');
   return 1;

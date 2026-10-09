@@ -41,7 +41,7 @@ ui_banner() {
     printf '\n  %sversion:%s %s\n\n' "$C_BOLD" "$C_RESET" "$version"
   else
     printf '\n  %smx-codr%s  %s\n' "$C_BOLD" "$C_RESET" "$version"
-    printf '  mxcli %s MDL skills, lint rules, hooks and the delivery gate\n\n' "$I_DOT"
+    printf '  mxcli %s MDL skills, rulebook, hooks and the delivery gate\n\n' "$I_DOT"
   fi
 }
 

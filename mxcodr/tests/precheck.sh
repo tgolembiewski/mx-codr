@@ -90,7 +90,7 @@ fi
 # TEST01: test first. A page or ACT_ microflow new to the model, named by no `# covers:` line of
 # tests/verify-*.test.sh, waits for its test. Then the test is red until the exec (red-first comes
 # by itself) and the tests do not pile up at the end. MDL_TEST_FIRST=0 (tests/harness.env) turns it off.
-if [ "${MDL_TEST_FIRST:-1}" != "0" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
+if [ "${MDL_TEST_FIRST:-1}" != "0" ] && [ "$(mdl_rule_level TEST01 block)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
   untested="$("$NODE" tools/mdl-checks/gate_helpers.cjs test-first . "$MPR" "$@" 2>/dev/null)"
   if [ -n "$untested" ]; then
     echo "precheck: TEST01 -- test first: these scripts create what no browser test names yet (the real model is untouched):"
@@ -125,7 +125,7 @@ stale_units() {   # stale_units <script> -- the documents a diff would write, on
   "$MXCLI" diff "$1" -p "$MPR" --format struct 2>/dev/null \
     | grep -E '^[A-Z][A-Za-z ]*: [A-Za-z_][A-Za-z0-9_]*\.[^[:space:]]+$' | sort -u
 }
-if [ -f tests/mdl-applied.sh ] && [ "${MDL_STALE_CHECK:-1}" != "0" ]; then
+if [ -f tests/mdl-applied.sh ] && [ "${MDL_STALE_CHECK:-1}" != "0" ] && [ "$(mdl_rule_level STALE01 block)" != "off" ]; then
   . tests/mdl-applied.sh
   for script in "$@"; do
     reference="$(mdl_applied_reference "$script")" || continue

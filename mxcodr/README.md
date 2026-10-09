@@ -32,7 +32,7 @@ tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), preche
                   diagnose.sh, peek.sh, film.sh, theme.sh, lib.sh + lib/ (timeout, sessions, scenario, results),
                   portable.sh, scenario-helpers.js, run-app.sh (Windows), run-docker.sh (Docker
                   mode) — the harness, upgraded in place on every install.
-                  gate.sh is the done gate: tests, mx check, lint, coverage, naming, layout and
+                  gate.sh is the done gate: tests, mx check, catalog, coverage, naming, layout and
                   security, then warnings (rendered pages, server errors). precheck.sh is what the hooks run before an exec; orient.sh and
                   diagnose.sh gather facts in parallel; peek.sh looks at a page without a test;
                   film.sh records a video of a test's run;
@@ -42,7 +42,11 @@ tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), preche
 examples/         8 verify-*.test.sh from the demo app — NOT installed; a project's tests
                   are written by whoever builds the feature
 skills/           5 × SKILL.md — the prose (test-first-delivery with a reference/ of four)
-lint-rules/       3 × *.star — MOD001, REU001, UI001 — run by `mxcli lint`
+rulebook/         one Markdown card per rule (89) -- step, level, the check that produces its code,
+                  what it checks, the fix; installed as tests/rulebook/, where the person's ## Local
+                  section sets a level or excepts a document (see "The rulebook" below)
+lint-rules/       3 × *.star — MOD001, REU001, UI001 — for `./mxcli lint` by hand; the gate no
+                  longer runs lint (UI001 and SEC007 are in the catalog step)
 checks/           *.cjs + fixtures/ — the checks Starlark cannot express, all on Node:
                   gate_helpers.cjs for the gate's JSON and digests; check_layout.cjs is the
                   entry of the layout check and its rules are in layout_rules/ (one module
@@ -92,6 +96,87 @@ Node 22.5 or newer reads the Mendix version from an `.mpr` (`node:sqlite`); with
 one detail is skipped. `$PY` is still set in `tests/portable.sh` for project tests written before
 the switch that call `"$PY"`; new tests read JSON with `field`/`oql_value` and do arithmetic with
 `awk` or `node -e`.
+
+## The rulebook: every rule is a card (2026.10.09.2)
+
+The harness judged an app by 87 rules spread over fifteen Node files, three bash functions and ten
+`MDL_*` switches in `tests/harness.env`; a rule's level sat in its code, two rules had exceptions,
+and the hand-written docs drifted (NAV02 and ALERT01 were documented as blocking for weeks while
+the checker warned). The person asked for one place, one format, readable by a human, where a rule
+is defined, changed or excepted -- with the hard condition that the harness behaves exactly as
+before.
+
+`rulebook/` holds one Markdown card per rule, installed as `tests/rulebook/<CODE>.md`:
+
+```markdown
+# URL01 — every page that can have a URL has one
+step: layout
+level: block
+check: layout_rules/urls.cjs#urlFindings
+key: document
+
+## What it checks
+...
+## Fix
+...
+## Local
+level: warn
+except: Orders.Approval_Task   # opened only from the task inbox
+```
+
+The header says which gate step prints the code, its default level (`block` fails the step, `warn`
+is listed under the gate's warnings, `info` is counted, `off` is not checked), which function
+produces it (`bash:` for a rule in a script, `mxcli` for lint) and whether a finding names a
+document (`key: document`, so `except:` makes sense). `baseline: captions|names|paths` records the
+rules that warn until the first DONE and then block a new or changed document. `fixed: yes` marks
+the three with no level to set (the suite, mx check, SCRIPT01). `## Local` is the person's: a
+`level:` overrides the default, each `except:` line names a document the rule skips, `#` starts a
+comment. 89 cards: the 87 codes, plus `PRODUCTION01` (the Production level and VIEW01, what
+`MDL_REQUIRE_PRODUCTION` switched), `COVERAGE01`, `TESTS01`, `MX01`, and three from mxcli lint.
+
+How it steers, without changing what happens: `checks/rulebook.cjs` is the one parser.
+`tests/gate/checks.sh` copies `tests/rulebook/` to `$WORK/rulebook` once (eleven parallel steps read
+one version), validates it (a broken card makes every model check "could not run" with the card
+and line), and hands each checker `--levels` with only the codes the person changed and `--except`
+with the exceptions; a checker keeps its own behaviour for every other code, so an untouched
+rulebook changes nothing. The bash points (`security_level`, `step_visual`, `step_runtime_errors`,
+precheck's TEST01 and STALE01, ALERT01's promotion) read `mdl_rule_level`. The step's levels and
+exceptions are part of its cache fingerprint, and a step's summary ends with what the person changed
+(`rulebook: 1 excepted (URL01 Orders.Approval_Task), WRITE01 raised to block`), also on a replayed
+pass. The ten `MDL_*` switches still work and the card wins; their migration into `## Local` is the
+next bundle.
+
+Measured: on 34 local apps every step's four result files (`.status`, `.summary`, `.detail`,
+`.warnings`) are byte-identical before and after, and identical again on an app with no
+`tests/rulebook/` at all.
+
+What moved with it:
+
+- **`mxcli lint` left the gate.** The person's decision: only its two blocking rules stay, as cards
+  in a new **`catalog`** step (`checks/catalog_rules.cjs`, on a copy of the project like the security
+  step): `UI001` and `SEC007`, ported one to one from their Starlark over `CATALOG.WIDGETS` and
+  `CATALOG.PERMISSIONS`, same messages (the grid named in UI001's message may differ: the Starlark
+  took the last grid of the module). `MPR009` and `QUAL006` are mx check errors anyway. Everything
+  else lint says is advice, read on request: `LINT01` (default `off`) at `warn` or `block` runs
+  `mxcli lint --format json` in the catalog step. The three `.star` files stay for `./mxcli lint` by
+  hand; `orient.sh` prints the rulebook instead of lint.
+- **The docs are generated from the cards.** `tests/checks/<step>.md` (`catalog.md` and `folders.md`
+  new, `lint.md` gone) and `tests/CHECKS.md` come from `node checks/rulebook.cjs rulebook docs tests`
+  in `mxcodr/`; a test fails when they are stale, and keeps each under 4,500 characters. The rows
+  that are not rules (CE hints, Studio Pro open, a stale client bundle) live in
+  `rulebook/_app-appendix.md`.
+- **`bash tests/rules.sh`** (read only): `list [step]`, `explain CODE`, `check`.
+- **The guard** blocks a session writing `tests/rulebook/`, also with `MDL_HARNESS_EDITS=allow` and
+  from inline code (`node -e` appending to a card), with a message that says what to do instead:
+  name the line to add under `## Local` in the report. `.claude/lint-config.yaml` (mxcli's own lint
+  levels) and `tests/rules.sh` are harness files.
+- **The installer** merges the bundle's cards into `tests/rulebook/`: new text up to `## Local`, the
+  installed `## Local` kept word for word, a card the bundle lacks (the team's own) left alone.
+  `INSTALL.json` hashes a card without its `## Local`, so a level or an exception is never
+  "harness drift"; a changed rule text is.
+
+Next bundle: the switches migrate into `## Local` and disappear; `check: pattern` cards for a
+team's own rule; the "kept on purpose?" line a finding prints for the person to paste.
 
 ## mxcli 0.25: the checks read `mdl 1`, the advice is written in it
 
@@ -530,9 +615,10 @@ of its own. After DONE it says to leave them for the report, which names each on
 next. Its old "fix them anyway" sent sessions back for more full gates after DONE, just for warnings.
 
 Lint warnings were only counted, so a commit inside a loop (`CONV011`, one database call per row)
-surfaced at the end of the work, or not at all: Pi fixed seven of them a turn later. The gate now
-lists each one under its warnings, with the fix, while the code is fresh, and the pitfalls in the
-syntax digest show the right form up front. They still do not block DONE.
+surfaced at the end of the work, or not at all: Pi fixed seven of them a turn later. From bundle
+2026.10.08.1 the gate listed each one under its warnings; since 2026.10.09.2 the gate does not run
+`mxcli lint` at all (the person's decision: lint's advice is read on request, `LINT01` in the
+rulebook), and the pitfall in the syntax digest shows the right form up front.
 
 `PERF02`, `PERF03`, `PERF05` and `PERF06`, warnings from the naming step: a loop over a retrieved list that only
 adds up its rows, a database call per row inside such a loop (a retrieve, a Java action, or a flow

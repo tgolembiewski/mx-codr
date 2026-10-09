@@ -89,7 +89,7 @@ bash tests/gate.sh
 == gate
    tests: Total: 9  Passed: 9  Failed: 0  Time: 19.5s
    mx check: 0 errors
-   lint: 53 issues: 0 errors, 31 warnings, 22 info
+   catalog: PASS  0 catalog finding(s) block, 0 warning(s)
    coverage InvoiceDesk: PASS  11/11 elements covered by 9 test script(s)
    DONE — every check passed
 ```
@@ -97,7 +97,7 @@ bash tests/gate.sh
 - [ ] The new test passes
 - [ ] The whole suite passes
 - [ ] `mx check` reports 0 errors
-- [ ] `./mxcli lint -p <app>.mpr` reports 0 errors for your module
+- [ ] `catalog` passes -- a grid filters itself (UI001), no anonymous read of every row (SEC007)
 - [ ] Every page and `ACT_` microflow is covered (the gate runs the checker)
 - [ ] `layout` passes — no two inline widgets touching (skill: `spacing-and-layout`)
 

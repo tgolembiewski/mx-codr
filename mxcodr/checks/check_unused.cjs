@@ -23,6 +23,7 @@
 // Prints PASS/FAIL, one `  - [UNUSED01] ...` line per document, then `drop: <statement>` lines.
 // Exit: 0 none, 1 findings, 2 the model could not be read.
 'use strict';
+const { levelArgs, levelOf } = require('./rulebook.cjs');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -191,7 +192,12 @@ function parseArgs(argv) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --levels / --except from the rulebook (tests/rulebook/UNUSED01.md): except: documents are kept
+  // (the same as --keep), `off` skips the check, `warn` lists instead of blocking.
+  const { levels, excepts, rest } = levelArgs(process.argv.slice(2));
+  const level = levelOf(levels, 'UNUSED01', 'block');
+  const args = parseArgs(rest);
+  args.keep = (args.keep || []).concat(excepts.UNUSED01 || []);
   let mprs = args.mpr ? [path.resolve(args.mpr)] : [];
   try { if (!mprs.length) mprs = fs.readdirSync(args.appDir).filter(n => /\.mpr$/i.test(n)).sort(); } catch { /* none */ }
   if (!mprs.length || (args.mpr && !fs.existsSync(mprs[0]))) { process.stdout.write(`ERROR no .mpr in ${args.mpr || args.appDir}\n`); return 2; }
@@ -203,10 +209,11 @@ function main() {
     process.stdout.write(`ERROR could not read the model -- ${error.message}\n`);
     return 2;
   }
+  if (level === 'off') found = [];
   if (!found.length) { process.stdout.write('PASS  no unused document\n'); return 0; }
-  const lines = [`FAIL  ${found.length} document(s) nothing uses`];
-  for (const c of found) {
-    lines.push(`  - [UNUSED01] ${c.kind} ${c.name}: nothing calls, shows or names it`);
+  const lines = [`${level === 'block' ? 'FAIL' : 'WARN'}  ${found.length} document(s) nothing uses`];
+  if (level !== 'info') for (const c of found) {
+    lines.push(`  ${level === 'block' ? '-' : '~'} [UNUSED01] ${c.kind} ${c.name}: nothing calls, shows or names it`);
   }
   for (const c of found) lines.push(`drop: ${dropStatement(c)}`);
   process.stdout.write(lines.join('\n') + '\n');

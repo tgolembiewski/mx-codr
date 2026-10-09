@@ -39,7 +39,7 @@ bash tests/gate.sh --only <feature> --boot-if-needed
 bash tests/gate.sh --only <feature>
 #    did the fix break another test? --changed runs the tests the change touched (never DONE)
 bash tests/gate.sh --changed
-# 5. the whole gate: suite + mx check + lint + coverage + naming + layout + security, ends DONE / NOT DONE.
+# 5. the whole gate: suite + mx check + catalog + coverage + naming + layout + security, ends DONE / NOT DONE.
 #    Scripts run alphabetically and keep their rows: verify-000-reset restores the seed,
 #    exact counts go in verify-001-. A test that changes a seeded row owns that row
 bash tests/gate.sh

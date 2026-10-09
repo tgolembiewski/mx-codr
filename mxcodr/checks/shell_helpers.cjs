@@ -396,7 +396,10 @@ const tools = {
       const expected = files.get(relative);
       let actual;
       try {
-        actual = crypto.createHash('sha256').update(fs.readFileSync(py.join(app, ...relative.split('/')))).digest('hex');
+        // A rulebook card is hashed without its ## Local section, as record_install.cjs recorded it.
+        let bytes = fs.readFileSync(py.join(app, ...relative.split('/')));
+        if (relative.startsWith('tests/rulebook/')) bytes = Buffer.from(require('./rulebook.cjs').withoutLocal(bytes.toString('utf8')));
+        actual = crypto.createHash('sha256').update(bytes).digest('hex');
       } catch {
         missing.push(relative);
         continue;

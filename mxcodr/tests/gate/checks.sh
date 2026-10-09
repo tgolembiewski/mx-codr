@@ -1,4 +1,4 @@
-# tests/gate/checks.sh -- the model checks that need no app (mx check, lint, coverage, naming,
+# tests/gate/checks.sh -- the model checks that need no app (mx check, catalog, coverage, naming,
 # layout, security, scope, paths, folders, unused), and their cache.
 # Sourced by tests/gate.sh; defines functions only. Entry points: start_model_checks, collect_model_checks.
 
@@ -148,50 +148,39 @@ modules_or_status() {
   return 0
 }
 
-# The lint warnings to fix now, from `mxcli lint` text on stdin, as `   - [CODE] ...` lines.
-lint_worth_fixing() {
-  grep -E '\[CONV011\][[:space:]]*$' | head -10 \
-    | sed -E 's/^[[:space:]]*[^[:alnum:]]*[[:space:]]*//; s/ This causes N\+1 database operations\.//; s/[[:space:]]*\[CONV011\][[:space:]]*$//' \
-    | sed 's/^/   - [CONV011] /; s/$/ -- change the objects in the loop, commit the list once after `end loop` (new objects: `add` them to a list first)/'
-}
-
-# Only lint errors fail; warnings and info do not.
-check_lint() {
-  local out code line errors
-  out="$("$MXCLI" lint -p "$MPR" 2>&1)"; code=$?
-  # Lint runs beside a boot: when mxbuild touches the project mid-run, lint stops on "Cache
-  # invalid: project file modified" with no summary. Once more, after the change, is enough.
-  if ! printf '%s\n' "$out" | grep -qE '^[0-9]+ issues:|No issues found\.'; then
-    sleep 3
-    out="$("$MXCLI" lint -p "$MPR" 2>&1)"; code=$?
-  fi
-  # Lint warnings never block, and the gate only counted them, so a session met a commit inside a
-  # loop (CONV011, one database call per row) at the end of its work or not at all. The ones worth
-  # fixing while the code is fresh are listed under the gate's warnings, each with its fix.
-  printf '%s\n' "$out" | lint_worth_fixing > "$WORK/lint.warnings"
-  # A .star file that fails to parse is skipped while lint still exits 0: not a pass.
-  if printf '%s\n' "$out" | grep -qE 'rule file\(s\) skipped|rule file skipped'; then
-    echo "lint: could not run -- $(printf '%s\n' "$out" | grep -cE '^Warning: rule file skipped') lint rule file(s) failed to load" > "$WORK/lint.summary"
-    printf '%s\n' "$out" | grep -E '^Warning: rule file skipped' | sed 's/^Warning: rule file skipped: /  - /' | head -5 > "$WORK/lint.detail"
+# The catalog step: the rules mxcli's catalog tables answer (tools/mdl-checks/catalog_rules.cjs) on
+# a copy of the project -- UI001 and SEC007, the two rules of mxcli lint that blocked DONE, ported
+# from their Starlark, and LINT01 (mxcli lint's own advice) when the rulebook asks for it. The gate
+# no longer runs mxcli lint itself: its other rules are advice, read on request (tests/rules.sh).
+check_catalog() {
+  local gate found code total scratch="$WORK/catalogcheck"
+  [ -f tools/mdl-checks/catalog_rules.cjs ] || {
+    echo "catalog: could not run -- tools/mdl-checks/catalog_rules.cjs is missing" > "$WORK/catalog.summary"; return 2; }
+  modules_or_status catalog; gate=$?
+  case "$gate" in
+    0) ;;
+    3) echo "catalog: no user module to check" > "$WORK/catalog.summary"; return 0 ;;
+    *) return "$gate" ;;
+  esac
+  rulebook_ok catalog || return 2
+  project_copy "$scratch" catalog || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args catalog)
+  # shellcheck disable=SC2086
+  found="$("$NODE" tools/mdl-checks/catalog_rules.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
+  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|WARN|FAIL) '; then
+    echo "catalog: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/catalog.summary"
     return 2
   fi
-  line="$(printf '%s\n' "$out" | grep -E '^[0-9]+ issues:' | tail -1)"
-  if [ -z "$line" ] && [ "$code" = "0" ] && printf '%s\n' "$out" | grep -qF 'No issues found.'; then
-    echo "lint: No issues found." > "$WORK/lint.summary"
-    return 0
+  echo "catalog: $(printf '%s\n' "$found" | head -1)" > "$WORK/catalog.summary"
+  mkdir -p .mxcli 2>/dev/null && printf '%s\n' "$found" > .mxcli/catalog.txt 2>/dev/null
+  total="$(printf '%s\n' "$found" | grep -c '^  ~ ')"
+  if [ "$total" -gt 0 ]; then
+    printf '%s\n' "$found" | grep '^  ~ ' | head -10 | sed -E 's/^  ~ /   - /' > "$WORK/catalog.warnings"
+    [ "$total" -gt 10 ] && echo "   ... 10 of $total catalog warnings shown; all of them: .mxcli/catalog.txt" >> "$WORK/catalog.warnings"
   fi
-  if [ -z "$line" ]; then
-    echo "lint: could not run -- mxcli lint exited $code without a summary" > "$WORK/lint.summary"
-    printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -5 > "$WORK/lint.detail"
-    return 2
-  fi
-  echo "lint: $line" > "$WORK/lint.summary"
-  errors="$(printf '%s\n' "$line" | grep -oE '[0-9]+ errors' | grep -oE '[0-9]+')"
-  [ -n "$errors" ] && [ "$errors" != "0" ] || return 0
-  # Each error with its `at` and `→` (the fix) lines. mxcli 0.25 marks an error ✗, older ones ✖;
-  # matching only ✖ left the detail empty under a red lint verdict.
-  printf '%s\n' "$out" | awk '/✖|✗|\[error\]/ { n = 3 } n > 0 { print; n-- }' | head -15 > "$WORK/lint.detail"
-  { echo "   Lint errors block DONE; why each one and its fix: tests/checks/lint.md"; } >> "$WORK/lint.detail"
+  [ "$code" = "0" ] && return 0
+  printf '%s\n' "$found" | grep '^  - ' | head -12 > "$WORK/catalog.detail"
+  { echo "   These block DONE; why each one and its fix: tests/checks/catalog.md"; } >> "$WORK/catalog.detail"
   return 1
 }
 
@@ -245,8 +234,10 @@ check_naming() {
   if ! ls "$WORK"/mdl/*.mdl >/dev/null 2>&1; then
     echo "naming: no microflow or nanoflow to check" > "$WORK/naming.summary"; return 0
   fi
+  rulebook_ok naming || return 2
   local captions=warn total
   [ "${MDL_CAPTIONS:-warn}" = "error" ] && captions=error
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args naming)
   # PERF07 reads the entities' indexes and the pages' data sources as well.
   rm -f "$WORK/naming.unread"
   local -a index_inputs=(--entities "$WORK/naming-entities" --pages "$WORK/naming-pages")
@@ -260,7 +251,7 @@ check_naming() {
   local -a baseline=()
   [ -f "$CACHE_DIR/captions-baseline.json" ] && baseline=(--captions-baseline "$CACHE_DIR/captions-baseline.json")
   mkdir -p "$CACHE_DIR" 2>/dev/null
-  out="$("$NODE" tools/mdl-checks/check_mdl.cjs "$WORK/mdl" --skill naming --captions "$captions" \
+  out="$("$NODE" tools/mdl-checks/check_mdl.cjs "$WORK/mdl" --skill naming --captions "$captions" ${rb[@]+"${rb[@]}"} \
     ${index_inputs[@]+"${index_inputs[@]}"} --expect-flows "$(cat "$WORK/naming.count" 2>/dev/null || echo 0)" \
     --format "$("$MXCLI" --version 2>/dev/null | head -1)" \
     --flow-hashes "$CACHE_DIR/naming.flows.json" ${baseline[@]+"${baseline[@]}"} 2>&1)"; code=$?
@@ -415,8 +406,10 @@ check_layout() {
     *) nav_args+=(--names warn --page-hashes "$CACHE_DIR/layout.pages.json")
        [ -f "$CACHE_DIR/names-baseline.json" ] && nav_args+=(--names-baseline "$CACHE_DIR/names-baseline.json") ;;
   esac
+  rulebook_ok layout || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args layout)
   mkdir -p "$CACHE_DIR" 2>/dev/null
-  out="$("$NODE" tools/mdl-checks/check_layout.cjs "$WORK/pages" "${nav_args[@]}" \
+  out="$("$NODE" tools/mdl-checks/check_layout.cjs "$WORK/pages" "${nav_args[@]}" ${rb[@]+"${rb[@]}"} \
     --expect-pages "$(cat "$WORK/layout.count" 2>/dev/null || echo 0)" 2>&1)"; code=$?
   checker_verdict "$code" "$out"; gate=$?
   if [ "$gate" = "2" ]; then
@@ -435,10 +428,11 @@ check_layout() {
   # How a page renders (ALERT01) is a warning while MDL_VISUAL=warn, a failure with MDL_VISUAL=error.
   local look
   look="$(printf '%s\n' "$out" | grep -E '^[[:space:]]+! \[ALERT01\]' | sed -E 's/^[[:space:]]+! /   - /')"
-  if [ -n "$look" ] && [ "${MDL_VISUAL:-warn}" = "error" ]; then
+  local alert; alert="${MDL_VISUAL:-$(mdl_rule_mode ALERT01)}"
+  if [ -n "$look" ] && [ "$alert" = "error" ]; then
     printf '%s\n' "$look" >> "$WORK/layout.detail"
     gate=1
-  elif [ -n "$look" ] && [ "${MDL_VISUAL:-warn}" != "0" ]; then
+  elif [ -n "$look" ] && [ "$alert" != "0" ]; then
     printf '%s\n' "$look" > "$WORK/layout.warnings"
   fi
   # A textbox whose attribute's name says it holds prose (TEXT02) is a hint, shown with the warnings.
@@ -503,21 +497,43 @@ run_cached() {
 }
 
 # Starts the model checks in the background, each through the cache.
+# The rulebook (tests/rulebook/): copied once into $WORK so the eleven parallel steps read one
+# version, and validated once; a broken card makes every model check "could not run" with the
+# card and line (the file is the person's, so it has to be loud). Each step's effective levels
+# and exceptions are part of its cache fingerprint (RULEBOOK_<step>).
+rulebook_prepare() {
+  rm -rf "$WORK/rulebook" "$WORK/rulebook.broken"
+  [ -d tests/rulebook ] || return 0
+  cp -R tests/rulebook "$WORK/rulebook" 2>/dev/null || { echo "could not copy tests/rulebook" > "$WORK/rulebook.broken"; return 0; }
+  local out
+  out="$("$NODE" "$MDL_RULEBOOK" "$WORK/rulebook" check 2>&1)" || printf '%s\n' "$out" | tail -1 > "$WORK/rulebook.broken"
+  return 0
+}
+# rulebook_ok <step> -- false, with the step's summary written, when the rulebook is broken.
+rulebook_ok() {
+  [ -f "$WORK/rulebook.broken" ] || return 0
+  echo "$1: could not run -- $(cat "$WORK/rulebook.broken") (tests/rulebook is the person's file)" > "$WORK/$1.summary"
+  return 1
+}
+# rulebook_fingerprint <step> -- `env:RULEBOOK_<step>=<digest of its effective levels and exceptions>`.
+rulebook_fingerprint() { printf 'env:RULEBOOK_%s=%s\n' "$1" "$(mdl_rulebook digest "$1" 2>/dev/null || echo none)"; }
+
 start_model_checks() {
+  rulebook_prepare
   # Upgrading the gate, its config or mxcli must not replay an old pass.
-  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/py_compat.cjs tests/harness.env "meta:$MXCLI")
+  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/rulebook.cjs tests/harness.env "meta:$MXCLI")
   ( run_cached mx       check_mx       "${cache_inputs[@]}" "env:MDL_MXBUILD_PATH=${MDL_MXBUILD_PATH:-}" \
       meta:widgets meta:theme meta:themesource meta:javasource ) &
-  ( run_cached lint     check_lint     "${cache_inputs[@]}" .claude/lint-rules ) &
-  ( run_cached coverage check_coverage "${cache_inputs[@]}" tests tools/mdl-checks/check_test_coverage.cjs ) &
-  ( run_cached naming   check_naming   "${cache_inputs[@]}" tools/mdl-checks/check_mdl.cjs tools/mdl-checks/perf_rules.cjs tools/mdl-checks/index_rules.cjs tools/mdl-checks/event_rules.cjs tools/mdl-checks/datasource_rules.cjs "$CACHE_DIR/captions-baseline.json" "env:MDL_CAPTIONS=${MDL_CAPTIONS:-}" ) &
-  ( run_cached layout   check_layout   "${cache_inputs[@]}" tools/mdl-checks/check_layout.cjs tools/mdl-checks/layout_rules "$CACHE_DIR/names-baseline.json" "env:MDL_VISUAL=${MDL_VISUAL:-}" "env:MDL_WIDGET_NAMES=${MDL_WIDGET_NAMES:-}" ) &
-  ( run_cached security check_security "${cache_inputs[@]}" tools/mdl-checks/view_access.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/check_unused.cjs "env:MDL_REQUIRE_PRODUCTION=${MDL_REQUIRE_PRODUCTION:-}" ) &
-  ( run_cached scope    check_scope    "${cache_inputs[@]}" tools/mdl-checks/check_scope.cjs "env:MDL_SCOPE=${MDL_SCOPE:-}" ) &
-  ( run_cached paths    check_paths    "${cache_inputs[@]}" tools/mdl-checks/check_paths.cjs tools/mdl-checks/outcome_rules.cjs tools/mdl-checks/check_unused.cjs tests "$CACHE_DIR/paths-baseline.json" "env:MDL_UNTESTED=${MDL_UNTESTED:-}" "env:MDL_PATHS=${MDL_PATHS:-}" ) &
-  ( run_cached folders  check_folders  "${cache_inputs[@]}" tools/mdl-checks/check_folders.cjs tools/mdl-checks/check_unused.cjs ) &
-  ( run_cached unused   check_unused   "${cache_inputs[@]}" tools/mdl-checks/check_unused.cjs javasource javascriptsource meta:theme meta:themesource tests "env:MDL_KEEP_UNUSED=${MDL_KEEP_UNUSED:-}" ) &
-  echo "== mx check, lint, coverage, naming, layout, security, scope, paths, folders and unused started (they need no app; running while the suite does)"
+  ( run_cached catalog  check_catalog  "${cache_inputs[@]}" tools/mdl-checks/catalog_rules.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint catalog)" ) &
+  ( run_cached coverage check_coverage "${cache_inputs[@]}" tests tools/mdl-checks/check_test_coverage.cjs "$(rulebook_fingerprint coverage)" ) &
+  ( run_cached naming   check_naming   "${cache_inputs[@]}" tools/mdl-checks/check_mdl.cjs tools/mdl-checks/perf_rules.cjs tools/mdl-checks/index_rules.cjs tools/mdl-checks/event_rules.cjs tools/mdl-checks/datasource_rules.cjs "$CACHE_DIR/captions-baseline.json" "env:MDL_CAPTIONS=${MDL_CAPTIONS:-}" "$(rulebook_fingerprint naming)" ) &
+  ( run_cached layout   check_layout   "${cache_inputs[@]}" tools/mdl-checks/check_layout.cjs tools/mdl-checks/layout_rules "$CACHE_DIR/names-baseline.json" "env:MDL_VISUAL=${MDL_VISUAL:-}" "env:MDL_WIDGET_NAMES=${MDL_WIDGET_NAMES:-}" "$(rulebook_fingerprint layout)" ) &
+  ( run_cached security check_security "${cache_inputs[@]}" tools/mdl-checks/view_access.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/check_unused.cjs "env:MDL_REQUIRE_PRODUCTION=${MDL_REQUIRE_PRODUCTION:-}" "$(rulebook_fingerprint security)" ) &
+  ( run_cached scope    check_scope    "${cache_inputs[@]}" tools/mdl-checks/check_scope.cjs "env:MDL_SCOPE=${MDL_SCOPE:-}" "$(rulebook_fingerprint scope)" ) &
+  ( run_cached paths    check_paths    "${cache_inputs[@]}" tools/mdl-checks/check_paths.cjs tools/mdl-checks/outcome_rules.cjs tools/mdl-checks/check_unused.cjs tests "$CACHE_DIR/paths-baseline.json" "env:MDL_UNTESTED=${MDL_UNTESTED:-}" "env:MDL_PATHS=${MDL_PATHS:-}" "$(rulebook_fingerprint paths)" ) &
+  ( run_cached folders  check_folders  "${cache_inputs[@]}" tools/mdl-checks/check_folders.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint folders)" ) &
+  ( run_cached unused   check_unused   "${cache_inputs[@]}" tools/mdl-checks/check_unused.cjs javasource javascriptsource meta:theme meta:themesource tests "env:MDL_KEEP_UNUSED=${MDL_KEEP_UNUSED:-}" "$(rulebook_fingerprint unused)" ) &
+  echo "== mx check, catalog, coverage, naming, layout, security, scope, paths, folders and unused started (they need no app; running while the suite does)"
 }
 
 # An app with sign-in is only as safe as its security level: at PROTOTYPE Mendix checks page and
@@ -593,6 +609,7 @@ view_findings() {
 check_security() {
   local level_status rules_status
   : > "$WORK/security.detail"
+  rulebook_ok security || return 2
   security_level; level_status=$?
   mv "$WORK/security.summary" "$WORK/security.level" 2>/dev/null
   security_rules; rules_status=$?
@@ -615,9 +632,11 @@ security_rules() {
     3) : > "$WORK/security.summary"; return 0 ;;
     *) return "$gate" ;;
   esac
+  rulebook_ok security || return 2
   project_copy "$scratch" security || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args security)
   # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/security_rules.cjs . $USER_MODULES --mpr "$scratch/$MPR" 2>&1)"; code=$?
+  found="$("$NODE" tools/mdl-checks/security_rules.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
   if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|FAIL) '; then
     echo "security rules: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/security.summary"
     return 2
@@ -640,7 +659,10 @@ security_rules() {
 
 security_level() {
   local level rules entity views
+  # PRODUCTION01 in the rulebook (tests/rulebook/PRODUCTION01.md): `off` skips the level and VIEW01,
+  # as MDL_REQUIRE_PRODUCTION=0 did; the security rules (CRED01 ...) run either way.
   [ "${MDL_REQUIRE_PRODUCTION:-1}" = "0" ] && { echo "security: not checked (MDL_REQUIRE_PRODUCTION=0)" > "$WORK/security.summary"; return 0; }
+  [ "$(mdl_rule_level PRODUCTION01 block)" = "off" ] && { echo "security: not checked (PRODUCTION01 is off in tests/rulebook)" > "$WORK/security.summary"; return 0; }
   level="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | sed -n 's/^Security Level:[[:space:]]*//p' | head -1)"
   if [ -z "$level" ]; then
     echo "security: could not run -- SHOW PROJECT SECURITY printed no level" > "$WORK/security.summary"
@@ -706,21 +728,24 @@ check_scope() {
     3) return 0 ;;
     *) return "$gate" ;;
   esac
+  rulebook_ok scope || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args scope)
   # shellcheck disable=SC2086
-  out="$("$NODE" tools/mdl-checks/check_scope.cjs . $USER_MODULES 2>&1)"; code=$?
+  out="$("$NODE" tools/mdl-checks/check_scope.cjs . $USER_MODULES ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
   if [ "$code" = "2" ]; then
     echo "scope: could not run -- $(printf '%s\n' "$out" | tail -1)" > "$WORK/scope.summary"; return 2
   fi
   # 0 passes and 1 has findings, each under a PASS or WARN line; anything else (a traceback
   # exits 1 too) did not check the model, and counted as "findings", a pass while MDL_SCOPE=warn.
-  if { [ "$code" != "0" ] && [ "$code" != "1" ]; } || ! printf '%s\n' "$out" | head -1 | grep -qE '^(PASS|WARN) '; then
+  if { [ "$code" != "0" ] && [ "$code" != "1" ]; } || ! printf '%s\n' "$out" | head -1 | grep -qE '^(PASS|WARN|FAIL) '; then
     echo "scope: could not run -- check_scope.cjs exited $code" > "$WORK/scope.summary"
     printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 > "$WORK/scope.detail"
     return 2
   fi
   echo "scope: $(printf '%s\n' "$out" | head -1)" > "$WORK/scope.summary"
   [ "$code" = "0" ] && return 0
-  if [ "${MDL_SCOPE:-warn}" = "error" ]; then
+  # SCOPE01 at `block` (tests/rulebook, or MDL_SCOPE=error while it exists): the checker says FAIL.
+  if [ "${MDL_SCOPE:-warn}" = "error" ] || printf '%s\n' "$out" | head -1 | grep -q '^FAIL '; then
     printf '%s\n' "$out" | grep -E '^\s+- ' > "$WORK/scope.detail"
     return 1
   fi
@@ -747,17 +772,25 @@ check_unused() {
     3) return 0 ;;
     *) return "$gate" ;;
   esac
+  rulebook_ok unused || return 2
   project_copy "$scratch" unused || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args unused)
   # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/check_unused.cjs . $USER_MODULES --mpr "$scratch/$MPR" \
+  found="$("$NODE" tools/mdl-checks/check_unused.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} \
     ${MDL_KEEP_UNUSED:+--keep "$MDL_KEEP_UNUSED"} 2>&1)"; code=$?
   case "$code" in
     0) echo "unused: no unused document" > "$WORK/unused.summary"; return 0 ;;
-    1) printf '%s\n' "$found" | head -1 | grep -q '^FAIL ' || code=2 ;;
+    1) printf '%s\n' "$found" | head -1 | grep -qE '^(FAIL|WARN) ' || code=2 ;;
   esac
   if [ "$code" != "1" ]; then
     echo "unused: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/unused.summary"
     return 2
+  fi
+  # UNUSED01 below block in tests/rulebook: listed under the warnings, not dropped on a copy.
+  if printf '%s\n' "$found" | head -1 | grep -q '^WARN '; then
+    echo "unused: $(printf '%s\n' "$found" | head -1 | sed 's/^WARN  //') (UNUSED01 is a warning in tests/rulebook)" > "$WORK/unused.summary"
+    printf '%s\n' "$found" | grep '^  ~ ' | head -10 | sed 's/^  ~ /   - /' > "$WORK/unused.warnings"
+    return 0
   fi
   count="$(printf '%s\n' "$found" | grep -c '^  - \[UNUSED01\]')"
   printf '%s\n' "$found" | sed -n 's/^drop: //p' > "$WORK/unused.drop.mdl"
@@ -809,9 +842,11 @@ check_paths() {
     3) return 0 ;;
     *) return "$gate" ;;
   esac
+  rulebook_ok paths || return 2
   project_copy "$scratch" paths || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args paths)
   # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/check_paths.cjs . $USER_MODULES --mpr "$scratch/$MPR" \
+  found="$("$NODE" tools/mdl-checks/check_paths.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} \
     --baseline "$CACHE_DIR/paths-baseline.json" ${MDL_UNTESTED:+--untested "$MDL_UNTESTED"} \
     $([ "${MDL_PATHS:-}" = "error" ] && echo --all-fail) 2>&1)"; code=$?
   if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|FAIL) '; then
@@ -848,15 +883,23 @@ check_folders() {
     3) return 0 ;;
     *) return "$gate" ;;
   esac
+  rulebook_ok folders || return 2
   project_copy "$scratch" folders || return 2
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args folders)
   # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/check_folders.cjs . $USER_MODULES --mpr "$scratch/$MPR" 2>&1)"; code=$?
-  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|FAIL) '; then
+  found="$("$NODE" tools/mdl-checks/check_folders.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
+  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|WARN|FAIL) '; then
     echo "folders: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/folders.summary"
     return 2
   fi
   echo "folders: $(printf '%s\n' "$found" | head -1)" > "$WORK/folders.summary"
   [ "$code" = "0" ] && return 0
+  # FOLDER01 below block in tests/rulebook: the documents and their moves under the warnings.
+  if printf '%s\n' "$found" | head -1 | grep -q '^WARN '; then
+    { printf '%s\n' "$found" | grep '^  ~ ' | head -10 | sed 's/^  ~ /   - /'
+      printf '%s\n' "$found" | sed -n 's/^move: /     /p' | head -10; } > "$WORK/folders.warnings"
+    return 0
+  fi
   {
     printf '%s\n' "$found" | grep '^  - \[FOLDER01\]' | sed 's/^  /   /'
     echo "   Fix: every move below in ONE new script (mdl 1;) and one exec -- a move changes no behaviour:"
@@ -881,6 +924,10 @@ collect() {
       [ -n "$line" ] && summary+=("$line")
     done < "$WORK/$name.summary"
   fi
+  # What the person's ## Local sections changed for this step (tests/rulebook/), so a verdict read
+  # beside the rulebook explains itself. In the summary, not the detail: a replayed pass keeps it.
+  local changed; changed="$(mdl_rulebook changes "$name" 2>/dev/null)" || changed=""
+  [ -n "$changed" ] && summary+=("   rulebook: $changed")
   # The detail lines print under the verdict (print_verdict_and_exit), so the tail of the
   # output holds both the verdict and its cause.
   case "$status" in
@@ -902,7 +949,7 @@ collect() {
 # After `wait`: each background check's verdict into summary, failures or cannot_run.
 collect_model_checks() {
   collect mx "mx check"
-  collect lint "lint"
+  collect catalog "catalog"
   collect coverage "coverage"
   collect naming "naming"
   collect layout "layout"

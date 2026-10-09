@@ -31,6 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const { mxcli, ModelReadError } = require('./check_unused.cjs');
+const { levelArgs, levelOf } = require('./rulebook.cjs');
 
 const words = text => (String(text).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
   .toLowerCase().match(/[a-z0-9]+/g) || []);
@@ -107,7 +108,7 @@ function findings(model, modules) {
   const own = new Set(modules);
   const mine = name => own.has(String(name).split('.')[0]);
   const out = [];
-  const add = (code, blocking, message) => out.push({ code, blocking, message });
+  const add = (code, blocking, message, key = '') => out.push({ code, blocking, message, key });
   const sec = model.security;
 
   // CRED01
@@ -195,7 +196,7 @@ function findings(model, modules) {
     const m = /'\s*(select|insert|update|delete|merge)\b[^']*'\s*\+\s*\$[\w/.]+/i.exec(d.SourceText || '');
     if (!m) continue;
     add('SQL01', true, `${d.QualifiedName} builds a query by joining text and a variable (${m[0].slice(0, 60)}...): whoever controls that ` +
-      'value controls the query. Use a database connection query with parameters, or OQL parameters, never concatenation');
+      'value controls the query. Use a database connection query with parameters, or OQL parameters, never concatenation', d.QualifiedName);
   }
 
   // EXTENDS01
@@ -203,7 +204,7 @@ function findings(model, modules) {
     if (d.ObjectType !== 'ENTITY' || !own.has(d.ModuleName)) continue;
     const m = /\bextends\s+(System\.User|Administration\.Account)\b/i.exec(d.SourceText || '');
     if (m) add('EXTENDS01', false, `${d.QualifiedName} specialises ${m[1]}: business data and the login account in one object. ` +
-      'Mendix: keep them apart, a 1-1 association from your entity to the account');
+      'Mendix: keep them apart, a 1-1 association from your entity to the account', d.QualifiedName);
   }
 
   // ADMIN01
@@ -235,7 +236,7 @@ function findings(model, modules) {
       add('XSS01', false, `${d.QualifiedName} puts ${(risky.length ? risky : attrs).join(', ')} into an HTML Element as HTML (innerHTML), ` +
         `and a user types that text${loosened ? ' -- and the widget\'s sanitizer is loosened (sanitizationConfigFull)' : ''}: markup a user wrote runs in ` +
         "every reader's browser. Show it as text (tagContentMode: 'container' with a dynamictext), or clean it on save (CommunityCommons XSSanitize)" +
-        (loosened ? ' and drop sanitizationConfigFull' : ''));
+        (loosened ? ' and drop sanitizationConfigFull' : ''), d.QualifiedName);
     }
   }
 
@@ -318,7 +319,9 @@ function readModel(appDir, mpr, read = mxcli) {
 }
 
 function main() {
-  const argv = process.argv.slice(2);
+  // --levels / --except: the rulebook's effective levels for this step (tests/rulebook/); without
+  // them each code keeps the level above (blocking: true/false).
+  const { levels, excepts, rest: argv } = levelArgs(process.argv.slice(2));
   const positional = [];
   let mpr = '', refresh = true;
   for (let i = 0; i < argv.length; i++) {
@@ -341,11 +344,12 @@ function main() {
     process.stdout.write(`ERROR could not read the model -- ${error.message}\n`);
     return 2;
   }
-  const found = findings(model, modules);
-  const blocking = found.filter(f => f.blocking), warnings = found.filter(f => !f.blocking);
+  const found = findings(model, modules).map(f => ({ ...f, level: levelOf(levels, f.code, f.blocking ? 'block' : 'warn') }))
+    .filter(f => f.level !== 'off' && !(excepts[f.code] || []).includes(f.key || ''));
+  const blocking = found.filter(f => f.level === 'block'), warnings = found.filter(f => f.level === 'warn' || f.level === 'info');
   const lines = [`${blocking.length ? 'FAIL' : 'PASS'}  ${blocking.length} security finding(s) block, ${warnings.length} warning(s)`];
   for (const f of blocking) lines.push(`  - [${f.code}] ${f.message}`);
-  for (const f of warnings) lines.push(`  ~ [${f.code}] ${f.message}`);
+  for (const f of warnings) if (f.level === 'warn') lines.push(`  ~ [${f.code}] ${f.message}`);
   process.stdout.write(lines.join('\n') + '\n');
   return blocking.length ? 1 : 0;
 }

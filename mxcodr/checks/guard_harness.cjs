@@ -208,8 +208,11 @@ const root = process.cwd().replace(/\\/g, '/').replace(/\/+$/, '');
 const ENV = 'tests/harness.env';
 const DIRS = ['tools/mdl-checks/', 'tests/gate/', 'tests/lib/', '.claude/lint-rules/', '.pi/extensions/',
   '.opencode/plugin/', '.mxcli/applied/'];
+// The rulebook (tests/rulebook/): the person's levels and exceptions, guarded like harness.env --
+// also with MDL_HARNESS_EDITS=allow, since a card changed by a session is a verdict changed.
+const RULEBOOK = 'tests/rulebook/';
 const FILES = new Set(['.claude/settings.local.json', '.codex/hooks.json', '.cursor/hooks.json', 'tests/gate.sh',
-  'tests/lib.sh', 'tests/precheck.sh', 'tests/portable.sh', 'tests/orient.sh',
+  'tests/lib.sh', 'tests/precheck.sh', 'tests/portable.sh', 'tests/orient.sh', 'tests/rules.sh', '.claude/lint-config.yaml',
   'tests/diagnose.sh', 'tests/peek.sh', 'tests/run-app.sh', 'tests/run-docker.sh',
   'tests/scenario-helpers.js', 'tests/marketplace-login.sh', '.mxcli/marketplace-login-needed',
   // Which paths are old enough to be warnings: the installer's record, not the session's.
@@ -236,6 +239,7 @@ function kind(path) {
   const p = rel(path);
   const low = p.toLowerCase();
   if (low === ENV || low.endsWith('/' + ENV)) return 'env';
+  if (p.startsWith(RULEBOOK) || p.includes('/' + RULEBOOK)) return 'rulebook';
   if (allowEdits) return null;
   for (const f of FILES) if (p === f || p.endsWith('/' + f)) return 'harness';
   for (const d of DIRS) if (p.startsWith(d) || p.includes('/' + d)) return 'harness';
@@ -282,7 +286,11 @@ function shellTargets(command) {
       for (const w of words) if (w.startsWith('of=')) targets.push(placed(w.slice(3)));
     } else if (/^(python[\d.]*|node|ruby|perl|php)\n?$/.test(verb) && words.slice(1).some(w => w === '-c' || w === '-e')) {
       const code = words.slice(1).join(' ');
-      if (code.includes('harness.env') && /write|open\s*\([^)]*["'][wa]|>/.test(code)) targets.push(ENV);
+      if (/write|append|open\s*\([^)]*["'][wa]|>/.test(code)) {
+        if (code.includes('harness.env')) targets.push(ENV);
+        const m = /tests[/\\]rulebook[/\\]([\w.-]+)/.exec(code);
+        if (m) targets.push(RULEBOOK + m[1]);
+      }
     }
   }
   return targets;

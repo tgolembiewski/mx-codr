@@ -22,7 +22,7 @@ Three shell calls asking three questions cost more than the questions: a call ha
 everything at once, in parallel:
 
 ```bash
-bash tests/orient.sh        # ~0.3s: structure, security, navigation, tests + covers, coverage, lint, app state
+bash tests/orient.sh        # ~0.3s: structure, security, navigation, tests + covers, coverage, app state
 bash tests/diagnose.sh Invoice demo_customer   # ~0.2s: row counts, sessions, access rules, associations, runtime errors
 ```
 
@@ -33,7 +33,7 @@ and entity changes do not hot-apply, and a stale runtime fails a correct fix —
 names the fix: `bash tests/gate.sh --restart`. `docs/brain/`, where it exists, is
 still where the *decisions* live; these report state only.
 
-`gate.sh` does the same internally: `mx check`, lint, coverage, naming and layout need neither the app
+`gate.sh` does the same internally: `mx check`, catalog, coverage, naming and layout need neither the app
 nor the browser, so they run while the suite runs (~37s serial becomes ~27s), and with
 `--boot-if-needed` they run while the runtime is still booting.
 

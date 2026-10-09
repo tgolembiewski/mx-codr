@@ -36,6 +36,10 @@ function* destinations(src) {
 
   for (const name of listdir(path.join(src, 'tests', 'checks'), '.md')) yield [path.join(src, 'tests', 'checks', name), 'tests/checks/' + name];
 
+  // The rulebook: one card per rule, hashed without its ## Local section (the person's levels and
+  // exceptions are theirs, not drift) -- see hashOf.
+  for (const name of listdir(path.join(src, 'rulebook'), '.md')) yield [path.join(src, 'rulebook', name), 'tests/rulebook/' + name];
+
   for (const name of listdir(path.join(src, 'checks'), '.py')) yield [path.join(src, 'checks', name), 'tools/mdl-checks/' + name];
 
   // The checks that run on Node: the guard and this recorder.
@@ -81,6 +85,13 @@ function* destinations(src) {
   }
 }
 
+// The hash the manifest records for a file: a rulebook card counts without its ## Local section
+// (tests/portable.sh install-freshness in shell_helpers.cjs compares the same way).
+function hashOf(relative, bytes) {
+  if (relative.startsWith('tests/rulebook/')) bytes = Buffer.from(require('./rulebook.cjs').withoutLocal(bytes.toString('utf8')));
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
 // time.strftime("%Y-%m-%d %H:%M:%S"): local time.
 function now() {
   const d = new Date();
@@ -100,8 +111,7 @@ function main(argv) {
     if (!isfile(source)) continue;
     // Keys stay forward-slashed so manifests are portable across Windows and macOS.
     try {
-      const bytes = fs.readFileSync(path.join(app, ...relative.split('/')));
-      files[relative] = crypto.createHash('sha256').update(bytes).digest('hex');
+      files[relative] = hashOf(relative, fs.readFileSync(path.join(app, ...relative.split('/'))));
     } catch {
       // Not installed in this project.
     }
@@ -123,3 +133,4 @@ if (require.main === module) {
   if (process.argv[2] === '--destinations') process.stdout.write(JSON.stringify([...destinations(process.argv[3])]) + '\n');
   else main(process.argv.slice(2));
 }
+module.exports = { destinations, hashOf };

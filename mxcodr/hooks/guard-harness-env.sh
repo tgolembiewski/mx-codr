@@ -29,7 +29,7 @@
 # DeepSeek run's `cat > /tmp/mdlprobe/x.mdl <<EOF` was blocked as a read on the first day.
 
 input="$(cat)"
-case "$input" in *harness.env*|*paths-baseline*|*mxcli/applied*|*write-baseline*|*tests/*|*tests\\\\*|*mdl-checks*|*lint-rules*|*settings.local.json*|*hooks.json*|*extensions*|*plugin*) ;;
+case "$input" in *harness.env*|*paths-baseline*|*mxcli/applied*|*write-baseline*|*tests/*|*tests\\\\*|*mdl-checks*|*lint-rules*|*lint-config*|*settings.local.json*|*hooks.json*|*extensions*|*plugin*) ;;
   *find\ *|*grep\ *|*egrep\ *|*fgrep\ *|*rg\ *|*ag\ *|*fd\ *|*mdfind*|*locate\ *|*/System/*|*/Applications/*|*/Library/*|*/usr/*|*/opt/*|*/private/*|*/tmp/*|*~/*|*\$HOME*|*/Users/*|*/home/*) ;;
   # The Mendix token: auth.json, $MENDIX_PAT, or a dump of the environment that holds it.
   *auth.json*|*MENDIX_PAT*|*env*|*set*|*export*|*declare*|*marketplace-login-needed*) ;;
@@ -89,6 +89,17 @@ the gate checks it against INSTALL.json). Do not change a check to get past it. 
 wrong -- it flags something that is right -- leave it, finish what you can, and say in your report
 which check, what it said and why it is wrong: the person fixes it in mx-codr, for every project.
 Your own tests (tests/verify-*.test.sh), scripts (mdlsource/) and tests/credentials.env are yours.
+MSG
+  exit 2
+fi
+if [ "$what" = "rulebook" ]; then
+  cat >&2 <<MSG
+Blocked: this call writes $path. tests/rulebook/ holds one card per rule of the gate -- what it
+checks, how hard it judges (level: block, warn, info, off) and the documents the person excepted
+under ## Local. It belongs to the person, not the session: a level a session lowers stays lowered
+for every later session. Do not work around a check -- meet it. If a rule is wrong for this app,
+say so in your report with the line to add under ## Local of that card (except: Module.Document
+# why, or level: warn) and let the person decide. bash tests/rules.sh explain <CODE> shows a card.
 MSG
   exit 2
 fi

@@ -1,0 +1,15 @@
+# LOOK02 — no reviewed screenshot was rejected (MDL_VISUAL_REVIEW=agent)
+step: tests
+level: warn
+check: gate_helpers.cjs#reviewScreenshots
+key: none
+
+## What it checks
+Only when switched on: none of those screenshots was judged to look wrong.
+
+## Fix
+Read each PNG in `.mxcli/visual/review.md`; write `verdicts.json`.
+
+## Local
+# level: warn
+

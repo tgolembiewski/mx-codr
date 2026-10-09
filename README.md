@@ -61,6 +61,13 @@ When it is done, open your agent **in the project folder** and ask for a feature
 The gate checks every rule below. If one is broken, it stays red and tells the agent
 what to fix. Codes in brackets are what the gate prints.
 
+Every rule is a card, `tests/rulebook/<CODE>.md`: what it checks, the fix, how hard it judges
+(`level: block | warn | info | off`). Under the card's `## Local` you change the level or except a
+document (`except: Orders.Approval_Task   # opened only from the task inbox`); the agent may read
+the cards and propose a line for you to paste, never write one. `bash tests/rules.sh` lists them,
+`bash tests/rules.sh explain URL01` shows one. mxcli's own lint is not part of the gate: set
+`LINT01` to `warn` to see its advice under the gate's warnings.
+
 **Done**
 - A failing test before each feature; a test for every page and action microflow.
 - Mendix's consistency check at 0 errors; project security at Production.
@@ -134,7 +141,7 @@ fetches what is missing, and tells you plainly about anything it could not do.
 | **Node, Playwright and its browser** | Installs the missing ones — the hooks, the checkers and the browser tests run on them |
 | **MxBuild** | Downloads the one for your Mendix version, so `mx check` runs |
 | **PostgreSQL** | Local mode (the default): sets it up |
-| **Skills, lint rules, checkers, hooks** | Puts them where each of the five agents looks for them |
+| **Skills, rulebook, checkers, hooks** | Puts them where each of the five agents looks for them; the rulebook (one card per rule, `tests/rulebook/`) keeps your `## Local` changes on every upgrade |
 | **Windows** | Applies the junctions and ARM64 fixes that Studio Pro's mxbuild needs |
 
 What cannot be installed unattended — a JDK, a Docker daemon that has to be started
@@ -145,7 +152,7 @@ if you use one — is listed at the end with the command to run.
 ```
  you ask ─▶ agent writes a test ─▶ test fails (red) ─▶ agent builds it in MDL
                                                               │
-      DONE ◀── gate: tests · mx check · lint · coverage · naming · layout · scope · paths · folders · unused ◀── test passes
+      DONE ◀── gate: tests · mx check · catalog · coverage · naming · layout · security · scope · paths · folders · unused ◀── test passes
 ```
 
 You never run the checks yourself. The agent runs the gate, and the hooks make sure
@@ -192,7 +199,8 @@ no checker to remember the arguments of, no order to run things in. After
 | The rules, in prose | `SKILL.md` files in the three directories each host looks in |
 | The always-loaded reminder | `.claude/rules/` and `.cursor/rules/`, and Pi's system prompt through its extension, on every turn |
 | The syntax sessions look up most | a digest from the project's own mxcli, with the pitfalls that cost sessions the most time on top, loaded into the session: `.claude/rules/`, `.cursor/rules/`, `opencode.json`, Pi's system prompt |
-| `MOD001`, `REU001`, `UI001` | `mxcli lint` discovers `.claude/lint-rules/*.star` by itself |
+| Every rule's level and exceptions | one card per rule in `tests/rulebook/<CODE>.md`; `bash tests/rules.sh` lists them |
+| `UI001`, `SEC007` | the gate's `catalog` step, over mxcli's model catalog; `MOD001`, `REU001`, `UI001` also run as `.claude/lint-rules/*.star` when you call `./mxcli lint` yourself |
 | `check_mdl.py`, `check_test_coverage.py`, `check_layout.py` | the skills that need them name the exact command; the gate runs them too |
 | The gate | host hooks fire it, and the `test-first-delivery` skill tells the agent to |
 
@@ -281,7 +289,8 @@ database lock stale while the app runs.
 .ai-context/skills/<name>/   mxcli, Cursor, OpenCode, Windsurf, Aider
 .claude/rules/               the always-loaded rule and the syntax digest (Cursor's copies in .cursor/rules/,
                              Pi gets it through its extension)
-.claude/lint-rules/          found by `mxcli lint` with nothing to register
+.claude/lint-rules/          found by `mxcli lint` with nothing to register (not run by the gate)
+tests/rulebook/              one card per rule: what it checks, how hard it judges, your exceptions
 tools/mdl-checks/            the checkers the skills cite (Node, .cjs)
 tests/                       the harness scripts, plus tests/harness.env
 .claude/settings.local.json  the hooks (Cursor and Codex get their own; OpenCode and Pi
@@ -297,16 +306,16 @@ reaches an installed project is not a fix. Your own `verify-*.test.sh` and
 
 ## The gate
 
-One command, seven checks, run concurrently — the browser suite, `mx check`, `mxcli
-lint`, test coverage, naming/captions, page layout and the security level. Every step
+One command, eleven checks, run concurrently — the browser suite, `mx check`, the catalog
+rules (`UI001`, `SEC007`), test coverage, naming/captions, page layout, security, scope, paths,
+folders and unused documents. Every step
 runs even when another fails, so one call reports the whole picture, and a red run ends with the list of what still
-blocks DONE. Exit 0 only when all seven pass. Below them come warnings that do not block
+blocks DONE. Exit 0 only when all of them pass. Below them come warnings that do not block
 DONE yet: how the pages rendered (`VIS`, `LOOK`), errors the server logged (`RUNTIME01`) and
 tests that were never seen to fail.
 The agent fixes them along with its next fix, never in a gate run of their own. Whatever is
 left at DONE goes into its report as the next thing to fix.
-A commit inside a loop (lint `CONV011`) is listed among them with its fix.
-So is row-by-row database work: a loop that sums retrieved rows, a database call per row, or a
+Row-by-row database work is listed among them with its fix: a loop that sums retrieved rows, a database call per row, or a
 whole table filtered with `if`, or a loop that only keeps the largest value (`PERF02`/`03`/`05`/`06`);
 the fix named is an OQL view, an XPath, or one sorted retrieve with `limit 1`.
 A query no database index serves is listed too (`PERF07`), with the index it wants: its `=`
@@ -334,7 +343,7 @@ access another script revoked.
 == gate
    tests: Total: 12  Passed: 12  Failed: 0  Time: 2m14s
    mx check: 0 errors
-   lint: 59 issues: 0 errors, 24 warnings, 35 info
+   catalog: PASS  0 catalog finding(s) block, 0 warning(s)
    coverage InvoiceDesk: PASS  14/14 elements covered by 12 test script(s)
    naming: PASS  0 failure(s) over 246 lines
    layout: PASS  0 failure(s) over 11 page(s)
@@ -365,6 +374,11 @@ When the app needs a Marketplace module and mxcli is not logged in, the harness 
 A blocked exec says when the command's earlier steps (an edit) did not run either; a scenario opens the browser when none is open; `# covers:` names may be separated by commas or spaces.
 
 ## Configuration
+
+**The rules: `tests/rulebook/`.** One card per rule; its `## Local` section is yours and survives
+every upgrade. `level: warn` makes a blocking rule a warning, `level: block` makes a warning block,
+`level: off` turns a rule off, `except: Module.Document  # why` skips one document. A broken card
+stops every model check with the card and line. `bash tests/rules.sh check` validates the folder.
 
 `tests/harness.env` is written by the installer and read by every harness script.
 It is yours: the agent may read it, but a hook blocks it from editing the file or setting a gate switch inline -- and from editing the harness's own checkers and scripts (`MDL_HARNESS_EDITS=allow` in this file lifts that part).

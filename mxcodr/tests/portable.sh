@@ -85,6 +85,47 @@ fi
 # `|| true`: a script under set -e must not stop when one of the two places is missing.
 MDL_SHELL_HELPERS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/mdl-checks/shell_helpers.cjs" || true
 [ -f "$MDL_SHELL_HELPERS" ] || MDL_SHELL_HELPERS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../checks" 2>/dev/null && pwd)/shell_helpers.cjs" || true
+MDL_RULEBOOK="$(dirname "$MDL_SHELL_HELPERS")/rulebook.cjs"
+
+# The rulebook: tests/rulebook/, one card per rule, the one place a rule's level (block, warn,
+# info, off) and the person's exceptions come from. The gate copies it to $WORK/rulebook so every
+# parallel step reads the same version; outside the gate (precheck, hooks) the folder itself is read.
+# An app installed before the rulebook has none: every rule then keeps its built-in level.
+mdl_rulebook_dir() {
+  if [ -n "${WORK:-}" ] && [ -d "$WORK/rulebook" ]; then printf '%s\n' "$WORK/rulebook"
+  elif [ -d tests/rulebook ]; then printf 'tests/rulebook\n'
+  else return 1; fi
+}
+mdl_rulebook() {   # mdl_rulebook <command> [arg] -- rulebook.cjs on the rulebook dir; false without one
+  local dir
+  dir="$(mdl_rulebook_dir)" || return 1
+  [ -f "$MDL_RULEBOOK" ] || return 1
+  "$NODE" "$MDL_RULEBOOK" "$dir" "$@"
+}
+mdl_rule_level() {   # mdl_rule_level <CODE> [<default>] -- the effective level, the default without a rulebook
+  local level
+  level="$(mdl_rulebook level "$1" 2>/dev/null)" && [ -n "$level" ] && { printf '%s\n' "$level"; return 0; }
+  printf '%s\n' "${2:-block}"
+}
+# mdl_rule_mode CODE... -- the old switch value for a group of codes: error when any is block, 0 when
+# every one is off, else warn (what step_visual and step_runtime_errors used to read from MDL_*).
+mdl_rule_mode() {
+  local code level any_block=0 all_off=1
+  for code in "$@"; do
+    level="$(mdl_rule_level "$code" warn)"
+    [ "$level" = "block" ] && any_block=1
+    [ "$level" = "off" ] || all_off=0
+  done
+  if [ "$any_block" = "1" ]; then echo error; elif [ "$all_off" = "1" ]; then echo 0; else echo warn; fi
+}
+# mdl_rule_args <step> -- `--levels <json> --except <json>` for a checker, one word per line (read into
+# an array); nothing without a rulebook, so the checker keeps its built-in levels.
+mdl_rule_args() {
+  local levels excepts
+  levels="$(mdl_rulebook overrides "$1" 2>/dev/null)" || return 0
+  excepts="$(mdl_rulebook excepts "$1" 2>/dev/null)" || return 0
+  printf -- '--levels\n%s\n--except\n%s\n' "${levels:-{\}}" "${excepts:-{\}}"
+}
 
 # --- 3. Load tests/harness.env ---
 # Parsed as allowlisted KEY=value, never sourced: sourcing would run shell from the project

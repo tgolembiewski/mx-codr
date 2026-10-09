@@ -11,7 +11,7 @@
 #   bash tests/gate.sh --no-cache         # re-run the model checks even if nothing changed
 #
 # Eleven verdicts: the suite (tests/verify-*.test.sh) and ten model checks that need no app -- mx check,
-# lint, coverage, naming, layout, security, scope, paths, folders, unused. Each runs; a pass replays while its inputs hold.
+# catalog, coverage, naming, layout, security, scope, paths, folders, unused. Each runs; a pass replays while its inputs hold.
 #   DONE — every check passed               exit 0 (--only/--tests-only print PASSED, never DONE)
 #   NOT DONE — failed: <checks>             exit 1
 #   NOT DONE — could not run: <checks>      exit 2
@@ -195,7 +195,7 @@ print_verdict_and_exit() {
   echo
   echo "== gate"
   for line in "${summary[@]}"; do echo "   $line"; done
-  for name in tests mx lint coverage naming layout security scope paths folders unused visual; do
+  for name in tests mx catalog coverage naming layout security scope paths folders unused visual; do
     [ -f "$WORK/$name.secs" ] && timing="$timing $name $(cat "$WORK/$name.secs")s,"
   done
   echo "   timing:${timing} wall $((SECONDS - GATE_START))s"
@@ -248,7 +248,7 @@ print_blockers() {
   # One file per step (tests/checks/), so a session reads the codes of what failed, not all of them.
   local guides="" guide failed
   for failed in ${failures[@]+"${failures[@]}"} ${cannot_run[@]+"${cannot_run[@]}"}; do
-    case "$failed" in layout|lint|naming|paths) guide="tests/checks/$failed.md" ;; folders) guide="tests/checks/lint.md" ;; *) guide="tests/checks/app.md" ;; esac
+    guide="tests/checks/$failed.md"; [ -f "$guide" ] || guide="tests/checks/app.md"
     case " $guides " in *" $guide "*) ;; *) guides="${guides:+$guides }$guide" ;; esac
   done
   echo "   what each code wants and its fix: ${guides:-tests/CHECKS.md} -- not the gate's source"

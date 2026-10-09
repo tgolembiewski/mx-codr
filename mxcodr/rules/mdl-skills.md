@@ -2,7 +2,7 @@
 
 This project's own skills live in `.claude/skills/`, beside the mxcli skills `CLAUDE.md` lists.
 Read **one** up front: `test-first-delivery`, before the first feature. The others are named
-by the check that needs them -- a `layout` finding says `spacing-and-layout`, a lint finding
+by the check that needs them -- a `layout` finding says `spacing-and-layout`, a `folders` finding
 `module-structure` or `reuse-and-snippets`, a `naming` finding `naming-and-captions` -- and
 each finding already carries its fix, so read a skill when a finding names it, one file per
 command, not all of them at the start (measured: four skills read up front cost more context
@@ -11,7 +11,7 @@ than these rules and the syntax digest together, and the same findings came anyw
 Facts about this app come from one call, not from exploring by hand:
 
 ```bash
-bash tests/orient.sh                            # structure, security, navigation, tests + covers, coverage, lint, app state
+bash tests/orient.sh                            # structure, security, navigation, tests + covers, coverage, app state
 bash tests/diagnose.sh <Entity> <user>          # row counts, sessions, access rules, associations, runtime errors
 bash tests/peek.sh '<menu item>' [widget]       # a page's visible text and console errors -- writes no test
 bash tests/film.sh --list | <name> | --all        # a video of a test's run; --all in the background (skill film-tests)
@@ -33,9 +33,9 @@ or a reload (`sleep` before the gate is blocked). Microflow tests (`*.test.mdl`)
 the gate and do not count for DONE; only `tests/verify-*.test.sh` do.
 
 **What each check code wants, and its fix: `tests/checks/<step>.md`**, the file the gate names for the step that failed; `tests/CHECKS.md` says which file holds a code (layout codes such
-as `USER01`, `NAV01`, `EDGE01`, lint `UI001`, precheck `SCRIPT01`, `RUNTIME01`, `VIS01`). Read
-that, never `tests/gate/*.sh` or the checkers: three sessions grepped the gate's source for
-what a code required, and the page says it in one line.
+as `USER01`, `NAV01`, `EDGE01`, catalog `UI001`, precheck `SCRIPT01`, `RUNTIME01`, `VIS01`). Each
+rule is a card in `tests/rulebook/<CODE>.md` (level, exceptions: the person's, never yours). Read
+that, never `tests/gate/*.sh` or the checkers: the page says in one line what a code requires.
 
 **The syntax digest is already in your context** under Claude Code, Cursor, OpenCode and Pi
 (anywhere else: `cat tools/mdl-checks/syntax-digest.md` once, after orient.sh). It holds the
@@ -63,7 +63,7 @@ datagrid dg (...) { column colStatus (attribute: "Status") { dropdownfilter fltS
   -- a grid filters itself, one filter inside its column: textfilter, numberfilter, datefilter,
   --   dropdownfilter on an enumeration or over an association (dropdownfilter fltCustomer
   --   (Association: Mod.Order_Customer, datasource: database Mod.Customer, CaptionAttribute: Name)).
-  --   Never a filter bar of your own over a helper entity (lint UI001); the column keeps its Attribute (GRID01)
+  --   Never a filter bar of your own over a helper entity (UI001); the column keeps its Attribute (GRID01)
 show message '{1}' type info objects [$Obj/Name + ' saved'];   validation feedback $Obj/Attr message 'Name is required';
 ```
 

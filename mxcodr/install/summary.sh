@@ -71,7 +71,7 @@ printf '       claude      %s(or codex, cursor, opencode, pi)%s\n' "$C_GREY" "$C
 
 ui_head "$I_PLAY" "Next"
 printf '     %-38s %s%s%s\n' "bash tests/orient.sh" "$C_GREY" "what is in this app, and its state" "$C_RESET"
-printf '     %-38s %s%s%s\n' "bash tests/gate.sh --boot-if-needed" "$C_GREY" "suite + mx check, lint, coverage, naming, layout" "$C_RESET"
+printf '     %-38s %s%s%s\n' "bash tests/gate.sh --boot-if-needed" "$C_GREY" "suite + mx check, catalog, coverage, naming, layout" "$C_RESET"
 printf '     %-38s %s%s%s\n' "bash tests/gate.sh --only <feature>" "$C_GREY" "one script, warm browser, red loop" "$C_RESET"
 printf '     %-38s %s%s%s\n' "bash tests/diagnose.sh <Entity> <user>" "$C_GREY" "why is that row not on the page" "$C_RESET"
 

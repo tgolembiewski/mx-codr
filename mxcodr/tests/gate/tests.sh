@@ -310,7 +310,9 @@ record_suite_result() {
 # agent must judge. Warnings by default (MDL_VISUAL=warn); MDL_VISUAL=error makes them block DONE.
 # A cancellation notice drew its red box over the order summary and the gate said DONE.
 step_visual() {
-  local mode="${MDL_VISUAL:-warn}" out
+  # The level comes from the rulebook (tests/rulebook/VIS01..VIS04.md, LOOK01/02); MDL_VISUAL in
+  # tests/harness.env still wins while it exists.
+  local mode="${MDL_VISUAL:-$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)}" out
   [ "$mode" = "0" ] && return 0
   [ -z "${ONLY:-}" ] && [ "${TESTS_ONLY:-0}" != "1" ] || return 0
   local -a review=()
@@ -360,7 +362,7 @@ note_microflow_tests() {
 # dialog, and a test that does not look for it passes; the runtime log has the real error. A
 # warning while MDL_RUNTIME_ERRORS=warn (the default); =error blocks DONE, =0 turns it off.
 step_runtime_errors() {
-  local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}" mode="${MDL_RUNTIME_ERRORS:-warn}" out
+  local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}" mode="${MDL_RUNTIME_ERRORS:-$(mdl_rule_mode RUNTIME01)}" out
   [ "$mode" = "0" ] && return 0
   [ -f "$log" ] && [ -s "$WORK/tests.started" ] || return 0
   out="$(gate_py runtime-errors "$log" "$(cat "$WORK/tests.started")" 2>"$WORK/runtime.error")" || {

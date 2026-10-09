@@ -36,6 +36,7 @@
 // --captions warn turns the caption rules (CAPTION_RULES) into warnings: the gate passes it by
 // default, since 286 of them landed at once on a session with no test green yet.
 'use strict';
+const { levelArgs } = require('./rulebook.cjs');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -513,7 +514,10 @@ function parseArgs(argv) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --levels: the codes the person raised or lowered in the rulebook (tests/rulebook/); every other
+  // code keeps the behaviour below (--captions, the baseline), so an untouched rulebook changes nothing.
+  const { levels, rest } = levelArgs(process.argv.slice(2));
+  const args = parseArgs(rest);
   const sources = args.sources.map(pathStr);
 
   const [text, used] = collectText(sources);
@@ -603,6 +607,15 @@ function main() {
     captionWarnings = demoted.length;
   }
 
+  if (Object.keys(levels).length) {
+    const all = failures.map(f => [f, 'fail']).concat(warnings.map(w => [w, 'warn']));
+    failures = []; warnings = [];
+    for (const [f, kind] of all) {
+      const level = Object.prototype.hasOwnProperty.call(levels, f.check) ? levels[f.check] : null;
+      if (level === 'off' || level === 'info') continue;
+      (level === 'block' || (level === null && kind === 'fail') ? failures : warnings).push(f);
+    }
+  }
   const report = {
     verdict: !failures.length ? 'PASS' : 'FAIL',
     warnings,
