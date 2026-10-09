@@ -37,8 +37,14 @@ RUNTIME="${RUNTIME:-$(dirname "$(dirname "$(dirname "$(pick "$HOME/.mxcli/runtim
 # JAVA_HOME must be space-free: mxbuild splits its arguments on spaces.
 JAVA_DIR="${JAVA_HOME:-}"
 JAVA="${JAVA:-$JAVA_DIR/bin/java$EXE_SUFFIX}"
-GRADLE_HOME="${GRADLE_HOME:-$MXCACHE/gradle-8.5}"
-[ -d "$GRADLE_HOME" ] || GRADLE_HOME="${MDL_MXBUILD_PATH:-}/gradle-8.5"
+# The Gradle Studio Pro ships beside mxbuild: gradle-8.5 in Mendix 11.12, gradle-9.5.1 in 11.15
+# (a Windows build of 11.15 failed on "does not contain a supported Gradle installation" while this
+# named gradle-8.5). The newest gradle-* in the mxbuild cache, else in the Studio Pro install.
+newest_gradle() { { ls -d "$1"/gradle-* 2>/dev/null || true; } | sort -V | tail -1; }   # never fails: set -e
+if [ -z "${GRADLE_HOME:-}" ]; then
+  GRADLE_HOME="$(newest_gradle "$MXCACHE")"
+  [ -n "$GRADLE_HOME" ] || GRADLE_HOME="$(newest_gradle "${MDL_MXBUILD_PATH:-}")"
+fi
 APP_PORT="${APP_PORT:-8081}"
 ADMIN_PORT="${ADMIN_PORT:-8090}"
 # mxcli oql and diagnose.sh use this password by default.
@@ -144,8 +150,16 @@ bundle_web_client() {
   echo "== bundling the web client (mxbuild skips this)"
   node="$(find_bundled_node)"
   [ -n "$node" ] || { echo "no bundled node under $MXBUILD_TOOLS" >&2; exit 1; }
-  ( cd "$DEPLOYMENT/web" && NODE_ENV=production "$node" \
-      "$MXBUILD_TOOLS/node_modules/rollup/dist/bin/rollup" -c rollup.config.mjs 2>&1 | tail -2 )
+  # Mendix 11.15 bundles with rspack: Studio Pro drives tools/node/rspack-runner.mjs, which in
+  # production mode builds once and exits (0.5 s on the VM). Older versions ship rollup and a
+  # rollup.config.mjs in deployment/web; a new 11.15 app failed to boot on "Cannot find module
+  # ...rollup" (2026-10-10). The runner writes its log to deployment/web/log.txt.
+  if [ -f "$MXBUILD_TOOLS/rspack-runner.mjs" ]; then
+    ( cd "$DEPLOYMENT/web" && NODE_ENV=production "$node" "$MXBUILD_TOOLS/rspack-runner.mjs" < /dev/null 2>&1 | tail -2 )
+  else
+    ( cd "$DEPLOYMENT/web" && NODE_ENV=production "$node" \
+        "$MXBUILD_TOOLS/node_modules/rollup/dist/bin/rollup" -c rollup.config.mjs 2>&1 | tail -2 )
+  fi
 }
 
 # --- 5. Start the runtime ---

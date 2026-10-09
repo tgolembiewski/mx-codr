@@ -51,6 +51,23 @@ jdk_find() {              # jdk_find <wanted-major> -- echo a matching java
   return 1
 }
 
+# app_jdk <studio-dir> -- the java mxbuild needs for this app: the JDK major of its Mendix version
+# (want_mx; 25 from 11.14), found on the machine or, failing that, the OpenJDK Studio Pro ships
+# beside mxbuild. Until 2026-10-10 harness.env always named a JDK 21 (or 17): a new 11.15 app on
+# Windows then failed to build its Java actions with "release version 25 not supported", though
+# Studio Pro 11.15 carried a JDK 25. Without a known version the old choice stands.
+app_jdk() {
+  local studio="${1:-}" want candidate
+  [ -n "${want_mx:-}" ] || { jdk_find 21 || jdk_find 17; return; }
+  want="$(jdk_major_for "$want_mx")"
+  jdk_find "$want" && return 0
+  for candidate in "$studio"/OpenJDK/bin/java$EXE "$studio"/OpenJDK/*/bin/java$EXE; do
+    [ -n "$studio" ] && [ -x "$candidate" ] || continue
+    [ "$(java_major "$candidate")" = "$want" ] && { printf '%s\n' "$candidate"; return 0; }
+  done
+  return 1
+}
+
 playwright_browser_present() {
   local root
   for root in "$HOME/Library/Caches/ms-playwright" "$HOME/.cache/ms-playwright" \
@@ -157,6 +174,19 @@ check_jdk() {
   local want_jdk found_jdk
   want_jdk="$(jdk_major_for "${want_mx:-}")"
   found_jdk="$(jdk_find "$want_jdk" || true)"
+  # Windows, no JDK of that major: Studio Pro ships one (11.15: OpenJDK 25), and tests/harness.env
+  # names it (app_jdk), so the gate builds and runs with it; nothing to install. The installer used
+  # to ask for a Temurin 25 the app did not need (2026-10-10).
+  if [ -z "$found_jdk" ] && [ "$IS_WINDOWS" = "1" ] && [ -n "${want_mx:-}" ]; then
+    local local_app="${LOCALAPPDATA:-}" studio
+    for studio in "/c/Program Files/Mendix/$want_mx" "${local_app//\\//}/Programs/Mendix/$want_mx"; do
+      [ -d "$studio/OpenJDK" ] || continue
+      if app_jdk "$studio" >/dev/null 2>&1; then
+        ui_note "JDK $want_jdk: Studio Pro $want_mx's own, which tests/harness.env names"
+        return 0
+      fi
+    done
+  fi
   if [ -z "$found_jdk" ]; then
     dep_report_only "JDK $want_jdk" "false" \
       "EclipseAdoptium.Temurin.$want_jdk.JDK" "temurin@$want_jdk" "temurin-$want_jdk-jdk" || true
