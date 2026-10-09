@@ -207,7 +207,9 @@ function merge(src, dstDir) {
     bundle.add(name);
     const text = fs.readFileSync(path.join(src, name), 'utf8');
     const target = path.join(dstDir, name);
-    if (name.startsWith('_') || !fs.existsSync(target)) { fs.writeFileSync(target, text); out.written++; continue; }
+    // An appendix (_name.md) is copied as it is and is not a card.
+    if (name.startsWith('_')) { fs.writeFileSync(target, text); continue; }
+    if (!fs.existsSync(target)) { fs.writeFileSync(target, text); out.written++; continue; }
     const local = localOf(fs.readFileSync(target, 'utf8'));
     const merged = local ? withoutLocal(text) + '\n' + local : text;
     if (merged !== fs.readFileSync(target, 'utf8')) fs.writeFileSync(target, merged);
@@ -215,7 +217,7 @@ function merge(src, dstDir) {
     // Kept: a ## Local with a line of the person's own (the bundle's template holds comments only).
     if (local.split('\n').slice(1).some(l => stripComment(l))) out.kept++;
   }
-  for (const name of fs.readdirSync(dstDir)) if (name.endsWith('.md') && !bundle.has(name)) out.left++;
+  for (const name of fs.readdirSync(dstDir)) if (name.endsWith('.md') && !name.startsWith('_') && !bundle.has(name)) out.left++;
   return out;
 }
 

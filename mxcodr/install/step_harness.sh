@@ -50,7 +50,8 @@ ui_done "test harness" "$suite_written $I_ARROW tests/  (verify-*.test.sh left a
 if [ -d "$SRC/rulebook" ]; then
   ui_begin "installing the rulebook"
   rulebook_note="$("$NODE" "$SRC/checks/rulebook.cjs" "$SRC/rulebook" merge "$APP" 2>&1 | tail -1)"
-  ui_done "rulebook" "${rulebook_note#rulebook: } $I_ARROW tests/rulebook/"
+  rulebook_note="${rulebook_note#rulebook: }"
+  ui_done "rulebook" "$rulebook_note $I_ARROW tests/rulebook/"
 fi
 
 # The syntax digest, now rather than at the first orient: Claude Code reads .claude/rules/ only
