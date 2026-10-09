@@ -31,13 +31,14 @@ ensure_runtime_junction() {   # ensure_runtime_junction <version>
   return 0
 }
 
-# mxbuild needs Studio Pro's gradle-8.5, OpenJDK and WebView2 beside the cached mxbuild; junction them in.
+# mxbuild needs Studio Pro's Gradle (gradle-8.5 in 11.12, gradle-9.5.1 in 11.15), OpenJDK and
+# WebView2 beside the cached mxbuild; junction them in.
 ensure_studio_support_junctions() {   # ensure_studio_support_junctions <version> <studio-dir>
   [ "$IS_WINDOWS" = "1" ] || return 0
   local version="$1" studio="$2" name target link linked=""
   [ -d "$studio" ] || return 0
   mkdir -p "$HOME/.mxcli/mxbuild/$version" 2>/dev/null || return 0
-  for name in gradle-8.5 OpenJDK WebView2; do
+  for name in $(cd "$studio" && ls -d gradle-* 2>/dev/null) OpenJDK WebView2; do
     target="$studio/$name"
     link="$HOME/.mxcli/mxbuild/$version/$name"
     [ -d "$target" ] || continue
@@ -87,9 +88,12 @@ jdk_spacefree_home() {   # jdk_spacefree_home <path-to-java> -- echo a space-fre
     *" "*) ;;
     *) printf '%s\n' "${win//\\//}"; return 0 ;;
   esac
+  # One junction per JDK major: a fixed name kept pointing at the first JDK it was made for.
+  local major
+  major="$(java_major "$java" 2>/dev/null)"
   link="${LOCALAPPDATA:-$HOME/AppData/Local}"
-  link="${link//\\//}/mxcli-jdk"
-  case "$link" in *" "*) link="/c/mxcli-jdk" ;; esac
+  link="${link//\\//}/mxcli-jdk${major:+-$major}"
+  case "$link" in *" "*) link="/c/mxcli-jdk${major:+-$major}" ;; esac
   [ -e "$link" ] || cmd //c mklink //J "$(win_path "$link")" "$win" >> "$DEPS_LOG" 2>&1 || true
   [ -x "$link/bin/java$EXE" ] || return 1
   printf '%s\n' "$(win_path "$link" | tr '\\' '/')"

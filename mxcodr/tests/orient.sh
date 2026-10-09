@@ -64,7 +64,7 @@ rulebook_section() {
   [ -d tests/rulebook ] || return 0
   echo "== rulebook (tests/rulebook/<group>/<CODE>.md; bash tests/rules.sh)"
   local count changed
-  count="$(ls tests/rulebook/[A-Za-z]*.md 2>/dev/null | wc -l | tr -d ' ')"
+  count="$(mdl_rulebook list 2>/dev/null | grep -c .)"
   if changed="$(mdl_rulebook changes 2>/dev/null)"; then
     echo "   $count rules; changed by the person: ${changed:-none}"
   else

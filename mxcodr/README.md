@@ -180,6 +180,15 @@ Bundle 2026.10.09.7: the cards sit in a folder per group, the same groups as the
 parser reads the folders, refuses a code in two files and a card in another group's folder; the
 installer moves a card installed flat by .09.2-.6 into its folder with its `## Local`.
 
+Bundle 2026.10.10.1: Mendix 11.15 builds and runs on Windows (found on the VM with Studio Pro
+11.15.0 installed per user). 11.15 ships `gradle-9.5.1` where 11.12 had `gradle-8.5`, needs JDK 25,
+and bundles the web client with rspack (`tools/node/rspack-runner.mjs`) instead of rollup.
+`tests/run-app.sh` takes the newest `gradle-*` and the bundler Studio Pro ships; the installer links
+every `gradle-*` into the mxbuild cache, writes the JDK the app's Mendix version needs into
+`tests/harness.env` (Studio Pro's own OpenJDK when the machine has no JDK of that major), and no
+longer asks for a Temurin 25 that Studio Pro already carries. `orient.sh` counts the cards in their
+folders (it said "0 rules").
+
 Next bundle: the switches migrate into `## Local` and disappear; `check: pattern` cards for a
 team's own rule; the "kept on purpose?" line a finding prints for the person to paste.
 

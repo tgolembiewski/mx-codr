@@ -122,7 +122,7 @@ write_harness_env() {    # write_harness_env <mendix-install-dir>
   db_name="$(basename "$APP" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_]//g')"
   psql="$(psql_path || true)"
   login="$(ensure_postgres_role || true)"
-  jdk="$(jdk_find 21 || jdk_find 17 || true)"
+  jdk="$(app_jdk "$mxbuild" || true)"
   [ -n "$jdk" ] && jdk_home="$(jdk_spacefree_home "$jdk" || true)"
   if [ -n "$login" ]; then
     MDL_DB_USER="${login%%:*}"
