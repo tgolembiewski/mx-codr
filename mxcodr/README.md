@@ -175,6 +175,13 @@ What moved with it:
   `INSTALL.json` hashes a card without its `## Local`, so a level or an exception is never
   "harness drift"; a changed rule text is.
 
+Bundle 2026.10.09.3: the naming step's ten oldest codes, the last ones in lowercase, follow the
+same scheme as every other: `CAPTION01` (an activity's business caption), `CAPTION02` (not the
+Mendix default), `CAPTION03` (a decision has one), `CAPTION04` (a question), `CAPTION05` (words, not
+the expression), `CAPTION06` (a loop's annotation), `CAPTION07` (no caption on a loop), `CAPTION08`
+(a case caption mxcli overwrote), `VAR01` (a placeholder variable name), `VAR02` (a name that only
+repeats its type). The gate prints the new codes; check_mdl left the Python parity test.
+
 Next bundle: the switches migrate into `## Local` and disappear; `check: pattern` cards for a
 team's own rule; the "kept on purpose?" line a finding prints for the person to paste.
 
@@ -361,7 +368,7 @@ line:
 ```
 == still blocking DONE
    naming: 8
-     - [loop-annotation] line 796: loop without @annotation -- put @annotation '<why it repeats>' on the line above: while $MonthBack >= 0
+     - [CAPTION06] line 796: loop without @annotation -- put @annotation '<why it repeats>' on the line above: while $MonthBack >= 0
      - …four more…
      ... 3 more under == naming above
    layout: 1
@@ -370,9 +377,9 @@ line:
 ```
 
 Every naming finding carries its fix after ` -- `, as the layout ones already did: a session that
-could not tell what `loop-annotation` wanted opened `check_mdl.py` to find out.
+could not tell what `CAPTION06` wanted opened `check_mdl.py` to find out.
 
-The caption rules (`action-caption`, `decision-caption`, `caption-not-a-question` and the other
+The caption rules (`CAPTION01`, `CAPTION03`, `CAPTION04` and the other
 wording rules) are warnings in the gate: 286 of them once landed at once on a session with no
 test green yet. `MDL_CAPTIONS=error` in `tests/harness.env` makes them block again; variable-name
 rules always block. A capped list says so ("10 of 286 shown"): the next session read ten lines as

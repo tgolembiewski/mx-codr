@@ -5,30 +5,30 @@
 // Usage: check_mdl.cjs <file.mdl|dir> ... --skill naming [--captions error|warn] [--json]
 // --json keys: verdict, warnings, skills, sources, lines, failures.
 // Exit: 0 no failures (warnings allowed), 1 failures or no MDL found, 2 bad arguments.
-// A port of check_mdl.py that prints the same, byte for byte.
+// Ported from check_mdl.py (2026-10-05); the codes were renamed to the CODE01 scheme in 2026-10-09.
 //
 // Rule codes (FAIL counts against the run, WARN does not):
-//   decision-caption             FAIL  if/case without @caption
-//   caption-restates-expression  FAIL  decision caption contains $, <, >, != or " = "
-//   caption-not-a-question       FAIL  decision caption does not end in "?"
-//   case-caption-dropped         WARN  case caption equals its expression (mxcli overwrote it)
-//   caption-on-loop              FAIL  loop/while with @caption (dropped: MDL042 on a loop, silently on a while)
-//   loop-annotation              FAIL  loop/while without @annotation
-//   action-caption               FAIL  retrieve/create/change/commit/delete/set/show page/call without @caption
-//   action-caption-is-default    FAIL  caption is the Mendix default ("Retrieve Invoice", "Commit object")
-//   placeholder-variable         FAIL  $Int1, $List2, $tmp, $x ...
-//   type-echo-variable           FAIL  name ends in _List, _Object or _Obj
-//   REFRESH01                    FAIL  a microflow that closes its page commits without `refresh`
+//   CAPTION03    FAIL  if/case without @caption
+//   CAPTION05    FAIL  decision caption contains $, <, >, != or " = "
+//   CAPTION04    FAIL  decision caption does not end in "?"
+//   CAPTION08    WARN  case caption equals its expression (mxcli overwrote it)
+//   CAPTION07    FAIL  loop/while with @caption (dropped: MDL042 on a loop, silently on a while)
+//   CAPTION06    FAIL  loop/while without @annotation
+//   CAPTION01    FAIL  retrieve/create/change/commit/delete/set/show page/call without @caption
+//   CAPTION02    FAIL  caption is the Mendix default ("Retrieve Invoice", "Commit object")
+//   VAR01        FAIL  $Int1, $List2, $tmp, $x ...
+//   VAR02        FAIL  name ends in _List, _Object or _Obj
+//   REFRESH01    FAIL  a microflow that closes its page commits without `refresh`
 //   PERF02 PERF03 PERF05 PERF06  WARN  a loop that only sums a retrieved list; a database call per row
 //                                      in such a loop; a whole table filtered by an `if`; a loop that
 //                                      only keeps the largest value (perf_rules.cjs)
-//   PERF07                       WARN  with --entities: a query (retrieve, page source, grid filter)
+//   PERF07       WARN  with --entities: a query (retrieve, page source, grid filter)
 //                                      no index serves (index_rules.cjs)
-//   PERF08                       WARN  with --entities: an index no query in the model needs
+//   PERF08       WARN  with --entities: an index no query in the model needs
 //   EVENT01 EVENT02              FAIL  with --entities: a commit handler that commits its own object with
 //                                      events (a loop); a before handler without raise error that can
 //                                      return false (a silent skip) (event_rules.cjs)
-//   DS01                         FAIL  with --entities and --pages: a data grid, list view or gallery fed by a
+//   DS01         FAIL  with --entities and --pages: a data grid, list view or gallery fed by a
 //                                      microflow or nanoflow that only retrieves its rows (datasource_rules.cjs)
 //   EVENT03 EVENT04 ERR01        WARN  with --entities: without events skipping a commit handler; Save
 //                                      changes on an entity a before-commit handler refuses with an error;
@@ -52,7 +52,7 @@ const CAPTION_RE = rx(String.raw`^\s*@caption\s+'(.*)'\s*$`, 'i');
 const DECISION_RE = rx(String.raw`^\s*(if|case)\b`, 'i');
 // A `while` is a loop, not a decision: mxcli writes no caption for it -- `@caption` passes
 // `check` and `exec` and is gone from `describe`, with no MDL042 to say so -- while
-// `@annotation` survives. Treated as a decision, it failed decision-caption with no way to pass:
+// `@annotation` survives. Treated as a decision, it failed CAPTION03 with no way to pass:
 // a Pi session spent 45 minutes on three such findings.
 const LOOP_RE = rx(String.raw`^\s*(loop|while)\b`, 'i');
 // Activity lines; `create` needs a qualified entity so `create microflow` is not matched.
@@ -84,9 +84,9 @@ const COMPARISON_RE = rx(String.raw`[<>]=?|!=|\s=\s`);
 
 // [regex, rule code, message label] for variable names.
 const VARIABLE_RULES = [
-  [PLACEHOLDER_VAR_RE, 'placeholder-variable', 'placeholder variable name -- name what it holds, e.g. $OpenInvoiceCount'],
-  [THROWAWAY_VAR_RE, 'placeholder-variable', 'throwaway variable name -- name what it holds, e.g. $DueDate'],
-  [TYPE_ECHO_VAR_RE, 'type-echo-variable', 'variable name only restates its type -- name what it holds, e.g. $OverdueInvoices'],
+  [PLACEHOLDER_VAR_RE, 'VAR01', 'placeholder variable name -- name what it holds, e.g. $OpenInvoiceCount'],
+  [THROWAWAY_VAR_RE, 'VAR01', 'throwaway variable name -- name what it holds, e.g. $DueDate'],
+  [TYPE_ECHO_VAR_RE, 'VAR02', 'variable name only restates its type -- name what it holds, e.g. $OverdueInvoices'],
 ];
 
 // A finding: {check, message, line}, in that key order (it is printed as JSON).
@@ -162,7 +162,7 @@ function decisionFindings(lines, index, mdl1 = false) {
     // out every default; v0.24 printed it. A split always has a caption in the model, so a missing
     // one there is that default, judged as v0.24's printed caption was.
     if (!mdl1) {
-      return [[finding('decision-caption',
+      return [[finding('CAPTION03',
         `decision without @caption -- put @caption '<the question it answers?>' on the line above: ${head(py.strip(line), 70)}`,
         index + 1)], [], false];
     }
@@ -176,19 +176,19 @@ function decisionFindings(lines, index, mdl1 = false) {
   const isEnumSplit = stripped.toLowerCase().startsWith('case');
   if (isEnumSplit && py.strip(text) === expression) {
     // mxcli overwrites an enum case's @caption with its expression.
-    return [[], [finding('case-caption-dropped',
+    return [[], [finding('CAPTION08',
       "mxcli wrote this split's own expression as its caption " +
       `('${text}'); measured on 11.13.0 it discards both @caption ` +
       "and @annotation on a split, so this is not the author's doing",
       index + 1)], true];
   }
   if (text.includes('$') || COMPARISON_RE.search(text)) {
-    return [[finding('caption-restates-expression',
+    return [[finding('CAPTION05',
       `caption restates the expression: '${text}' -- write the business question instead, with no $, <, >, != or =, ending in '?'`,
       index + 1)], [], true];
   }
   if (!py.rstrip(text).endsWith('?')) {
-    return [[finding('caption-not-a-question',
+    return [[finding('CAPTION04',
       `decision caption is not phrased as a question: '${text}' -- end it with '?', e.g. 'Is the invoice overdue?'`,
       index + 1)], [], true];
   }
@@ -201,12 +201,12 @@ function loopFindings(lines, index) {
   const kinds = annotationKinds(precedingAnnotations(lines, index));
   const failures = [];
   if (kinds.includes('caption')) {
-    failures.push(finding('caption-on-loop',
+    failures.push(finding('CAPTION07',
       'loop carries @caption, which is dropped (MDL042 on a loop, silently on a while) -- write @annotation \'<why it repeats>\' above it instead',
       index + 1));
   }
   if (!kinds.includes('annotation')) {
-    failures.push(finding('loop-annotation',
+    failures.push(finding('CAPTION06',
       `loop without @annotation -- put @annotation '<why it repeats>' on the line above: ${head(py.strip(line), 70)}`,
       index + 1));
   }
@@ -218,13 +218,13 @@ function actionFindings(lines, index) {
   const line = lines[index];
   const annotations = precedingAnnotations(lines, index);
   if (!annotationKinds(annotations).includes('caption')) {
-    return [finding('action-caption',
+    return [finding('CAPTION01',
       `action without business-operation @caption -- put @caption '<what it does for the business>' on the line above: ${head(py.strip(line), 70)}`,
       index + 1)];
   }
   const text = captionText(annotations);
   if (text && DEFAULT_ACTION_CAPTION_RE.match(py.strip(text))) {
-    return [finding('action-caption-is-default',
+    return [finding('CAPTION02',
       `action caption restates the Mendix default: '${text}' -- say what it does for the business, e.g. 'Load the open invoices'`,
       index + 1)];
   }
@@ -333,8 +333,8 @@ const CHECKS = { naming: checkNamingAndRefresh };
 
 // The wording rules: a flow runs the same without them. Variable names and loop captions that
 // mxcli drops stay failures.
-const CAPTION_RULES = new Set(['decision-caption', 'caption-restates-expression', 'caption-not-a-question',
-  'loop-annotation', 'action-caption', 'action-caption-is-default']);
+const CAPTION_RULES = new Set(['CAPTION03', 'CAPTION05', 'CAPTION04',
+  'CAPTION06', 'CAPTION01', 'CAPTION02']);
 
 const FLOW_START = rx(String.raw`^\s*create\s+(?:or\s+(?:modify|replace)\s+)?(?:microflow|nanoflow)\s+(?P<name>[\w.]+)`, 'i');
 const LAYOUT_ONLY = rx(String.raw`^\s*@(?:position|anchor|merge)\b`, 'i');

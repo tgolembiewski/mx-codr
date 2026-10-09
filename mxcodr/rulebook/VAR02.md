@@ -1,4 +1,4 @@
-# type-echo-variable — no _List, _Object or _Obj suffix on a variable
+# VAR02 — no _List, _Object or _Obj suffix on a variable
 step: naming
 level: block
 check: check_mdl.cjs#variableFindings

@@ -1,4 +1,4 @@
-# case-caption-dropped — a case split's caption is not its own expression (mxcli overwrote it)
+# CAPTION08 — a case split's caption is not its own expression (mxcli overwrote it)
 step: naming
 level: warn
 check: check_mdl.cjs#decisionFindings

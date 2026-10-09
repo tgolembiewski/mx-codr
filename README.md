@@ -86,7 +86,7 @@ the cards and propose a line for you to paste, never write one. `bash tests/rule
 - Process folders, `ACT_`/`SUB_` microflows under 15 activities, nothing at module root.
 - `MyFirstModule` removed once the app has its own module (`MODULE01`).
 - PascalCase names, `ENUM_`/`SNIPPET_` prefixes, `_NewEdit`/`_View`/`_Overview` pages.
-- A business caption on every activity; decisions as questions; a note on every loop.
+- A business caption on every activity; decisions as questions; a note on every loop (`CAPTION01`-`08`); variable names that say what they hold (`VAR01`-`02`).
 - Reuse: snippets and sub-microflows instead of copies; data grids use column filters
   (`UI001`, `GRID01`), and a button that changes a grid's rows sits in the grid's header
   (`GRID02`).
@@ -393,7 +393,7 @@ The environment still wins, so any of it can be overridden for one run.
 | `MDL_BOOT_COMMAND` | how the gate boots the app when nothing answers |
 | `MDL_VISUAL` / `MDL_RUNTIME_ERRORS` | the rendered-page and server-error checks: warnings by default, `error` blocks DONE, `0` turns them off |
 | `MDL_VISUAL_REVIEW` | `agent`: a model that reads images also judges a screenshot of each page |
-| `MDL_CAPTIONS` | the caption rules of the naming check: warnings by default, `error` blocks DONE |
+| `MDL_CAPTIONS` | the caption rules of the naming check (`CAPTION01`-`06`): warnings by default, `error` blocks DONE |
 | `MDL_SCOPE` | `SCOPE01`, a page's data source microflow that ignores its role's row scope: a warning by default, `error` blocks DONE |
 | `MDL_UNTESTED` | paths deliberately left without a test (a document, `Module.Workflow/Task`, `Module.Entity\|Module.Role`, `role:<UserRole>`), so the `paths` step passes them |
 | `MDL_DB_RESET` | `session`: the database is snapshotted at the start of each agent session and rolled back after its first DONE, so test data does not pile up (local PostgreSQL) |

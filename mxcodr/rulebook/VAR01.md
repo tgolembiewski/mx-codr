@@ -1,4 +1,4 @@
-# placeholder-variable — a variable name says what it holds
+# VAR01 — a variable name says what it holds
 step: naming
 level: block
 check: check_mdl.cjs#variableFindings

@@ -4,6 +4,14 @@ One line per code of the `naming` step; every code blocks DONE unless marked war
 
 | Code | Wants | Fix |
 |---|---|---|
+| `CAPTION01` | warning: every activity has a business @caption | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION02` | warning: no activity keeps Mendix's default caption | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION03` | warning: every decision has a @caption | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION04` | warning: a decision's caption ends with a question mark | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION05` | warning: a decision's caption is a question in words, not the expression | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION06` | warning: every loop has an @annotation saying what it walks | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION07` | no @caption on a loop: mxcli drops it, the annotation carries the text | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
+| `CAPTION08` | warning: a case split's caption is not its own expression (mxcli overwrote it) |  |
 | `DS01` | a list takes its rows from the database, not from a flow that only retrieves them | The `DataSource: database ...` it prints; `'[%CurrentObject%]'` for the enclosing object -- blocks DONE. |
 | `ERR01` | warning: every error handler is noticed | `log error 'Saving failed: ' + $latestError/Message;` and `raise error;`; `on error continue` is mxcli's lint CONV014. |
 | `EVENT01` | an event handler never commits its own object with events | `commit $Order without events;` in an after-commit handler; a before-commit handler only changes attributes -- blocks DONE. |
@@ -17,13 +25,5 @@ One line per code of the `naming` step; every code blocks DONE unless marked war
 | `PERF07` | warning: every query is served by an index | The line it prints: `alter entity M.E add index if not exists (A, B);`, `=` columns first; a query along an association needs none. |
 | `PERF08` | warning: no index that no query needs | The `drop index if exists (...)` it prints, spelled as written; keep it if Java, other OQL or an outside client filters on it. |
 | `REFRESH01` | a pop-up's Save commits with refresh | `commit $Invoice refresh;`, `change $Invoice (...) commit refresh;` -- blocks DONE. |
-| `action-caption-is-default` | warning: no activity keeps Mendix's default caption | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `action-caption` | warning: every activity has a business @caption | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `caption-not-a-question` | warning: a decision's caption ends with a question mark | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `caption-on-loop` | no @caption on a loop: mxcli drops it, the annotation carries the text | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `caption-restates-expression` | warning: a decision's caption is a question in words, not the expression | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `case-caption-dropped` | warning: a case split's caption is not its own expression (mxcli overwrote it) |  |
-| `decision-caption` | warning: every decision has a @caption | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `loop-annotation` | warning: every loop has an @annotation saying what it walks | Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block). |
-| `placeholder-variable` | a variable name says what it holds | `$OpenInvoiceCount`, not `$Int1`, `$tmp`, `$x`. |
-| `type-echo-variable` | no _List, _Object or _Obj suffix on a variable | `$OverdueInvoices`, not `$Invoice_List`. |
+| `VAR01` | a variable name says what it holds | `$OpenInvoiceCount`, not `$Int1`, `$tmp`, `$x`. |
+| `VAR02` | no _List, _Object or _Obj suffix on a variable | `$OverdueInvoices`, not `$Invoice_List`. |

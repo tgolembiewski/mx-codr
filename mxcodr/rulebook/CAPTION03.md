@@ -1,4 +1,4 @@
-# caption-restates-expression — a decision's caption is a question in words, not the expression
+# CAPTION03 — every decision has a @caption
 step: naming
 level: warn
 check: check_mdl.cjs#decisionFindings
@@ -6,7 +6,7 @@ key: none
 baseline: captions
 
 ## What it checks
-A decision's caption is not the expression itself ($Order/Total > 1000). It says the question in words.
+Every decision has a caption.
 
 ## Fix
 Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block).

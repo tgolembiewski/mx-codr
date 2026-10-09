@@ -8,7 +8,7 @@ exceptions: `tests/rulebook/<CODE>.md`; all of them: `bash tests/rules.sh list`.
 | step | file | codes |
 |---|---|---|
 | layout | `tests/checks/layout.md` | ACCOUNT01, ACCOUNT02, ACCOUNT03, ALERT01, BACK01, EDGE01, GRID01, GRID02, HEAD01, HOME01, ICON01, LAYOUT01, MODULE01, NAME01, NAME02, NAV01, NAV02, NAV03, NAV04, NAV05, NAV06, SPACE01, SPACE02, SPACE03, SPACE04, TEXT01, TEXT02, URL01, USER01 |
-| naming | `tests/checks/naming.md` | DS01, ERR01, EVENT01, EVENT02, EVENT03, EVENT04, PERF02, PERF03, PERF05, PERF06, PERF07, PERF08, REFRESH01, action-caption-is-default, action-caption, caption-not-a-question, caption-on-loop, caption-restates-expression, case-caption-dropped, decision-caption, loop-annotation, placeholder-variable, type-echo-variable |
+| naming | `tests/checks/naming.md` | CAPTION01, CAPTION02, CAPTION03, CAPTION04, CAPTION05, CAPTION06, CAPTION07, CAPTION08, DS01, ERR01, EVENT01, EVENT02, EVENT03, EVENT04, PERF02, PERF03, PERF05, PERF06, PERF07, PERF08, REFRESH01, VAR01, VAR02 |
 | security | `tests/checks/security.md` | ADMIN01, ANON01, CRED01, EXTENDS01, FILTER01, PRODUCTION01, PWD01, SQL01, STRICT01, VIEW01, WRITE01, XSS01 |
 | paths | `tests/checks/paths.md` | ISO01, OUTCOME01, ROLE01, SVC01, WF01, WF02 |
 | catalog | `tests/checks/catalog.md` | LINT01, SEC007, UI001 |
