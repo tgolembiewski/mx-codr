@@ -109,11 +109,14 @@ before.
 `rulebook/` holds one Markdown card per rule, installed as `tests/rulebook/<CODE>.md`:
 
 ```markdown
-# URL01 — every page that can have a URL has one
+---
 step: layout
 level: block
 check: layout_rules/urls.cjs#urlFindings
 key: document
+---
+
+# URL01 — every page that can have a URL has one
 
 ## What it checks
 ...
@@ -124,7 +127,7 @@ level: warn
 except: Orders.Approval_Task   # opened only from the task inbox
 ```
 
-The header says which gate step prints the code, its default level (`block` fails the step, `warn`
+The header (front matter between two `---` lines, so GitHub and editors show it as metadata; since bundle 2026.10.09.5) says which gate step prints the code, its default level (`block` fails the step, `warn`
 is listed under the gate's warnings, `info` is counted, `off` is not checked), which function
 produces it (`bash:` for a rule in a script, `mxcli` for lint) and whether a finding names a
 document (`key: document`, so `except:` makes sense). `baseline: captions|names|paths` records the

@@ -1,8 +1,11 @@
-# ICON01 — an icon on every button
+---
 step: layout
 level: block
 check: layout_rules/controls.cjs#buttonIconFindings
 key: none
+---
+
+# ICON01 — an icon on every button
 
 ## What it checks
 Every button has an icon. The finding suggests one.

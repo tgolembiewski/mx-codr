@@ -1,8 +1,11 @@
-# BACK01 — a Back button, top left, on every page another page opens
+---
 step: layout
 level: block
 check: layout_rules/page_top.cjs#backButtonFindings
 key: none
+---
+
+# BACK01 — a Back button, top left, on every page another page opens
 
 ## What it checks
 A page opened from another page has a Back button, top left. Pop-ups don't need one: they close with their X.

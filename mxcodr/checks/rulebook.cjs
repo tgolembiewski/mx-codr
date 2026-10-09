@@ -6,13 +6,15 @@
 // `check:` names the function that produces its code, and `level:` says what the gate does with it.
 //
 // A card:
-//     # URL01 — every page that can have a URL has one      (the first line: code and title)
-//     step: layout                                           (header: `key: value` lines up to the
-//     level: block                                            first blank line)
+//     ---                                                    (front matter: `key: value` lines
+//     step: layout                                            between two `---` lines)
+//     level: block
 //     check: layout_rules/urls.cjs#urlFindings
 //     key: document
 //     baseline: names                                        (optional: captions | names | paths)
 //     fixed: yes                                             (optional: no level to set)
+//     ---
+//     # URL01 — every page that can have a URL has one      (then the code and title)
 //
 //     ## What it checks ...  ## Fix ...                      (documentation, free text)
 //
@@ -61,20 +63,28 @@ function parseCard(file) {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   const fail = (line, what) => { throw new RulebookError(`${file}:${line}: ${what}`); };
-  const first = /^#\s+(\S+)\s+(?:—|--)\s+(.*)$/.exec(lines[0] || '');
-  if (!first) fail(1, 'the first line is `# CODE — title`');
-  const code = first[1];
-  if (!CODE_RE.test(code)) fail(1, `"${code}" is not a rule code (letters, digits, hyphens)`);
-  if (path.basename(file, '.md') !== code) fail(1, `the file is named ${path.basename(file)} but the card says ${code}`);
+  // Front matter first: `---`, one `key: value` per line, `---`; then the card's `# CODE — title`.
+  if ((lines[0] || '').trim() !== '---') fail(1, 'a card starts with `---`, its header, `---`, then `# CODE — title`');
   const header = {}, at = {};
   let i = 1;
-  for (; i < lines.length && lines[i].trim() !== ''; i++) {
+  for (; i < lines.length && lines[i].trim() !== '---'; i++) {
+    if (!lines[i].trim()) continue;
     const kv = /^([a-z]+):\s*(.*)$/.exec(lines[i]);
     if (!kv) fail(i + 1, 'a header line is `key: value`');
     if (!HEADER_KEYS.has(kv[1])) fail(i + 1, `unknown header key "${kv[1]}" (step, level, check, key, baseline, fixed)`);
     header[kv[1]] = kv[1] === 'match' ? kv[2].trim() : stripComment(kv[2]);
     at[kv[1]] = i + 1;
   }
+  if (i >= lines.length) fail(1, 'the header has no closing `---`');
+  i++;
+  while (i < lines.length && !lines[i].trim()) i++;
+  const titleAt = i + 1;
+  const first = /^#\s+(\S+)\s+(?:—|--)\s+(.*)$/.exec(lines[i] || '');
+  if (!first) fail(titleAt, 'after the header comes `# CODE — title`');
+  const code = first[1];
+  if (!CODE_RE.test(code)) fail(titleAt, `"${code}" is not a rule code (letters, digits, hyphens)`);
+  if (path.basename(file, '.md') !== code) fail(titleAt, `the file is named ${path.basename(file)} but the card says ${code}`);
+  i++;
   for (const need of ['step', 'level', 'check', 'key']) if (!(need in header)) fail(1, `the header has no ${need}:`);
   if (!STEPS.has(header.step)) fail(at.step, `step "${header.step}" is not a gate step (${[...STEPS].join(', ')})`);
   checkLevel(header.level, at.level, fail);

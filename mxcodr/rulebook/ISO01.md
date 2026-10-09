@@ -1,9 +1,12 @@
-# ISO01 — each row-scoped role reads its entity in a test
+---
 step: paths
 level: block
 check: check_paths.cjs#findings
 key: document
 baseline: paths
+---
+
+# ISO01 — each row-scoped role reads its entity in a test
 
 ## What it checks
 When a role may only see its own records (for example a customer sees only their own orders), a test logs in as that role and checks that their own records are there and someone else's are not.

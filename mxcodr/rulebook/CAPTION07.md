@@ -1,8 +1,11 @@
-# CAPTION07 — no @caption on a loop: mxcli drops it, the annotation carries the text
+---
 step: naming
 level: block
 check: check_mdl.cjs#loopFindings
 key: none
+---
+
+# CAPTION07 — no @caption on a loop: mxcli drops it, the annotation carries the text
 
 ## What it checks
 A loop has no caption: mxcli drops loop captions, so the text belongs in the annotation.

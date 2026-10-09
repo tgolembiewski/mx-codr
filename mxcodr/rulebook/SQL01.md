@@ -1,8 +1,11 @@
-# SQL01 — no query built by joining text and a variable
+---
 step: security
 level: block
 check: security_rules.cjs#findings
 key: document
+---
+
+# SQL01 — no query built by joining text and a variable
 
 ## What it checks
 No microflow builds a database query by gluing text and a variable together. Whoever controls the variable controls the query (SQL injection).

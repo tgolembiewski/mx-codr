@@ -1,8 +1,11 @@
-# VIS02 — the page does not scroll sideways
+---
 step: tests
 level: warn
 check: scenario-helpers.js#visual_findings
 key: none
+---
+
+# VIS02 — the page does not scroll sideways
 
 ## What it checks
 The page does not scroll sideways.

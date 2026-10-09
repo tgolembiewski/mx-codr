@@ -1,8 +1,11 @@
-# LOOK02 — no reviewed screenshot was rejected (MDL_VISUAL_REVIEW=agent)
+---
 step: tests
 level: warn
 check: gate_helpers.cjs#reviewScreenshots
 key: none
+---
+
+# LOOK02 — no reviewed screenshot was rejected (MDL_VISUAL_REVIEW=agent)
 
 ## What it checks
 Only when switched on: none of those screenshots was judged to look wrong.

@@ -1,8 +1,11 @@
-# WRITE01 — a role does not write what only server-side flows set
+---
 step: security
 level: warn
 check: security_rules.cjs#findings
 key: none
+---
+
+# WRITE01 — a role does not write what only server-side flows set
 
 ## What it checks
 Points out a role that may change fields only the system should set, like a total or a status. The finding names the fields to remove and the associations to keep.

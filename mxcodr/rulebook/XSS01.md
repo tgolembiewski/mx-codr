@@ -1,8 +1,11 @@
-# XSS01 — no user-typed attribute shown as HTML
+---
 step: security
 level: warn
 check: security_rules.cjs#findings
 key: document
+---
+
+# XSS01 — no user-typed attribute shown as HTML
 
 ## What it checks
 Points out an HTML widget that shows text a user typed as HTML. Someone could type a script that runs in other users' browsers.

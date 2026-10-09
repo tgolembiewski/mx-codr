@@ -1,8 +1,11 @@
-# EVENT02 — a before handler that can refuse raises an error
+---
 step: naming
 level: block
 check: event_rules.cjs#eventFindings
 key: none
+---
+
+# EVENT02 — a before handler that can refuse raises an error
 
 ## What it checks
 A before-commit event microflow that can say "no" (return false) is set to raise an error. Otherwise the save is skipped and the user gets no message at all.

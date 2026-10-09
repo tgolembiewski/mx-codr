@@ -1,8 +1,11 @@
-# VIS04 — a chart fits one screen
+---
 step: tests
 level: warn
 check: scenario-helpers.js#visual_findings
 key: none
+---
+
+# VIS04 — a chart fits one screen
 
 ## What it checks
 A chart fits on one screen, in height and in width.

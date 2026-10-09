@@ -1,8 +1,11 @@
-# PERF07 — every query is served by an index
+---
 step: naming
 level: warn
 check: index_rules.cjs#indexFindings
 key: none
+---
+
+# PERF07 — every query is served by an index
 
 ## What it checks
 Points out a search on attributes that no index covers. The finding prints the index to add.

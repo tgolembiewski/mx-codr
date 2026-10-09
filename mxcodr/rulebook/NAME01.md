@@ -1,8 +1,11 @@
-# NAME01 — a widget name is used on one page only
+---
 step: layout
 level: warn
 check: layout_rules/names.cjs#nameFindings
 key: document
+---
+
+# NAME01 — a widget name is used on one page only
 
 ## What it checks
 Points out a widget name used on more than one page.

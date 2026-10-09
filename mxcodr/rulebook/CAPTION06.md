@@ -1,9 +1,12 @@
-# CAPTION06 — every loop has an @annotation saying what it walks
+---
 step: naming
 level: warn
 check: check_mdl.cjs#loopFindings
 key: none
 baseline: captions
+---
+
+# CAPTION06 — every loop has an @annotation saying what it walks
 
 ## What it checks
 Every loop has an annotation saying what it walks through.

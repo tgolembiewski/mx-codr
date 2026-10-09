@@ -1,9 +1,12 @@
-# ROLE01 — every demo user's role is the user of some test
+---
 step: paths
 level: block
 check: check_paths.cjs#findings
 key: document
 baseline: paths
+---
+
+# ROLE01 — every demo user's role is the user of some test
 
 ## What it checks
 Every demo user's role is used by at least one test.

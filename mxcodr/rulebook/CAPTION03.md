@@ -1,9 +1,12 @@
-# CAPTION03 — every decision has a @caption
+---
 step: naming
 level: warn
 check: check_mdl.cjs#decisionFindings
 key: none
 baseline: captions
+---
+
+# CAPTION03 — every decision has a @caption
 
 ## What it checks
 Every decision has a caption.

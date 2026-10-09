@@ -1,8 +1,11 @@
-# EVENT04 — no plain Save button on an entity a before handler can refuse
+---
 step: naming
 level: warn
 check: event_rules.cjs#eventFindings
 key: none
+---
+
+# EVENT04 — no plain Save button on an entity a before handler can refuse
 
 ## What it checks
 Points out a plain Save button on an entity whose before-commit event can refuse: the user sees only "An error has occurred". Save through a microflow with a validation message instead.

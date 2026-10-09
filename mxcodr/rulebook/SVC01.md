@@ -1,9 +1,12 @@
-# SVC01 — every published service is called by a test
+---
 step: paths
 level: block
 check: check_paths.cjs#findings
 key: document
 baseline: paths
+---
+
+# SVC01 — every published service is called by a test
 
 ## What it checks
 Every published REST or OData service is called by a test.

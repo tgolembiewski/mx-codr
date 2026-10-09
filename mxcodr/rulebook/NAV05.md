@@ -1,8 +1,11 @@
-# NAV05 — an icon on every menu item
+---
 step: layout
 level: block
 check: layout_rules/navigation.cjs#menuIconFindings
 key: none
+---
+
+# NAV05 — an icon on every menu item
 
 ## What it checks
 Every menu item has an icon.

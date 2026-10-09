@@ -1,9 +1,12 @@
-# OUTCOME01 — every message a user can be shown is asserted by a test
+---
 step: paths
 level: block
 check: check_paths.cjs#findings
 key: document
 baseline: paths
+---
+
+# OUTCOME01 — every message a user can be shown is asserted by a test
 
 ## What it checks
 Every message the app can show (a success message, a validation error, a "credit limit exceeded" refusal) is checked by a test: the test makes the message appear and reads it on the screen.

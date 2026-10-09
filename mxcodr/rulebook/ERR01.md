@@ -1,8 +1,11 @@
-# ERR01 — every error handler is noticed
+---
 step: naming
 level: warn
 check: event_rules.cjs#eventFindings
 key: none
+---
+
+# ERR01 — every error handler is noticed
 
 ## What it checks
 Points out an error handler that nobody would notice: it should log, show a message, raise the error again or return.

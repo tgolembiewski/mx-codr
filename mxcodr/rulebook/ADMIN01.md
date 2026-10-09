@@ -1,8 +1,11 @@
-# ADMIN01 — the administrator is not called MxAdmin
+---
 step: security
 level: warn
 check: security_rules.cjs#findings
 key: none
+---
+
+# ADMIN01 — the administrator is not called MxAdmin
 
 ## What it checks
 Points out that the administrator account is still called MxAdmin. A task for you in Studio Pro; mxcli cannot change it.

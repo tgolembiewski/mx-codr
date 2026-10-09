@@ -1,8 +1,11 @@
-# PERF02 — no loop over database rows that only adds them up
+---
 step: naming
 level: warn
 check: perf_rules.cjs#perfFindings
 key: none
+---
+
+# PERF02 — no loop over database rows that only adds them up
 
 ## What it checks
 Points out a loop over database rows that only adds them up or counts them. The database can do that in one query.
