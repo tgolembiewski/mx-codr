@@ -13,7 +13,7 @@ const path = require('path');
 // Files are listed from the bundle, not globbed in the app, so mxcli's own skills and rules are not tracked.
 const SKILL_DIRS = ['.claude/skills', '.agents/skills', '.ai-context/skills'];
 const HARNESS_SCRIPTS = ['gate.sh', 'orient.sh', 'diagnose.sh', 'precheck.sh', 'peek.sh', 'film.sh', 'db-snapshot.sh', 'mdl-applied.sh', 'theme.sh', 'lib.sh', 'portable.sh', 'scenario-helpers.js',
-  'run-docker.sh', 'run-app.sh', 'marketplace-login.sh', 'CHECKS.md'];
+  'run-docker.sh', 'run-app.sh', 'marketplace-login.sh', 'CHECKS.md', 'rules.sh'];
 
 // Sorted names ending in `suffix`; [] if the directory is missing.
 function listdir(dir, suffix) {
