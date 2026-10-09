@@ -169,6 +169,11 @@ the expression), `CAPTION06` (a loop's annotation), `CAPTION07` (no caption on a
 (a case caption mxcli overwrote), `VAR01` (a placeholder variable name), `VAR02` (a name that only
 repeats its type). The gate prints the new codes.
 
+Bundle 2026.10.09.6 changes no behaviour: it is the maintainability refactor of 2026-10-09 (a shared
+mxcli client, `step_run`, `hooks/hook-env.sh`, `gate_helpers` and `tests/gate/checks.sh` split by job,
+this README a map). Every step was checked on 34 apps against a frozen copy of the harness
+(`tests/performance/fixtures/node-reference/`), with each Node call run against that copy too.
+
 Next bundle: the switches migrate into `## Local` and disappear; `check: pattern` cards for a
 team's own rule; the "kept on purpose?" line a finding prints for the person to paste.
 
