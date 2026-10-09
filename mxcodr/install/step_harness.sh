@@ -40,6 +40,8 @@ done
 if [ ! -e "$APP/.gitattributes" ] && [ -f "$SRC/.gitattributes" ]; then
   cp "$SRC/.gitattributes" "$APP/.gitattributes"
 fi
+# tests/checks/lint.md went with the lint step (bundle 2026.10.09.2): an upgraded app does not keep it.
+rm -f "$APP/tests/checks/lint.md"
 ui_done "test harness" "$suite_written $I_ARROW tests/  (verify-*.test.sh left alone)"
 
 # The rulebook: one card per rule in tests/rulebook/. A card's text is upgraded to the bundle's;

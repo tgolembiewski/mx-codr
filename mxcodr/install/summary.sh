@@ -11,7 +11,8 @@ if [ -n "${created_app:-}" ]; then
   ui_row "app" "1" "$created_app  ${C_GREY}(created empty, Mendix ${mx_version:-?})${C_RESET}"
 fi
 ui_row "skills"   "$installed_skills" ".claude/skills  .agents/skills  .ai-context/skills"
-ui_row "lint"     "$rules"            ".claude/lint-rules/"
+ui_row "lint"     "$rules"            ".claude/lint-rules/  ${C_GREY}(./mxcli lint by hand; not in the gate)${C_RESET}"
+[ -z "${rulebook_note:-}" ] || ui_row "rulebook" "${rulebook_note%% *}" "tests/rulebook/  ${C_GREY}(one card per rule; ## Local is yours)${C_RESET}"
 ui_row "checkers" "$checks"           "tools/mdl-checks/  ${C_GREY}(VERSION $version)${C_RESET}"
 ui_row "rule"     "1"                 ".claude/rules/mdl-skills.md  ${C_GREY}(every session)${C_RESET}"
 ui_row "hooks"    "4"                 ".claude/settings.local.json  ${C_GREY}(Claude)${C_RESET}"
