@@ -19,6 +19,11 @@ One line per code of the `mx`, `coverage`, `precheck`, `scope`, `unused`, `tests
 | `VIS02` | warning: the page does not scroll sideways | A negative margin or a fixed width wider than the screen (`MDL_VISUAL=error` blocks). |
 | `VIS03` | warning: no text is cut off by its box | A fixed height on a text box, or a box class on inline text (`MDL_VISUAL=error` blocks). |
 | `VIS04` | warning: a chart fits one screen | A chart height that fits one screen (`MDL_VISUAL=error` blocks). |
+
+## Hints: what the gate says when...
+
+| Situation | Wants | Fix |
+|---|---|---|
 | stale client bundle | a test failed on a 404 for `dist/*.js` after a `--watch` rebuild (the failure line says so) | `bash tests/gate.sh --restart --only <feature>` -- not the page, not a widget |
 | Studio Pro has this project open | no mxcli edit while Studio Pro holds the model: its next save replaces what mxcli wrote (warning) | close Studio Pro without saving, or make the change there |
 | "went green without ever being red" | a test that was seen to fail once (warning) | break the feature, `bash tests/gate.sh --only <feature>`, fix it; or list the test in `MDL_ALLOW_GREEN_FIRST` when green by nature |

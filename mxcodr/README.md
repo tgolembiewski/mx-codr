@@ -164,7 +164,8 @@ What moved with it:
   new, `lint.md` gone) and `tests/CHECKS.md` come from `node checks/rulebook.cjs rulebook docs tests`
   in `mxcodr/`; a test fails when they are stale, and keeps each under 4,500 characters. The rows
   that are not rules (CE hints, Studio Pro open, a stale client bundle) live in
-  `rulebook/_app-appendix.md`.
+  `checks/docs/hints.md` (bundle 2026.10.09.4; before, `rulebook/_app-appendix.md`), under their own
+  heading in `app.md`: they are ours, not rules the person sets.
 - **`bash tests/rules.sh`** (read only): `list [step]`, `explain CODE`, `check`.
 - **The guard** blocks a session writing `tests/rulebook/`, also with `MDL_HARNESS_EDITS=allow` and
   from inline code (`node -e` appending to a card), with a message that says what to do instead:

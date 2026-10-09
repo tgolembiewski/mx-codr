@@ -207,8 +207,6 @@ function merge(src, dstDir) {
     bundle.add(name);
     const text = fs.readFileSync(path.join(src, name), 'utf8');
     const target = path.join(dstDir, name);
-    // An appendix (_name.md) is copied as it is and is not a card.
-    if (name.startsWith('_')) { fs.writeFileSync(target, text); continue; }
     if (!fs.existsSync(target)) { fs.writeFileSync(target, text); out.written++; continue; }
     const local = localOf(fs.readFileSync(target, 'utf8'));
     const merged = local ? withoutLocal(text) + '\n' + local : text;
@@ -217,6 +215,8 @@ function merge(src, dstDir) {
     // Kept: a ## Local with a line of the person's own (the bundle's template holds comments only).
     if (local.split('\n').slice(1).some(l => stripComment(l))) out.kept++;
   }
+  // The appendix bundle 2026.10.09.2-.3 put here is checks/docs/hints.md now: not a card, not the person's.
+  fs.rmSync(path.join(dstDir, '_app-appendix.md'), { force: true });
   for (const name of fs.readdirSync(dstDir)) if (name.endsWith('.md') && !name.startsWith('_') && !bundle.has(name)) out.left++;
   return out;
 }
@@ -240,13 +240,16 @@ function docs(cards, dir, testsDir) {
   const index = [];
   for (const [file, steps, what] of DOC_FILES) {
     const rows = Object.values(cards).filter(c => steps.includes(c.header.step));
-    const appendix = path.join(dir, `_${file}-appendix.md`);
-    const extra = fs.existsSync(appendix) ? fs.readFileSync(appendix, 'utf8').replace(/\r\n?/g, '\n').trim() : '';
+    // app.md also carries the hints (checks/docs/hints.md): what the gate says in a situation that
+    // is not a rule -- a CE error's fix, a stale client bundle, Studio Pro holding the model. Ours,
+    // kept beside this generator, never in the person's rulebook.
+    const hints = path.join(__dirname, 'docs', 'hints.md');
+    const extra = file === 'app' && fs.existsSync(hints) ? fs.readFileSync(hints, 'utf8').replace(/\r\n?/g, '\n').trim() : '';
     const lines = [`# ${file} -- ${what}`, '',
       `One line per code of the \`${steps.join('`, `')}\` step${steps.length > 1 ? 's' : ''}; every code blocks DONE unless marked warning. The card: \`tests/rulebook/<CODE>.md\`.`,
       '', '| Code | Wants | Fix |', '|---|---|---|'];
     for (const c of rows) lines.push(`| \`${c.code}\` | ${levelNote(c)}${c.title} | ${section(c, 'Fix')} |`);
-    if (extra) lines.push(...extra.split('\n'));
+    if (extra) lines.push('', '## Hints: what the gate says when...', '', '| Situation | Wants | Fix |', '|---|---|---|', ...extra.split('\n'));
     fs.writeFileSync(path.join(checksDir, `${file}.md`), lines.join('\n') + '\n');
     const codes = rows.map(c => c.code).concat(extra ? [...new Set(extra.match(/`(CE\d{4})`/g) || [])].map(c => c.replace(/`/g, '')) : []);
     index.push(`| ${steps.join(', ')} | \`tests/checks/${file}.md\` | ${codes.join(', ')} |`);
