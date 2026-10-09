@@ -167,12 +167,3 @@ function adminHomeFindings(navigation, userRoleText, ownModules) {
 module.exports = {
   USER_ROLE_RE, userRoles, accountFindings, templateModuleFindings, adminHomeFindings, HOME_RE, adminRoles,
 };
-
-// Under the Python names.
-Object.assign(module.exports, {
-  ADMIN_PAGE, MY_ACCOUNT_FLOW, ADMIN_ITEM, MY_ACCOUNT_ITEM, TEMPLATE_MODULE, TEMPLATE_USE_RE,
-  account_findings: accountFindings,
-  admin_roles: adminRoles,
-  template_module_findings: templateModuleFindings,
-  admin_home_findings: adminHomeFindings,
-});

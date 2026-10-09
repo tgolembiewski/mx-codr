@@ -18,13 +18,9 @@ mx_check_copy() {
 
 # project_copy <dir> <label> -- a fresh copy of the project's model, widgets, theme and Java in <dir>.
 project_copy() {
-  local item scratch="$1"
-  rm -rf "$scratch"; mkdir -p "$scratch"
-  for item in "$MPR" mprcontents widgets theme themesource javasource; do
-    [ -e "$item" ] || continue
-    cp -Rc "$item" "$scratch/" 2>/dev/null || cp -R "$item" "$scratch/" 2>/dev/null || {
-      echo "$2: could not run -- could not copy $item to a scratch directory" > "$WORK/$2.summary"; return 1; }
-  done
+  rm -rf "$1"; mkdir -p "$1"
+  mdl_copy_model "$1" || {
+    echo "$2: could not run -- could not copy $MDL_COPY_FAILED to a scratch directory" > "$WORK/$2.summary"; return 1; }
 }
 
 # mx_check_in <dir> -- mx check on the copy in <dir>; sets out.
@@ -148,38 +144,69 @@ modules_or_status() {
   return 0
 }
 
+# --- What every checker step does the same way -------------------------------------------------
+# step_run <step> <label> <checker.cjs> <copy|nocopy> [extra args...] -- the checker exists, the
+# project has modules of its own, the rulebook reads, the project is copied to $WORK/<step>check
+# (with `copy`), then `node tools/mdl-checks/<checker> . <modules> [--mpr copy] <rulebook args>
+# <extra args>` runs. Sets STEP_OUT (stdout and stderr) and STEP_CODE. Returns 0 when the checker
+# ran, 3 when the project has no module of its own, else 2 with the step's summary written.
+step_run() {
+  local step="$1" label="$2" checker="$3" copy="$4" gate line
+  shift 4
+  [ -f "tools/mdl-checks/$checker" ] || {
+    echo "$label: could not run -- tools/mdl-checks/$checker is missing" > "$WORK/$step.summary"; return 2; }
+  modules_or_status "$step"; gate=$?
+  [ "$gate" = "0" ] || return "$gate"
+  rulebook_ok "$step" || return 2
+  local -a args=()
+  if [ "$copy" = "copy" ]; then
+    project_copy "$WORK/${step}check" "$step" || return 2
+    args+=(--mpr "$WORK/${step}check/$MPR")
+  fi
+  while IFS= read -r line; do args+=("$line"); done < <(mdl_rule_args "$step")
+  # shellcheck disable=SC2086
+  STEP_OUT="$("$NODE" "tools/mdl-checks/$checker" . $USER_MODULES ${args[@]+"${args[@]}"} "$@" 2>&1)"; STEP_CODE=$?
+  return 0
+}
+
+# step_verdict <step> <label> <verdicts> -- STEP_OUT's first line is one of <verdicts> (`PASS|FAIL`):
+# the step's summary is `<label>: <that line>`. Otherwise the checker did not check the model:
+# the summary says "could not run" with its last line, and the return is 2.
+step_verdict() {
+  if ! printf '%s\n' "$STEP_OUT" | head -1 | grep -qE "^($3) "; then
+    echo "$2: could not run -- $(printf '%s\n' "$STEP_OUT" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/$1.summary"
+    return 2
+  fi
+  echo "$2: $(printf '%s\n' "$STEP_OUT" | head -1)" > "$WORK/$1.summary"
+}
+
+# step_findings_file <step> -- every finding in .mxcli/<step>.txt, where a session reads them all
+# without running the checker. step_warnings <step> <max> <what> -- the `  ~ ` lines into
+# $WORK/<step>.warnings, at most <max>, with "... <max> of <n> <what> shown" when there are more.
+step_findings_file() { mkdir -p .mxcli 2>/dev/null && printf '%s\n' "$STEP_OUT" > ".mxcli/$1.txt" 2>/dev/null; }
+step_warnings() {
+  local total
+  total="$(printf '%s\n' "$STEP_OUT" | grep -c '^  ~ ')"
+  [ "$total" -gt 0 ] || return 0
+  printf '%s\n' "$STEP_OUT" | grep '^  ~ ' | head -"$2" | sed -E 's/^  ~ /   - /' > "$WORK/$1.warnings"
+  [ "$total" -gt "$2" ] && echo "   ... $2 of $total $3 shown; all of them: .mxcli/$1.txt" >> "$WORK/$1.warnings"
+  return 0
+}
+
 # The catalog step: the rules mxcli's catalog tables answer (tools/mdl-checks/catalog_rules.cjs) on
 # a copy of the project -- UI001 and SEC007, the two rules of mxcli lint that blocked DONE, ported
 # from their Starlark, and LINT01 (mxcli lint's own advice) when the rulebook asks for it. The gate
 # no longer runs mxcli lint itself: its other rules are advice, on request (LINT01 in tests/rulebook).
 check_catalog() {
-  local gate found code total scratch="$WORK/catalogcheck"
-  [ -f tools/mdl-checks/catalog_rules.cjs ] || {
-    echo "catalog: could not run -- tools/mdl-checks/catalog_rules.cjs is missing" > "$WORK/catalog.summary"; return 2; }
-  modules_or_status catalog; gate=$?
-  case "$gate" in
-    0) ;;
-    3) echo "catalog: no user module to check" > "$WORK/catalog.summary"; return 0 ;;
-    *) return "$gate" ;;
-  esac
-  rulebook_ok catalog || return 2
-  project_copy "$scratch" catalog || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args catalog)
-  # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/catalog_rules.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
-  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|WARN|FAIL) '; then
-    echo "catalog: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/catalog.summary"
-    return 2
-  fi
-  echo "catalog: $(printf '%s\n' "$found" | head -1)" > "$WORK/catalog.summary"
-  mkdir -p .mxcli 2>/dev/null && printf '%s\n' "$found" > .mxcli/catalog.txt 2>/dev/null
-  total="$(printf '%s\n' "$found" | grep -c '^  ~ ')"
-  if [ "$total" -gt 0 ]; then
-    printf '%s\n' "$found" | grep '^  ~ ' | head -10 | sed -E 's/^  ~ /   - /' > "$WORK/catalog.warnings"
-    [ "$total" -gt 10 ] && echo "   ... 10 of $total catalog warnings shown; all of them: .mxcli/catalog.txt" >> "$WORK/catalog.warnings"
-  fi
-  [ "$code" = "0" ] && return 0
-  printf '%s\n' "$found" | grep '^  - ' | head -12 > "$WORK/catalog.detail"
+  local status
+  step_run catalog catalog catalog_rules.cjs copy; status=$?
+  [ "$status" = "3" ] && { echo "catalog: no user module to check" > "$WORK/catalog.summary"; return 0; }
+  [ "$status" = "0" ] || return "$status"
+  step_verdict catalog catalog 'PASS|WARN|FAIL' || return 2
+  step_findings_file catalog
+  step_warnings catalog 10 "catalog warnings"
+  [ "$STEP_CODE" = "0" ] && return 0
+  printf '%s\n' "$STEP_OUT" | grep '^  - ' | head -12 > "$WORK/catalog.detail"
   { echo "   These block DONE; why each one and its fix: tests/checks/catalog.md"; } >> "$WORK/catalog.detail"
   return 1
 }
@@ -522,7 +549,7 @@ rulebook_fingerprint() { printf 'env:RULEBOOK_%s=%s\n' "$1" "$(mdl_rulebook dige
 start_model_checks() {
   rulebook_prepare
   # Upgrading the gate, its config or mxcli must not replay an old pass.
-  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/rulebook.cjs tests/harness.env "meta:$MXCLI")
+  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/rulebook.cjs tools/mdl-checks/mxcli_client.cjs tests/harness.env "meta:$MXCLI")
   ( run_cached mx       check_mx       "${cache_inputs[@]}" "env:MDL_MXBUILD_PATH=${MDL_MXBUILD_PATH:-}" \
       meta:widgets meta:theme meta:themesource meta:javasource ) &
   ( run_cached catalog  check_catalog  "${cache_inputs[@]}" tools/mdl-checks/catalog_rules.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint catalog)" ) &
@@ -617,36 +644,17 @@ check_security() {
 }
 
 security_rules() {
-  local gate found code total scratch="$WORK/securitycheck"
+  local status
   : > "$WORK/security.summary"
-  [ -f tools/mdl-checks/security_rules.cjs ] || {
-    echo "security rules: could not run -- tools/mdl-checks/security_rules.cjs is missing" > "$WORK/security.summary"; return 2; }
-  modules_or_status security; gate=$?
-  case "$gate" in
-    0) ;;
-    3) : > "$WORK/security.summary"; return 0 ;;
-    *) return "$gate" ;;
-  esac
-  rulebook_ok security || return 2
-  project_copy "$scratch" security || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args security)
-  # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/security_rules.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
-  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|FAIL) '; then
-    echo "security rules: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/security.summary"
-    return 2
-  fi
-  echo "security rules: $(printf '%s\n' "$found" | head -1)" > "$WORK/security.summary"
-  # Every finding where a session can read them all without running the checker, as paths does.
-  mkdir -p .mxcli 2>/dev/null && printf '%s\n' "$found" > .mxcli/security.txt 2>/dev/null
-  total="$(printf '%s\n' "$found" | grep -c '^  ~ ')"
-  if [ "$total" -gt 0 ]; then
-    printf '%s\n' "$found" | grep '^  ~ ' | head -8 | sed -E 's/^  ~ /   - /' > "$WORK/security.warnings"
-    [ "$total" -gt 8 ] && echo "   ... 8 of $total security warnings shown; all of them: .mxcli/security.txt" >> "$WORK/security.warnings"
-  fi
-  [ "$code" = "0" ] && return 0
+  step_run security "security rules" security_rules.cjs copy; status=$?
+  [ "$status" = "3" ] && { : > "$WORK/security.summary"; return 0; }
+  [ "$status" = "0" ] || return "$status"
+  step_verdict security "security rules" 'PASS|FAIL' || return 2
+  step_findings_file security
+  step_warnings security 8 "security warnings"
+  [ "$STEP_CODE" = "0" ] && return 0
   {
-    printf '%s\n' "$found" | grep '^  - ' | sed 's/^  /   /'
+    printf '%s\n' "$STEP_OUT" | grep '^  - ' | sed 's/^  /   /'
     echo "   Why each one matters and its fix: tests/checks/security.md. Every finding: .mxcli/security.txt"
   } >> "$WORK/security.detail"
   return 1
@@ -720,19 +728,11 @@ security_level() {
 # MDL_SCOPE=error: a DeepSeek portal leaked another customer's invoice this way, and only its
 # verify test caught it.
 check_scope() {
-  local gate out code total
-  [ -f tools/mdl-checks/check_scope.cjs ] || {
-    echo "scope: could not run -- tools/mdl-checks/check_scope.cjs is missing" > "$WORK/scope.summary"; return 2; }
-  modules_or_status scope; gate=$?
-  case "$gate" in
-    0) ;;
-    3) return 0 ;;
-    *) return "$gate" ;;
-  esac
-  rulebook_ok scope || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args scope)
-  # shellcheck disable=SC2086
-  out="$("$NODE" tools/mdl-checks/check_scope.cjs . $USER_MODULES ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
+  local status out code total
+  step_run scope scope check_scope.cjs nocopy; status=$?
+  [ "$status" = "3" ] && return 0
+  [ "$status" = "0" ] || return "$status"
+  out="$STEP_OUT"; code="$STEP_CODE"
   if [ "$code" = "2" ]; then
     echo "scope: could not run -- $(printf '%s\n' "$out" | tail -1)" > "$WORK/scope.summary"; return 2
   fi
@@ -764,21 +764,13 @@ check_scope() {
 # still report 0 errors. A document Mendix still needs is never reported. MDL_KEEP_UNUSED in
 # tests/harness.env (Mod.Doc,Mod.Other) keeps one on purpose.
 check_unused() {
-  local gate out found code scratch="$WORK/unusedcheck" count errors
-  [ -f tools/mdl-checks/check_unused.cjs ] || {
-    echo "unused: could not run -- tools/mdl-checks/check_unused.cjs is missing" > "$WORK/unused.summary"; return 2; }
-  modules_or_status unused; gate=$?
-  case "$gate" in
-    0) ;;
-    3) return 0 ;;
-    *) return "$gate" ;;
-  esac
-  rulebook_ok unused || return 2
-  project_copy "$scratch" unused || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args unused)
-  # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/check_unused.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} \
-    ${MDL_KEEP_UNUSED:+--keep "$MDL_KEEP_UNUSED"} 2>&1)"; code=$?
+  local status out found code scratch="$WORK/unusedcheck" count errors
+  local -a extra=()
+  [ -n "${MDL_KEEP_UNUSED:-}" ] && extra+=(--keep "$MDL_KEEP_UNUSED")
+  step_run unused unused check_unused.cjs copy ${extra[@]+"${extra[@]}"}; status=$?
+  [ "$status" = "3" ] && return 0
+  [ "$status" = "0" ] || return "$status"
+  found="$STEP_OUT"; code="$STEP_CODE"
   case "$code" in
     0) echo "unused: no unused document" > "$WORK/unused.summary"; return 0 ;;
     1) printf '%s\n' "$found" | head -1 | grep -qE '^(FAIL|WARN) ' || code=2 ;;
@@ -834,37 +826,19 @@ check_unused() {
 # workflow task anyone can decide) always blocks. MDL_UNTESTED in tests/harness.env: the person's
 # list of paths deliberately left without a test.
 check_paths() {
-  local gate found code scratch="$WORK/pathscheck" total
-  [ -f tools/mdl-checks/check_paths.cjs ] || {
-    echo "paths: could not run -- tools/mdl-checks/check_paths.cjs is missing" > "$WORK/paths.summary"; return 2; }
-  modules_or_status paths; gate=$?
-  case "$gate" in
-    0) ;;
-    3) return 0 ;;
-    *) return "$gate" ;;
-  esac
-  rulebook_ok paths || return 2
-  project_copy "$scratch" paths || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args paths)
-  # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/check_paths.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} \
-    --baseline "$CACHE_DIR/paths-baseline.json" ${MDL_UNTESTED:+--untested "$MDL_UNTESTED"} \
-    $([ "${MDL_PATHS:-}" = "error" ] && echo --all-fail) 2>&1)"; code=$?
-  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|FAIL) '; then
-    echo "paths: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/paths.summary"
-    return 2
-  fi
-  echo "paths: $(printf '%s\n' "$found" | head -1)" > "$WORK/paths.summary"
-  # Every finding, old ones too, where a session can read them all without running the checker.
-  mkdir -p .mxcli 2>/dev/null && printf '%s\n' "$found" > .mxcli/paths.txt 2>/dev/null
-  total="$(printf '%s\n' "$found" | grep -c '^  ~ ')"
-  if [ "$total" -gt 0 ]; then
-    printf '%s\n' "$found" | grep '^  ~ ' | head -6 | sed -E 's/^  ~ /   - /' > "$WORK/paths.warnings"
-    [ "$total" -gt 6 ] && echo "   ... 6 of $total older paths without a test shown; all of them: .mxcli/paths.txt" >> "$WORK/paths.warnings"
-  fi
-  [ "$code" = "0" ] && return 0
+  local status
+  local -a extra=(--baseline "$CACHE_DIR/paths-baseline.json")
+  [ -n "${MDL_UNTESTED:-}" ] && extra+=(--untested "$MDL_UNTESTED")
+  [ "${MDL_PATHS:-}" = "error" ] && extra+=(--all-fail)
+  step_run paths paths check_paths.cjs copy "${extra[@]}"; status=$?
+  [ "$status" = "3" ] && return 0
+  [ "$status" = "0" ] || return "$status"
+  step_verdict paths paths 'PASS|FAIL' || return 2
+  step_findings_file paths   # old paths too
+  step_warnings paths 6 "older paths without a test"
+  [ "$STEP_CODE" = "0" ] && return 0
   {
-    printf '%s\n' "$found" | grep '^  - ' | sed 's/^  /   /'
+    printf '%s\n' "$STEP_OUT" | grep '^  - ' | sed 's/^  /   /'
     echo "   A path is walked when a test (not a comment in it) asserts what the user meets there. Read"
     echo "   tests/checks/paths.md and reference/paths.md of the test-first-delivery skill. Every finding: .mxcli/paths.txt"
   } > "$WORK/paths.detail"
@@ -875,26 +849,13 @@ check_paths() {
 # (pages, snippets), /FNC (microflows, nanoflows) or /ENV (everything else). The finding lists the
 # `move` statements; one script with all of them applies it. Read from a copy's catalog, as unused does.
 check_folders() {
-  local gate found code scratch="$WORK/folderscheck"
-  [ -f tools/mdl-checks/check_folders.cjs ] || {
-    echo "folders: could not run -- tools/mdl-checks/check_folders.cjs is missing" > "$WORK/folders.summary"; return 2; }
-  modules_or_status folders; gate=$?
-  case "$gate" in
-    0) ;;
-    3) return 0 ;;
-    *) return "$gate" ;;
-  esac
-  rulebook_ok folders || return 2
-  project_copy "$scratch" folders || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args folders)
-  # shellcheck disable=SC2086
-  found="$("$NODE" tools/mdl-checks/check_folders.cjs . $USER_MODULES --mpr "$scratch/$MPR" ${rb[@]+"${rb[@]}"} 2>&1)"; code=$?
-  if ! printf '%s\n' "$found" | head -1 | grep -qE '^(PASS|WARN|FAIL) '; then
-    echo "folders: could not run -- $(printf '%s\n' "$found" | grep -v '^[[:space:]]*$' | tail -1)" > "$WORK/folders.summary"
-    return 2
-  fi
-  echo "folders: $(printf '%s\n' "$found" | head -1)" > "$WORK/folders.summary"
-  [ "$code" = "0" ] && return 0
+  local status found
+  step_run folders folders check_folders.cjs copy; status=$?
+  [ "$status" = "3" ] && return 0
+  [ "$status" = "0" ] || return "$status"
+  step_verdict folders folders 'PASS|WARN|FAIL' || return 2
+  found="$STEP_OUT"
+  [ "$STEP_CODE" = "0" ] && return 0
   # FOLDER01 below block in tests/rulebook: the documents and their moves under the warnings.
   if printf '%s\n' "$found" | head -1 | grep -q '^WARN '; then
     { printf '%s\n' "$found" | grep '^  ~ ' | head -10 | sed 's/^  ~ /   - /'

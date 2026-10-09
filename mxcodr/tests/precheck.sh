@@ -148,13 +148,8 @@ fi
 scratch="$(mdl_tmpdir mdl-precheck)" || { echo "precheck: could not run -- no scratch directory"; exit 0; }
 trap 'rm -rf "$scratch"' EXIT
 
-# The same copy the gate's mx check makes: the .mpr with its units, widgets and theme.
-# `cp -Rc` clones on APFS; elsewhere plain cp -R (0.3s for a 30MB project here).
-for item in "$MPR" mprcontents widgets theme themesource javasource; do
-  [ -e "$item" ] || continue
-  cp -Rc "$item" "$scratch/" 2>/dev/null || cp -R "$item" "$scratch/" 2>/dev/null \
-    || { echo "precheck: could not run -- could not copy $item"; exit 0; }
-done
+# The same copy the gate's mx check makes (mdl_copy_model), plus the widget cache:
+mdl_copy_model "$scratch" || { echo "precheck: could not run -- could not copy $MDL_COPY_FAILED"; exit 0; }
 # .mxcli/widgets is the resolved widget-definition cache. Without it the exec below rebuilds it
 # from widgets/*.mpk on every run (measured: 0.7s against 0.2s); only that one directory is
 # copied -- the rest of .mxcli is this project's catalog, logs and records, none of it read here.
@@ -230,9 +225,7 @@ fi
 # own passes, and says what is already broken, instead of blocking every script on the same error.
 new_errors="$(printf '%s\n' "$out" | grep -E '^\[error\]')"
 base="$(mdl_tmpdir mdl-precheck-base)" && {
-  for item in "$MPR" mprcontents widgets theme themesource javasource; do
-    [ -e "$item" ] && { cp -Rc "$item" "$base/" 2>/dev/null || cp -R "$item" "$base/" 2>/dev/null; }
-  done
+  mdl_copy_model "$base" keep-going
   base_out="$("$MXCLI" docker check -p "$base/$MPR" ${MDL_MXBUILD_PATH:+--mxbuild-path "$MDL_MXBUILD_PATH"} --no-update-widgets 2>&1)"
   rm -rf "$base"
   old_errors="$(printf '%s\n' "$base_out" | grep -E '^\[error\]')"

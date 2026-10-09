@@ -15,9 +15,7 @@
 // Prints PASS/FAIL, `  - [FOLDER01] ...` per document, then `move: <statement>` lines.
 // Exit 0 none, 1 findings, 2 the model could not be read.
 'use strict';
-const fs = require('fs');
-const path = require('path');
-const { mxcli, ModelReadError } = require('./check_unused.cjs');
+const { mxcli, ModelReadError, catalogArgs } = require('./mxcli_client.cjs');
 const { levelArgs, levelOf } = require('./rulebook.cjs');
 
 const KIND = {
@@ -102,19 +100,10 @@ function main() {
   const { levels, excepts, rest: argv } = levelArgs(process.argv.slice(2));
   const level = levelOf(levels, 'FOLDER01', 'block');
   const left = new Set(excepts.FOLDER01 || []);
-  const positional = [];
-  let mpr = '', refresh = true;
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--mpr') mpr = argv[++i] || '';
-    else if (argv[i] === '--no-refresh') refresh = false;
-    else if (argv[i] === '-h' || argv[i] === '--help') { process.stdout.write(USAGE + '\n'); return 0; }
-    else positional.push(argv[i]);
-  }
-  if (positional.length < 2) { process.stderr.write(USAGE + '\n'); return 2; }
-  const appDir = positional[0];
-  const modules = positional.slice(1).flatMap(m => m.split(/\s+/)).filter(Boolean);
-  if (!mpr) { try { mpr = fs.readdirSync(appDir).filter(n => /\.mpr$/i.test(n)).sort()[0] || ''; } catch { /* none */ } }
-  else mpr = path.resolve(mpr);
+  if (argv.includes('-h') || argv.includes('--help')) { process.stdout.write(USAGE + '\n'); return 0; }
+  const args = catalogArgs(argv);
+  if (!args) { process.stderr.write(USAGE + '\n'); return 2; }
+  const { appDir, modules, mpr, refresh } = args;
   if (!mpr) { process.stdout.write(`ERROR no .mpr in ${appDir}\n`); return 2; }
   let objects;
   try {

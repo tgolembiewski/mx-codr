@@ -28,9 +28,7 @@
 // Prints `FAIL|PASS <summary>`, `  - [CODE] ...` blocking lines, `  ~ [CODE] ...` warnings.
 // Exit 0 nothing blocking, 1 blocking findings, 2 the model could not be read.
 'use strict';
-const fs = require('fs');
-const path = require('path');
-const { mxcli, ModelReadError } = require('./check_unused.cjs');
+const { mxcli, ModelReadError, moduleRolesOf, catalogArgs } = require('./mxcli_client.cjs');
 const { levelArgs, levelOf } = require('./rulebook.cjs');
 
 const words = text => (String(text).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
@@ -307,14 +305,7 @@ function readModel(appDir, mpr, read = mxcli) {
   const constants = read(appDir, mpr, 'SELECT QualifiedName, ModuleName, DataType, DefaultValue, ExposedToClient FROM CATALOG.CONSTANTS', true);
   const associations = read(appDir, mpr, 'SELECT QualifiedName FROM CATALOG.ASSOCIATIONS', true);
   const security = projectSecurity(read(appDir, mpr, 'show project security;'));
-  const moduleRoles = {};
-  const userRoles = read(appDir, mpr, 'SHOW USER ROLES', true).map(r => r.Name).filter(Boolean);
-  if (userRoles.length) {
-    const text = read(appDir, mpr, userRoles.map(r => `DESCRIBE USER ROLE ${r};`).join(' '));
-    for (const m of text.matchAll(/user\s+role\s+"?(\w+)"?\s*\(\s*ModuleRoles\s*:\s*\(([^)]*)\)/gi)) {
-      moduleRoles[m[1]] = m[2].split(',').map(s => s.trim().replace(/"/g, '')).filter(Boolean);
-    }
-  }
+  const moduleRoles = moduleRolesOf(appDir, mpr, read);
   return { sources, permissions, constants, associations, security, moduleRoles };
 }
 
@@ -322,18 +313,9 @@ function main() {
   // --levels / --except: the rulebook's effective levels for this step (tests/rulebook/); without
   // them each code keeps the level above (blocking: true/false).
   const { levels, excepts, rest: argv } = levelArgs(process.argv.slice(2));
-  const positional = [];
-  let mpr = '', refresh = true;
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--mpr') mpr = argv[++i] || '';
-    else if (argv[i] === '--no-refresh') refresh = false;
-    else positional.push(argv[i]);
-  }
-  if (positional.length < 2) { process.stderr.write('usage: security_rules.cjs app_dir Module... [--mpr copy.mpr] [--no-refresh]\n'); return 2; }
-  const appDir = positional[0];
-  const modules = positional.slice(1).flatMap(m => m.split(/\s+/)).filter(Boolean);
-  if (!mpr) { try { mpr = fs.readdirSync(appDir).filter(n => /\.mpr$/i.test(n)).sort()[0] || ''; } catch { /* none */ } }
-  else mpr = path.resolve(mpr);
+  const args = catalogArgs(argv);
+  if (!args) { process.stderr.write('usage: security_rules.cjs app_dir Module... [--mpr copy.mpr] [--no-refresh]\n'); return 2; }
+  const { appDir, modules, mpr, refresh } = args;
   if (!mpr) { process.stdout.write(`ERROR no .mpr in ${appDir}\n`); return 2; }
   let model;
   try {

@@ -1055,32 +1055,15 @@ function modelWideDigest(states, mapping) {
   return digest.digest('hex');
 }
 
-// check_test_coverage's covers: parser, the one the coverage check uses.
-const QUALIFIED_LIST = String.raw`[\w.]+\.\w+(?:(?:\s*,\s*|\s+)[\w.]+\.\w+)*\s*,?`;
-const COVERS_RE = re.compile(String.raw`^\s*#\s*covers\s*:\s*(.+(?:\n\s*#\s*` + QUALIFIED_LIST + String.raw`\s*$)*)`, 'im');
+// The covers: lines, read by check_test_coverage's parser (the one the coverage check uses); a read
+// error surfaces as Python's would, as it did when this file had its own copy.
 function covered(testsDir) {
-  const claims = new Map();
-  if (!py.isdir(testsDir)) return claims;
-  const rx = py.WIN ? /^verify-.*\.test\.sh$/is : /^verify-.*\.test\.sh$/s;
-  const names = fs.readdirSync(testsDir).filter(n => rx.test(n));
-  for (const name of py.WIN ? py.sorted(names, n => n.toLowerCase()) : names.sort(py.compare)) {
-    let text;
-    try {
-      text = readReplace(py.join(testsDir, name));
-    } catch (error) {
-      throw new PyError(error.code === 'EISDIR' ? 'IsADirectoryError' : 'OSError', String(error.message));
-    }
-    for (const match of COVERS_RE.finditer(text)) {
-      for (let element of re.split(String.raw`[,\s]+`, re.sub(String.raw`\n\s*#`, ',', match.group(1)))) {
-        element = py.strip(element);
-        if (element) {
-          if (!claims.has(element)) claims.set(element, []);
-          claims.get(element).push(name);
-        }
-      }
-    }
+  try {
+    return require('./check_test_coverage.cjs').covered(testsDir);
+  } catch (error) {
+    if (error instanceof PyError || !error.code) throw error;
+    throw new PyError(error.code === 'EISDIR' ? 'IsADirectoryError' : 'OSError', String(error.message));
   }
-  return claims;
 }
 
 // {test script name: [qualified names its # covers: line names]}.

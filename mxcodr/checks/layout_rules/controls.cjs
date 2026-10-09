@@ -168,11 +168,3 @@ function buttonIconFindings(lines) {
 }
 
 module.exports = { columnFilterFindings, buttonIcon, buttonIconFindings, DOCUMENT_RE };
-
-// Under the Python names.
-Object.assign(module.exports, {
-  COLUMN_RE, FILTER_RE, FILTER_TARGET_RE, BUTTON_TYPES, CAPTION_RE, ACTION_RE, BUTTON_ICON_RE, ACTION_ICONS, CAPTION_ICONS,
-  column_filter_findings: columnFilterFindings,
-  button_icon: buttonIcon,
-  button_icon_findings: buttonIconFindings,
-});

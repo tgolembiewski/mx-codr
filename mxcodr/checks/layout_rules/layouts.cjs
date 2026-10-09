@@ -105,12 +105,3 @@ function layoutMenuFindings(layouts) {
 }
 
 module.exports = { layoutTypes, oneLayoutFindings, layoutMenuFindings, LOGIN_PAGE_RE, loginPagesOf };
-
-// Under the Python names, with Python's shapes.
-const { toObject } = require('./compat.cjs');
-Object.assign(module.exports, {
-  OWN_KIND_LAYOUT_RE, LAYOUT_TYPE_RE, LAYOUT_RE, SHOW_PAGE_RE,
-  layout_types: layouts => toObject(layoutTypes(layouts)),
-  one_layout_findings: oneLayoutFindings,
-  layout_menu_findings: layoutMenuFindings,
-});

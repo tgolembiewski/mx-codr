@@ -466,6 +466,23 @@ mdl_tmpfile() {  # mdl_tmpfile <name> -- portable `mktemp -t <name>`
   mktemp "${TMPDIR:-/tmp}/$1.XXXXXX"
 }
 
+# mdl_copy_model <dir> [keep-going] -- the model into <dir>: the .mpr with its units, widgets,
+# theme and Java, what mx check needs (gate and precheck both check copies, never the project).
+# `cp -Rc` clones on APFS; elsewhere plain cp -R (0.3s for a 30MB project). A copy that fails
+# stops it, false, with the item in MDL_COPY_FAILED; with keep-going the other items are copied.
+mdl_copy_model() {
+  local item status=0
+  MDL_COPY_FAILED=""
+  for item in "$MPR" mprcontents widgets theme themesource javasource; do
+    [ -e "$item" ] || continue
+    cp -Rc "$item" "$1/" 2>/dev/null || cp -R "$item" "$1/" 2>/dev/null || {
+      MDL_COPY_FAILED="${MDL_COPY_FAILED:-$item}"; status=1
+      [ "${2:-}" = "keep-going" ] || return 1
+    }
+  done
+  return "$status"
+}
+
 # --- 9. Find the .mpr ---
 # mdl_find_mpr -- set MPR for the current directory: MPR=<name>.mpr when given, else the first
 # *.mpr (with a warning when there are several). Returns 1, with the reason on stderr, when none.

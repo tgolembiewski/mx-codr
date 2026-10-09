@@ -365,8 +365,5 @@ const DOC_HEAD = rx(DOC_HEAD_PATTERN, 'i');
 module.exports = {
   ENTITY_HEAD, ATTRIBUTE, INDEX, DOC_HEAD, RETRIEVE, SOURCE, XPATH, COMPARED, COMPARED_RIGHT, OR, SORT, GRID, COLUMN,
   FILTER, VIEW_HEAD, OQL_SOURCE, OQL_ORDER, ASSOCIATION, SKIP_TYPES: [...SKIP_TYPES].sort(), ONE_TIME,
-  _plain: plain,
-  entity_heads: entityHeads, entities, queries, oql_queries: oqlQueries, wanted, index_findings: indexFindings,
-  match_length: matchLength, redundant_findings: redundantFindings,
-  entityHeads, oqlQueries, indexFindings, matchLength, redundantFindings,
+  entities, queries, wanted, entityHeads, oqlQueries, indexFindings, matchLength, redundantFindings,
 };

@@ -31,7 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { mxcli, ModelReadError } = require('./check_unused.cjs');
+const { mxcli, ModelReadError, findMpr, moduleRolesOf } = require('./mxcli_client.cjs');
 const { levelArgs, levelOf } = require('./rulebook.cjs');
 const rules = require('./outcome_rules.cjs');
 
@@ -52,14 +52,7 @@ function readModel(appDir, mpr, read = mxcli) {
     name: r['User Name'] || r.UserName || r.Name || '',
     roles: String(r['User Roles'] || r.UserRoles || '').split(/[,\s]+/).filter(Boolean),
   })).filter(u => u.name);
-  const userRoles = read(appDir, mpr, 'SHOW USER ROLES', true).map(r => r.Name).filter(Boolean);
-  const moduleRoles = {};
-  if (userRoles.length) {
-    const text = read(appDir, mpr, userRoles.map(r => `DESCRIBE USER ROLE ${r};`).join(' '));
-    for (const m of text.matchAll(/user\s+role\s+"?(\w+)"?\s*\(\s*ModuleRoles\s*:\s*\(([^)]*)\)/gi)) {
-      moduleRoles[m[1]] = m[2].split(',').map(s => s.trim().replace(/"/g, '')).filter(Boolean);
-    }
-  }
+  const moduleRoles = moduleRolesOf(appDir, mpr, read);
   return { sources, permissions, restServices, odataServices, demoUsers, moduleRoles };
 }
 
@@ -212,7 +205,7 @@ function main() {
   const a = parseArgs(rest);
   for (const keys of Object.values(excepts)) a.untested.push(...keys);
   let mpr = a.mpr ? path.resolve(a.mpr) : '';
-  if (!mpr) { try { mpr = fs.readdirSync(a.appDir).filter(n => /\.mpr$/i.test(n)).sort()[0] || ''; } catch { /* none */ } }
+  if (!mpr) mpr = findMpr(a.appDir);
   if (!mpr || (a.mpr && !fs.existsSync(mpr))) { process.stdout.write(`ERROR no .mpr in ${a.mpr || a.appDir}\n`); return 2; }
   let model;
   try {

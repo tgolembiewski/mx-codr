@@ -13,10 +13,8 @@
 // Prints `FAIL|WARN|PASS <summary>`, `  - [CODE] ...` blocking lines, `  ~ [CODE] ...` warnings.
 // Exit 0 nothing blocking, 1 blocking findings, 2 the model could not be read.
 'use strict';
-const fs = require('fs');
 const { spawnSync } = require('child_process');
-const path = require('path');
-const { mxcli, ModelReadError } = require('./check_unused.cjs');
+const { mxcli, ModelReadError, binary, catalogArgs } = require('./mxcli_client.cjs');
 const { readModel } = require('./security_rules.cjs');
 const { levelArgs, levelOf } = require('./rulebook.cjs');
 
@@ -85,8 +83,9 @@ function anonymousUnconstrainedRead(model, entities) {
 // LINT01: mxcli lint's findings, each as one line, when the rulebook asks for them. The JSON (mxcli
 // 0.25): {violations: [{ruleId, severity, message, module, document, documentType, suggestion}], summary}.
 function lintFindings(appDir, mpr) {
-  const bin = ['mxcli', 'mxcli.exe'].map(n => path.join(appDir, n)).find(p => fs.existsSync(p)) || 'mxcli';
-  const result = spawnSync(bin, ['lint', '-p', mpr, '--format', 'json'], { cwd: appDir, encoding: 'utf8', maxBuffer: 1 << 28, windowsHide: true });
+  // The project's own ./mxcli, bounded like every other call (MDL_MXCLI_TIMEOUT).
+  const timeout = parseFloat(process.env.MDL_MXCLI_TIMEOUT || '120');
+  const result = spawnSync(binary(appDir), ['lint', '-p', mpr, '--format', 'json'], { cwd: appDir, encoding: 'utf8', timeout: timeout * 1000, maxBuffer: 1 << 28, windowsHide: true });
   return parseLint(result.stdout || '');
 }
 function parseLint(text) {
@@ -104,18 +103,10 @@ function parseLint(text) {
 
 function main() {
   const { levels, excepts, rest: argv } = levelArgs(process.argv.slice(2));
-  const positional = [];
-  let mpr = '', refresh = true;
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--mpr') mpr = argv[++i] || '';
-    else if (argv[i] === '--no-refresh') refresh = false;
-    else positional.push(argv[i]);
-  }
-  if (positional.length < 2) { process.stderr.write('usage: catalog_rules.cjs app_dir Module... [--mpr copy.mpr] [--no-refresh] [--levels json] [--except json]\n'); return 2; }
-  const appDir = positional[0];
-  const modules = new Set(positional.slice(1).flatMap(m => m.split(/\s+/)).filter(Boolean));
-  if (!mpr) { try { mpr = fs.readdirSync(appDir).filter(n => /\.mpr$/i.test(n)).sort()[0] || ''; } catch { /* none */ } }
-  else mpr = path.resolve(mpr);
+  const args = catalogArgs(argv);
+  if (!args) { process.stderr.write('usage: catalog_rules.cjs app_dir Module... [--mpr copy.mpr] [--no-refresh] [--levels json] [--except json]\n'); return 2; }
+  const { appDir, mpr, refresh } = args;
+  const modules = new Set(args.modules);
   if (!mpr) { process.stdout.write(`ERROR no .mpr in ${appDir}\n`); return 2; }
   const level = code => levelOf(levels, code, code === 'LINT01' ? 'off' : 'block');
   let found = [];

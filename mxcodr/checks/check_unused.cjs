@@ -24,9 +24,9 @@
 // Exit: 0 none, 1 findings, 2 the model could not be read.
 'use strict';
 const { levelArgs, levelOf } = require('./rulebook.cjs');
+const { mxcli, ModelReadError, findMpr } = require('./mxcli_client.cjs');
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
 
 // catalog table -> [kind as MDL spells it in `drop <kind>`, label]
 const TABLES = {
@@ -51,36 +51,6 @@ const MAX_FILE = 2 * 1024 * 1024;
 // The same lines check_test_coverage.cjs reads (its QUALIFIED_LIST).
 const QUALIFIED_LIST = String.raw`[\w.]+\.\w+(?:(?:[ \t]*,[ \t]*|[ \t]+)[\w.]+\.\w+)*[ \t]*,?`;
 const COVERS_LINES = new RegExp(String.raw`^[ \t]*#[ \t]*covers[ \t]*:.*(?:\n[ \t]*#[ \t]*` + QUALIFIED_LIST + String.raw`[ \t]*$)*`, 'gim');
-
-class ModelReadError extends Error {}
-
-function mxcliBinary(appDir) {
-  for (const name of ['mxcli', 'mxcli.exe']) if (fs.existsSync(path.join(appDir, name))) return './' + name;
-  return './mxcli';
-}
-
-function mxcli(appDir, mpr, command, asJson = false) {
-  const args = ['-p', mpr, ...(asJson ? ['--json'] : []), '-c', command];
-  const timeout = parseFloat(process.env.MDL_MXCLI_TIMEOUT || '120');
-  const result = spawnSync(mxcliBinary(appDir), args, { cwd: appDir, encoding: 'utf8', timeout: timeout * 1000, maxBuffer: 1 << 30, windowsHide: true });
-  if (result.error) throw new ModelReadError(`\`${command}\` could not run: ${result.error.message}`);
-  const stdout = (result.stdout || '').replace(/\r\n?/g, '\n');
-  if (result.status !== 0) {
-    const lines = ((result.stderr || '') + stdout).trim().split('\n');
-    throw new ModelReadError(`\`${command}\` exited ${result.status}: ${lines[lines.length - 1] || 'no output'}`);
-  }
-  if (!asJson) return stdout;
-  // `Found N result(s)` may come before the JSON; an empty table prints no list at all.
-  const start = stdout.indexOf('[');
-  if (start < 0) {
-    if (/Found 0 result|No results/i.test(stdout) || !stdout.trim()) return [];
-    throw new ModelReadError(`\`${command}\` did not return JSON`);
-  }
-  let rows;
-  try { rows = JSON.parse(stdout.slice(start)); } catch { throw new ModelReadError(`\`${command}\` did not return JSON`); }
-  if (!Array.isArray(rows)) throw new ModelReadError(`\`${command}\` did not return a list`);
-  return rows;
-}
 
 const shortName = name => name.split('.').pop();
 const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -199,7 +169,7 @@ function main() {
   const args = parseArgs(rest);
   args.keep = (args.keep || []).concat(excepts.UNUSED01 || []);
   let mprs = args.mpr ? [path.resolve(args.mpr)] : [];
-  try { if (!mprs.length) mprs = fs.readdirSync(args.appDir).filter(n => /\.mpr$/i.test(n)).sort(); } catch { /* none */ }
+  if (!mprs.length && findMpr(args.appDir)) mprs = [findMpr(args.appDir)];
   if (!mprs.length || (args.mpr && !fs.existsSync(mprs[0]))) { process.stdout.write(`ERROR no .mpr in ${args.mpr || args.appDir}\n`); return 2; }
   let found;
   try {

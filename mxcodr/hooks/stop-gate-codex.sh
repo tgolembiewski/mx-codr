@@ -4,28 +4,8 @@
 # Exit 2 with an instruction and the gate output tail on stderr (Codex feeds it back to the model).
 set -uo pipefail
 
-# Prints a node that runs; inlined so the hook is self-contained (same as tests/portable.sh).
-mdl_find_node() {
-  if command -v node >/dev/null 2>&1; then
-    printf 'node\n'
-    return 0
-  fi
-  # The Node.js installer (also via winget) puts node on PATH only for shells started after it.
-  local local_app="${LOCALAPPDATA:-}" candidate
-  local_app="${local_app//\\//}"
-  for candidate in "/c/Program Files/nodejs/node.exe" "$local_app/Programs/nodejs/node.exe"; do
-    [ -x "$candidate" ] || continue
-    printf '%s\n' "$candidate"
-    return 0
-  done
-  return 1
-}
-NODE="$(mdl_find_node || true)"
-NODE="${NODE:-node}"
-# hook_tool.cjs holds the small jobs (read a field, wrap a message); installed one directory up
-# from this hook, in the bundle under checks/. An absolute path: the hook may cd into the project.
-HOOK_TOOL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/hook_tool.cjs"
-[ -f "$HOOK_TOOL" ] || HOOK_TOOL="$(cd "$(dirname "${BASH_SOURCE[0]}")/../checks" 2>/dev/null && pwd)/hook_tool.cjs"
+# NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message).
+. "$(dirname "${BASH_SOURCE[0]}")/hook-env.sh"
 
 input="$(cat)"
 session_id="$(printf '%s' "$input" | "$NODE" "$HOOK_TOOL" get-default session_id 2>/dev/null)"
