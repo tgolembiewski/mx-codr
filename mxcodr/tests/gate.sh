@@ -25,8 +25,8 @@
 # Lines 2-24 are printed by --help; keep them 23 lines.
 
 # How to read this file: main() at the bottom is the whole gate, step by step. The steps
-# live in tests/gate/ -- app.sh (find, boot, stop the app), checks.sh (the ten model
-# checks and their cache), preflight.sh (sessions, stale model, environment) and tests.sh
+# live in tests/gate/ -- app.sh (find, boot, stop the app), checks.sh (how the ten model
+# checks run, and their cache), steps.sh, layout.sh and security.sh (the checks), preflight.sh (sessions, stale model, environment) and tests.sh
 # (the suite). tools/mdl-checks/gate_helpers.cjs holds the Node they call.
 # No -e: a failing step must not end the gate.
 set -uo pipefail
@@ -35,7 +35,7 @@ HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$HARNESS_DIR/.." && pwd)"
 cd "$APP_DIR"
 . "$HARNESS_DIR/portable.sh"
-for part in hints app checks preflight tests; do
+for part in hints app checks steps layout security preflight tests; do
   if [ ! -f "$HARNESS_DIR/gate/$part.sh" ]; then
     echo "tests/gate/$part.sh is missing -- re-run the installer" >&2
     exit 2

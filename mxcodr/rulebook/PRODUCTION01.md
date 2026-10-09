@@ -1,7 +1,7 @@
 ---
 step: security
 level: block
-check: bash:tests/gate/checks.sh#security_level
+check: bash:tests/gate/security.sh#security_level
 key: none
 ---
 

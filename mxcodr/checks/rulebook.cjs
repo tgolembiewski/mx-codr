@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The rulebook: one Markdown card per rule in tests/rulebook/ (the bundle's rulebook/), the one
 // place that says what each rule checks, how hard it judges (its level) and which documents the
-// person excepted. Read by the gate (tests/gate/checks.sh, tests/gate/tests.sh), precheck.sh, the
+// person excepted. Read by the gate (tests/gate/*.sh), precheck.sh, the
 // checkers (--levels / --except) and tests/rules.sh. The checkers keep their code; a card's
 // `check:` names the function that produces its code, and `level:` says what the gate does with it.
 //

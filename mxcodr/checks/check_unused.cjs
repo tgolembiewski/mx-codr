@@ -15,7 +15,7 @@
 //      themesource/ or tests/*.test.* -- Java, JavaScript and tests can call a document by its
 //      name (a test's `# covers:` line is not a use: it only declares what the test covers);
 //   3. Mendix: the gate drops them all on a scratch copy and mx check must still report 0 errors
-//      (tests/gate/checks.sh, check_unused). This file does proofs 1 and 2.
+//      (tests/gate/steps.sh, check_unused). This file does proofs 1 and 2.
 //
 // Usage: check_unused.cjs <app_dir> <Module> [<Module> ...] [--keep Mod.Doc,Mod.Other] [--mpr <copy.mpr>] [--no-refresh]
 // --mpr reads the model from a copy: the catalog is written beside the .mpr it reads, and the gate's

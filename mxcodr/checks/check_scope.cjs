@@ -145,7 +145,7 @@ function parseArgs(argv) {
 
 function main() {
   // --levels: the rulebook's level for SCOPE01 (tests/rulebook/SCOPE01.md); `block` fails the step
-  // here, which until now tests/gate/checks.sh decided from MDL_SCOPE=error.
+  // here, which until now tests/gate/steps.sh decided from MDL_SCOPE=error.
   const { levels, rest } = levelArgs(process.argv.slice(2));
   const level = levelOf(levels, 'SCOPE01', 'warn');
   const args = parseArgs(rest);

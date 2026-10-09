@@ -665,13 +665,13 @@ const tools = {
     const mtime = fs.statSync(file).mtimeMs / 1000;
     print(BigInt(Math.trunc(Date.now() / 1000 - mtime)));
   },
-  // tests/gate/checks.sh: the user role names of SHOW USER ROLES --json.
+  // tests/gate/security.sh: the user role names of SHOW USER ROLES --json.
   'role-names'() {
     const rows = loadStdin();
     if (!Array.isArray(rows)) exit(1);
     for (const row of rows) print(get(row, 'Name', ''));
   },
-  // tests/gate/checks.sh entity_names: exit 1 on a name that is not Module.Entity.
+  // tests/gate/security.sh entity_names: exit 1 on a name that is not Module.Entity.
   'entity-names'() {
     const rows = loadStdin();
     if (!Array.isArray(rows)) exit(1);
@@ -685,7 +685,7 @@ const tools = {
       print(name);
     }
   },
-  // tests/gate/checks.sh describe_entities_into: one file per entity from one describe.
+  // tests/gate/security.sh describe_entities_into: one file per entity from one describe.
   'split-entities'(allPath, dir) {
     if (allPath === undefined) raise('IndexError', 'list index out of range');
     const text = readStrict(allPath);
