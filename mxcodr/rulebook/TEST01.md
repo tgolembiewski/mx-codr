@@ -1,7 +1,7 @@
 ---
 step: precheck
 level: block
-check: gate_helpers.cjs#testFirst
+check: gate_scripts.cjs#testFirst
 key: none
 ---
 

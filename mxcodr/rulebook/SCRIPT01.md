@@ -1,7 +1,7 @@
 ---
 step: precheck
 level: block
-check: gate_helpers.cjs#duplicateDefinitions
+check: gate_scripts.cjs#duplicateDefinitions
 key: none
 fixed: yes
 ---

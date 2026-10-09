@@ -549,7 +549,7 @@ rulebook_fingerprint() { printf 'env:RULEBOOK_%s=%s\n' "$1" "$(mdl_rulebook dige
 start_model_checks() {
   rulebook_prepare
   # Upgrading the gate, its config or mxcli must not replay an old pass.
-  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/rulebook.cjs tools/mdl-checks/mxcli_client.cjs tests/harness.env "meta:$MXCLI")
+  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/gate_values.cjs tools/mdl-checks/gate_scripts.cjs tools/mdl-checks/gate_runtime.cjs tools/mdl-checks/gate_visual.cjs tools/mdl-checks/gate_changed.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/rulebook.cjs tools/mdl-checks/mxcli_client.cjs tests/harness.env "meta:$MXCLI")
   ( run_cached mx       check_mx       "${cache_inputs[@]}" "env:MDL_MXBUILD_PATH=${MDL_MXBUILD_PATH:-}" \
       meta:widgets meta:theme meta:themesource meta:javasource ) &
   ( run_cached catalog  check_catalog  "${cache_inputs[@]}" tools/mdl-checks/catalog_rules.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint catalog)" ) &

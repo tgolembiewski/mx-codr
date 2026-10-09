@@ -1,7 +1,7 @@
 ---
 step: tests
 level: warn
-check: gate_helpers.cjs#reviewScreenshots
+check: gate_visual.cjs#reviewScreenshots
 key: none
 ---
 

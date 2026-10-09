@@ -1,7 +1,7 @@
 ---
 step: tests
 level: warn
-check: gate_helpers.cjs#runtimeErrors
+check: gate_runtime.cjs#runtimeErrors
 key: none
 ---
 
