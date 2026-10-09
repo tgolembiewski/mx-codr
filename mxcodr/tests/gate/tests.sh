@@ -310,7 +310,7 @@ record_suite_result() {
 # agent must judge. Warnings by default (MDL_VISUAL=warn); MDL_VISUAL=error makes them block DONE.
 # A cancellation notice drew its red box over the order summary and the gate said DONE.
 step_visual() {
-  # The level comes from the rulebook (tests/rulebook/VIS01..VIS04.md, LOOK01/02); MDL_VISUAL in
+  # The level comes from the rulebook (tests/rulebook/app/VIS01..VIS04.md, LOOK01/02); MDL_VISUAL in
   # tests/harness.env still wins while it exists.
   local mode="${MDL_VISUAL:-$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)}" out
   [ "$mode" = "0" ] && return 0

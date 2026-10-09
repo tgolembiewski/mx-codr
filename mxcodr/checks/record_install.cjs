@@ -26,6 +26,11 @@ function listdir(dir, suffix) {
 
 const isfile = p => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 
+// The rulebook's cards, <group>/<CODE>.md (rulebook.cjs cardFiles); none when there is no rulebook.
+function rulebookCards(dir) {
+  try { return require('./rulebook.cjs').cardFiles(dir); } catch { return []; }
+}
+
 // [bundle file, app-relative destination] for everything tracked.
 function* destinations(src) {
   for (const name of HARNESS_SCRIPTS) yield [path.join(src, 'tests', name), 'tests/' + name];
@@ -38,7 +43,9 @@ function* destinations(src) {
 
   // The rulebook: one card per rule, hashed without its ## Local section (the person's levels and
   // exceptions are theirs, not drift) -- see hashOf.
-  for (const name of listdir(path.join(src, 'rulebook'), '.md')) yield [path.join(src, 'rulebook', name), 'tests/rulebook/' + name];
+  for (const file of rulebookCards(path.join(src, 'rulebook'))) {
+    yield [file, 'tests/rulebook/' + path.relative(path.join(src, 'rulebook'), file).split(path.sep).join('/')];
+  }
 
   for (const name of listdir(path.join(src, 'checks'), '.py')) yield [path.join(src, 'checks', name), 'tools/mdl-checks/' + name];
 

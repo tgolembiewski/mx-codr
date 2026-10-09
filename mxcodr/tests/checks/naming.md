@@ -1,6 +1,6 @@
 # naming -- microflows and nanoflows (`check_mdl.cjs --skill naming`, skill `naming-and-captions`)
 
-One line per code of the `naming` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/<CODE>.md`.
+One line per code of the `naming` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/naming/<CODE>.md`.
 
 | Code | Wants | Fix |
 |---|---|---|

@@ -42,7 +42,8 @@ tests/            gate.sh + gate/ (app, checks, hints, preflight, tests), preche
 examples/         8 verify-*.test.sh from the demo app — NOT installed; a project's tests
                   are written by whoever builds the feature
 skills/           5 × SKILL.md — the prose (test-first-delivery with a reference/ of four)
-rulebook/         one Markdown card per rule (89) -- step, level, the check that produces its code,
+rulebook/         one Markdown card per rule (89) in a folder per group (layout, naming, security,
+                  paths, catalog, folders, app) -- step, level, the check that produces its code,
                   what it checks, the fix; installed as tests/rulebook/, where the person's ## Local
                   section sets a level or excepts a document (see "The rulebook" below)
 lint-rules/       3 × *.star — MOD001, REU001, UI001 — for `./mxcli lint` by hand; the gate no
@@ -89,7 +90,7 @@ the checker warned). The person asked for one place, one format, readable by a h
 is defined, changed or excepted -- with the hard condition that the harness behaves exactly as
 before.
 
-`rulebook/` holds one Markdown card per rule, installed as `tests/rulebook/<CODE>.md`:
+`rulebook/` holds one Markdown card per rule, installed as `tests/rulebook/<group>/<CODE>.md`:
 
 ```markdown
 ---
@@ -173,6 +174,11 @@ Bundle 2026.10.09.6 changes no behaviour: it is the maintainability refactor of 
 mxcli client, `step_run`, `hooks/hook-env.sh`, `gate_helpers` and `tests/gate/checks.sh` split by job,
 this README a map). Every step was checked on 34 apps against a frozen copy of the harness
 (`tests/performance/fixtures/node-reference/`), with each Node call run against that copy too.
+
+Bundle 2026.10.09.7: the cards sit in a folder per group, the same groups as the files of
+`tests/checks/` (layout 29, naming 23, security 12, paths 6, catalog 3, folders 1, app 15). The
+parser reads the folders, refuses a code in two files and a card in another group's folder; the
+installer moves a card installed flat by .09.2-.6 into its folder with its `## Local`.
 
 Next bundle: the switches migrate into `## Local` and disappear; `check: pattern` cards for a
 team's own rule; the "kept on purpose?" line a finding prints for the person to paste.

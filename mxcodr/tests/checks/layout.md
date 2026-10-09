@@ -1,6 +1,6 @@
 # layout -- the shape of a signed-in app (skill `spacing-and-layout`)
 
-One line per code of the `layout` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/<CODE>.md`.
+One line per code of the `layout` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/layout/<CODE>.md`.
 
 | Code | Wants | Fix |
 |---|---|---|

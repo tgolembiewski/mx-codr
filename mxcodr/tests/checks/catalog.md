@@ -1,6 +1,6 @@
 # catalog -- rules the model catalog answers (`catalog_rules.cjs`); mxcli lint on request
 
-One line per code of the `catalog` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/<CODE>.md`.
+One line per code of the `catalog` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/catalog/<CODE>.md`.
 
 | Code | Wants | Fix |
 |---|---|---|

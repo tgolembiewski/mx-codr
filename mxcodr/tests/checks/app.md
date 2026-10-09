@@ -1,6 +1,6 @@
 # app -- mx check, coverage, precheck, scope, unused, the suite, visual and runtime
 
-One line per code of the `mx`, `coverage`, `precheck`, `scope`, `unused`, `tests` steps; every code blocks DONE unless marked warning. The card: `tests/rulebook/<CODE>.md`.
+One line per code of the `mx`, `coverage`, `precheck`, `scope`, `unused`, `tests` steps; every code blocks DONE unless marked warning. The card: `tests/rulebook/app/<CODE>.md`.
 
 | Code | Wants | Fix |
 |---|---|---|

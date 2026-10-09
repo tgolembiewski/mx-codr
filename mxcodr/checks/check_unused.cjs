@@ -162,7 +162,7 @@ function parseArgs(argv) {
 }
 
 function main() {
-  // --levels / --except from the rulebook (tests/rulebook/UNUSED01.md): except: documents are kept
+  // --levels / --except from the rulebook (tests/rulebook/app/UNUSED01.md): except: documents are kept
   // (the same as --keep), `off` skips the check, `warn` lists instead of blocking.
   const { levels, excepts, rest } = levelArgs(process.argv.slice(2));
   const level = levelOf(levels, 'UNUSED01', 'block');

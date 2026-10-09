@@ -3,7 +3,7 @@
 One file per gate step; the gate names the file for the step that failed. Read that file, not
 `tests/gate/*.sh` or the checkers: the finding already says what to change, the file says why.
 Every code blocks DONE unless its line says "warning". A rule's card, with its level and the person's
-exceptions: `tests/rulebook/<CODE>.md`; all of them: `bash tests/rules.sh list`. Generated from the cards.
+exceptions: `tests/rulebook/<group>/<CODE>.md`; all of them: `bash tests/rules.sh list`. Generated from the cards.
 
 | step | file | codes |
 |---|---|---|

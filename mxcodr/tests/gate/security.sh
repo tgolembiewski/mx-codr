@@ -105,7 +105,7 @@ security_rules() {
 # users at all.
 security_level() {
   local level rules entity views
-  # PRODUCTION01 in the rulebook (tests/rulebook/PRODUCTION01.md): `off` skips the level and VIEW01,
+  # PRODUCTION01 in the rulebook (tests/rulebook/security/PRODUCTION01.md): `off` skips the level and VIEW01,
   # as MDL_REQUIRE_PRODUCTION=0 did; the security rules (CRED01 ...) run either way.
   [ "${MDL_REQUIRE_PRODUCTION:-1}" = "0" ] && { echo "security: not checked (MDL_REQUIRE_PRODUCTION=0)" > "$WORK/security.summary"; return 0; }
   [ "$(mdl_rule_level PRODUCTION01 block)" = "off" ] && { echo "security: not checked (PRODUCTION01 is off in tests/rulebook)" > "$WORK/security.summary"; return 0; }

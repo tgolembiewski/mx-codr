@@ -39,7 +39,7 @@ the gate and do not count for DONE; only `tests/verify-*.test.sh` do.
 
 **What each check code wants, and its fix: `tests/checks/<step>.md`**, the file the gate names for the step that failed; `tests/CHECKS.md` says which file holds a code (layout codes such
 as `USER01`, `NAV01`, `EDGE01`, catalog `UI001`, precheck `SCRIPT01`, `RUNTIME01`, `VIS01`). Each
-rule is a card in `tests/rulebook/<CODE>.md` (level, exceptions: the person's, never yours). Read
+rule is a card, `tests/rulebook/<group>/<CODE>.md`; its level and exceptions are the person's. Read
 that, never `tests/gate/*.sh` or the checkers: the page says in one line what a code requires.
 
 **The syntax digest is already in your context** under Claude Code, Cursor, OpenCode and Pi

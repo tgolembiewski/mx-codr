@@ -62,7 +62,7 @@ tests_section() {
 # itself is no longer run here: its advice is read on request (LINT01 in tests/rulebook/).
 rulebook_section() {
   [ -d tests/rulebook ] || return 0
-  echo "== rulebook (tests/rulebook/<CODE>.md; bash tests/rules.sh)"
+  echo "== rulebook (tests/rulebook/<group>/<CODE>.md; bash tests/rules.sh)"
   local count changed
   count="$(ls tests/rulebook/[A-Za-z]*.md 2>/dev/null | wc -l | tr -d ' ')"
   if changed="$(mdl_rulebook changes 2>/dev/null)"; then

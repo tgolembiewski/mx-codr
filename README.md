@@ -61,7 +61,7 @@ When it is done, open your agent **in the project folder** and ask for a feature
 The gate checks every rule below. If one is broken, it stays red and tells the agent
 what to fix. Codes in brackets are what the gate prints.
 
-Every rule is a card, `tests/rulebook/<CODE>.md`: what it checks, the fix, how hard it judges
+Every rule is a card, `tests/rulebook/<group>/<CODE>.md`: what it checks, the fix, how hard it judges
 (`level: block | warn | info | off`). Under the card's `## Local` you change the level or except a
 document (`except: Orders.Approval_Task   # opened only from the task inbox`); the agent may read
 the cards and propose a line for you to paste, never write one. `bash tests/rules.sh` lists them,
@@ -199,7 +199,7 @@ no checker to remember the arguments of, no order to run things in. After
 | The rules, in prose | `SKILL.md` files in the three directories each host looks in |
 | The always-loaded reminder | `.claude/rules/` and `.cursor/rules/`, and Pi's system prompt through its extension, on every turn |
 | The syntax sessions look up most | a digest from the project's own mxcli, with the pitfalls that cost sessions the most time on top, loaded into the session: `.claude/rules/`, `.cursor/rules/`, `opencode.json`, Pi's system prompt |
-| Every rule's level and exceptions | one card per rule in `tests/rulebook/<CODE>.md`; `bash tests/rules.sh` lists them |
+| Every rule's level and exceptions | one card per rule in `tests/rulebook/<group>/<CODE>.md`; `bash tests/rules.sh` lists them |
 | `UI001`, `SEC007` | the gate's `catalog` step, over mxcli's model catalog; `MOD001`, `REU001`, `UI001` also run as `.claude/lint-rules/*.star` when you call `./mxcli lint` yourself |
 | `check_mdl.py`, `check_test_coverage.py`, `check_layout.py` | the skills that need them name the exact command; the gate runs them too |
 | The gate | host hooks fire it, and the `test-first-delivery` skill tells the agent to |
@@ -290,7 +290,8 @@ database lock stale while the app runs.
 .claude/rules/               the always-loaded rule and the syntax digest (Cursor's copies in .cursor/rules/,
                              Pi gets it through its extension)
 .claude/lint-rules/          found by `mxcli lint` with nothing to register (not run by the gate)
-tests/rulebook/              one card per rule: what it checks, how hard it judges, your exceptions
+tests/rulebook/<group>/      one card per rule (groups: layout, naming, security, paths, catalog, folders,
+                             app): what it checks, how hard it judges, your exceptions
 tools/mdl-checks/            the checkers the skills cite (Node, .cjs)
 tests/                       the harness scripts, plus tests/harness.env
 .claude/settings.local.json  the hooks (Cursor and Codex get their own; OpenCode and Pi

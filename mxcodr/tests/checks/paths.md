@@ -1,6 +1,6 @@
 # paths -- every path a user can take has a test (`check_paths.cjs`)
 
-One line per code of the `paths` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/<CODE>.md`.
+One line per code of the `paths` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/paths/<CODE>.md`.
 
 | Code | Wants | Fix |
 |---|---|---|

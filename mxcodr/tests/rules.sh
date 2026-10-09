@@ -6,7 +6,7 @@
 #   bash tests/rules.sh explain CODE    the card: what it checks, the fix, the ## Local section
 #   bash tests/rules.sh check           validate every card (the gate does this too; a broken card stops every model check)
 #
-# The cards are tests/rulebook/<CODE>.md. A level or an exception is changed by editing the card's
+# The cards are tests/rulebook/<group>/<CODE>.md (layout, naming, security, paths, catalog, folders, app). A level or an exception is changed by editing the card's
 # ## Local section -- by the person, never by a session (the guard blocks it); a session that finds
 # a rule wrong for this app says so in its report with the line to add.
 set -uo pipefail

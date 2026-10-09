@@ -121,12 +121,46 @@ function checkLevel(level, line, fail) {
 }
 
 // Every card of a directory, by code; throws RulebookError on the first broken one.
+// The groups: a folder of the rulebook and a file of tests/checks/ each, by gate step (the steps
+// with one or two rules share app/).
+const DOC_FILES = [
+  ['layout', ['layout'], 'the shape of a signed-in app (skill `spacing-and-layout`)'],
+  ['naming', ['naming'], 'microflows and nanoflows (`check_mdl.cjs --skill naming`, skill `naming-and-captions`)'],
+  ['security', ['security'], 'the security level and the security rules (`security_rules.cjs`)'],
+  ['paths', ['paths'], 'every path a user can take has a test (`check_paths.cjs`)'],
+  ['catalog', ['catalog'], 'rules the model catalog answers (`catalog_rules.cjs`); mxcli lint on request'],
+  ['folders', ['folders'], 'documents in process folders (`check_folders.cjs`, skill `module-structure`)'],
+  ['app', ['mx', 'coverage', 'precheck', 'scope', 'unused', 'tests'], 'mx check, coverage, precheck, scope, unused, the suite, visual and runtime'],
+];
+// The folder a card of <step> belongs in.
+const groupOf = step => (DOC_FILES.find(([, steps]) => steps.includes(step)) || ['app'])[0];
+
+// The card files of a rulebook: <dir>/<group>/<CODE>.md (and, from before the groups, <dir>/<CODE>.md).
+function cardFiles(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+    if (entry.name.startsWith('_') || entry.name.startsWith('.')) continue;
+    if (entry.isDirectory()) {
+      for (const name of fs.readdirSync(path.join(dir, entry.name)).sort()) {
+        if (name.endsWith('.md') && !name.startsWith('_')) out.push(path.join(dir, entry.name, name));
+      }
+    } else if (entry.name.endsWith('.md')) out.push(path.join(dir, entry.name));
+  }
+  return out;
+}
+
+// Every card of a directory, by code; throws RulebookError on the first broken one, on a code that is
+// in two files, and on a card in the folder of another group (URL01 is a layout rule: layout/URL01.md).
 function load(dir) {
   if (!fs.existsSync(dir)) throw new RulebookError(`${dir}: no rulebook directory`);
   const cards = {};
-  for (const name of fs.readdirSync(dir).sort()) {
-    if (!name.endsWith('.md') || name.startsWith('_')) continue;
-    const card = parseCard(path.join(dir, name));
+  for (const file of cardFiles(dir)) {
+    const card = parseCard(file);
+    if (cards[card.code]) throw new RulebookError(`${file}:1: ${card.code} is also ${cards[card.code].file}; a rule has one card`);
+    const folder = path.basename(path.dirname(file));
+    if (path.resolve(path.dirname(file)) !== path.resolve(dir) && folder !== groupOf(card.header.step)) {
+      throw new RulebookError(`${file}:1: ${card.code} is a ${card.header.step} rule; its card goes in ${groupOf(card.header.step)}/`);
+    }
     cards[card.code] = card;
   }
   return cards;
@@ -211,36 +245,32 @@ function localOf(text) {
 function merge(src, dstDir) {
   fs.mkdirSync(dstDir, { recursive: true });
   const out = { written: 0, kept: 0, left: 0 };
+  // The installed cards by code, wherever they are: flat (bundles before the groups) or in a folder.
+  const installed = new Map();
+  for (const file of fs.existsSync(dstDir) ? cardFiles(dstDir) : []) installed.set(path.basename(file, '.md'), file);
   const bundle = new Set();
-  for (const name of fs.readdirSync(src).sort()) {
-    if (!name.endsWith('.md')) continue;
-    bundle.add(name);
-    const text = fs.readFileSync(path.join(src, name), 'utf8');
-    const target = path.join(dstDir, name);
-    if (!fs.existsSync(target)) { fs.writeFileSync(target, text); out.written++; continue; }
-    const local = localOf(fs.readFileSync(target, 'utf8'));
+  for (const file of cardFiles(src)) {
+    const code = path.basename(file, '.md');
+    bundle.add(code);
+    const text = fs.readFileSync(file, 'utf8');
+    const target = path.join(dstDir, path.relative(src, file));
+    const old = installed.get(code);
+    const local = old ? localOf(fs.readFileSync(old, 'utf8')) : '';
     const merged = local ? withoutLocal(text) + '\n' + local : text;
-    if (merged !== fs.readFileSync(target, 'utf8')) fs.writeFileSync(target, merged);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    if (!fs.existsSync(target) || merged !== fs.readFileSync(target, 'utf8')) fs.writeFileSync(target, merged);
+    // A card that moved into its group's folder: the old file goes, its ## Local came along.
+    if (old && path.resolve(old) !== path.resolve(target)) fs.rmSync(old, { force: true });
     out.written++;
     // Kept: a ## Local with a line of the person's own (the bundle's template holds comments only).
     if (local.split('\n').slice(1).some(l => stripComment(l))) out.kept++;
   }
   // The appendix bundle 2026.10.09.2-.3 put here is checks/docs/hints.md now: not a card, not the person's.
   fs.rmSync(path.join(dstDir, '_app-appendix.md'), { force: true });
-  for (const name of fs.readdirSync(dstDir)) if (name.endsWith('.md') && !name.startsWith('_') && !bundle.has(name)) out.left++;
+  for (const code of installed.keys()) if (!bundle.has(code)) out.left++;
   return out;
 }
 
-// tests/checks/<file>.md: one file per gate step, the steps with one rule folded into app.md.
-const DOC_FILES = [
-  ['layout', ['layout'], 'the shape of a signed-in app (skill `spacing-and-layout`)'],
-  ['naming', ['naming'], 'microflows and nanoflows (`check_mdl.cjs --skill naming`, skill `naming-and-captions`)'],
-  ['security', ['security'], 'the security level and the security rules (`security_rules.cjs`)'],
-  ['paths', ['paths'], 'every path a user can take has a test (`check_paths.cjs`)'],
-  ['catalog', ['catalog'], 'rules the model catalog answers (`catalog_rules.cjs`); mxcli lint on request'],
-  ['folders', ['folders'], 'documents in process folders (`check_folders.cjs`, skill `module-structure`)'],
-  ['app', ['mx', 'coverage', 'precheck', 'scope', 'unused', 'tests'], 'mx check, coverage, precheck, scope, unused, the suite, visual and runtime'],
-];
 const section = (card, name) => { const m = new RegExp('^## ' + name + '\\n([\\s\\S]*?)(?=\\n## |$)', 'm').exec(card.doc); return m ? m[1].trim().replace(/\s*\n\s*/g, ' ') : ''; };
 const levelNote = card => card.header.fixed === 'yes' || card.header.level === 'block' ? '' : card.header.level === 'warn' ? 'warning: ' : card.header.level === 'info' ? 'info: ' : 'off unless the rulebook turns it on: ';
 
@@ -256,7 +286,7 @@ function docs(cards, dir, testsDir) {
     const hints = path.join(__dirname, 'docs', 'hints.md');
     const extra = file === 'app' && fs.existsSync(hints) ? fs.readFileSync(hints, 'utf8').replace(/\r\n?/g, '\n').trim() : '';
     const lines = [`# ${file} -- ${what}`, '',
-      `One line per code of the \`${steps.join('`, `')}\` step${steps.length > 1 ? 's' : ''}; every code blocks DONE unless marked warning. The card: \`tests/rulebook/<CODE>.md\`.`,
+      `One line per code of the \`${steps.join('`, `')}\` step${steps.length > 1 ? 's' : ''}; every code blocks DONE unless marked warning. The card: \`tests/rulebook/${file}/<CODE>.md\`.`,
       '', '| Code | Wants | Fix |', '|---|---|---|'];
     for (const c of rows) lines.push(`| \`${c.code}\` | ${levelNote(c)}${c.title} | ${section(c, 'Fix')} |`);
     if (extra) lines.push('', '## Hints: what the gate says when...', '', '| Situation | Wants | Fix |', '|---|---|---|', ...extra.split('\n'));
@@ -268,7 +298,7 @@ function docs(cards, dir, testsDir) {
     'One file per gate step; the gate names the file for the step that failed. Read that file, not',
     '`tests/gate/*.sh` or the checkers: the finding already says what to change, the file says why.',
     'Every code blocks DONE unless its line says "warning". A rule\'s card, with its level and the person\'s',
-    'exceptions: `tests/rulebook/<CODE>.md`; all of them: `bash tests/rules.sh list`. Generated from the cards.',
+    'exceptions: `tests/rulebook/<group>/<CODE>.md`; all of them: `bash tests/rules.sh list`. Generated from the cards.',
     '', '| step | file | codes |', '|---|---|---|'];
   fs.writeFileSync(path.join(testsDir, 'CHECKS.md'), head.concat(index).join('\n') + '\n');
   return DOC_FILES.length;
@@ -322,4 +352,4 @@ function main() {
 // `rulebook.cjs ... list | head` closes stdout early: not an error.
 process.stdout.on('error', e => { if (e.code === 'EPIPE') process.exit(0); throw e; });
 if (require.main === module) process.exitCode = main();
-module.exports = { parseCard, load, levels, overrides, excepts, digest, changes, effective, levelArgs, levelOf, withoutLocal, localOf, merge, docs, RulebookError, LEVELS, STEPS };
+module.exports = { parseCard, load, cardFiles, groupOf, levels, overrides, excepts, digest, changes, effective, levelArgs, levelOf, withoutLocal, localOf, merge, docs, RulebookError, LEVELS, STEPS };

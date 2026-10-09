@@ -1,6 +1,6 @@
 # security -- the security level and the security rules (`security_rules.cjs`)
 
-One line per code of the `security` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/<CODE>.md`.
+One line per code of the `security` step; every code blocks DONE unless marked warning. The card: `tests/rulebook/security/<CODE>.md`.
 
 | Code | Wants | Fix |
 |---|---|---|
