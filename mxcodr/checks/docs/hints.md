@@ -1,8 +1,8 @@
-| stale client bundle | a test failed on a 404 for `dist/*.js` after a `--watch` rebuild (the failure line says so) | `bash tests/gate.sh --restart --only <feature>` -- not the page, not a widget |
+| stale client bundle | a test failed on a 404 for `dist/*.js` after a `--watch` rebuild | `bash tests/gate.sh --restart --only <feature>` -- not the page, not a widget |
 | Studio Pro has this project open | no mxcli edit while Studio Pro holds the model: its next save replaces what mxcli wrote (warning) | close Studio Pro without saving, or make the change there |
-| "went green without ever being red" | a test that was seen to fail once (warning) | break the feature, `bash tests/gate.sh --only <feature>`, fix it; or list the test in `MDL_ALLOW_GREEN_FIRST` when green by nature |
+| "went green without ever being red" | a test seen to fail once (warning) | break the feature, `bash tests/gate.sh --only <feature>`, fix it; or `MDL_ALLOW_GREEN_FIRST` when green by nature |
 | `CE0582` | no classic drop-down (not React-client compatible) | `combobox` or `radiobuttons` on the same enumeration or Boolean attribute |
 | `CE0106` `CE0557` | a microflow or page reached from a page, button or menu has a role | the hint's `grant execute on microflow ... to <role>;` / `grant view on page ...;` in the script that creates the document |
-| `CE0007` `CE0117` `CE0161` `CE0642` `CE1613` `CE2729` `CE7247` | build errors the gate and precheck print a hint for | read the hint under the error; the pitfalls in the syntax digest cover the same ground |
+| `CE0007` `CE0117` `CE0161` `CE0642` `CE1613` `CE2729` `CE7247` | build errors the gate and precheck explain | read the hint under the error; the digest's pitfalls cover the same |
 | `CE7247` | a reserved name, or an invalid URL (a REST client BaseUrl set to a constant) | rename Owner/Type/Default; a BaseUrl is a literal http(s):// address, a mock URL is built in the microflow |
-| missing Marketplace module | mx check: "couldn't find the X module" -- not logged in, so builds and gates wait | ask the person to run `./mxcli auth login`, then `./mxcli marketplace search` and `install <id>`; never build a replacement |
+| missing Marketplace module | mx check: "couldn't find the X module" (not logged in) | ask the person for `./mxcli auth login`, then `./mxcli marketplace search` and `install <id>`; never build a replacement |

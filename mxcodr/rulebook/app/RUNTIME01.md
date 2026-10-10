@@ -11,7 +11,7 @@ key: none
 While the tests ran, the Mendix server logged no errors. A test can pass while something failed in the background.
 
 ## Fix
-The log line names the microflow or page; `MDL_RUNTIME_ERRORS=error` makes it block.
+The log line names the flow or page; `MDL_RUNTIME_ERRORS=error` blocks.
 
 ## Local
 # level: warn

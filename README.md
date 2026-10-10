@@ -110,6 +110,7 @@ the cards and propose a line for you to paste, never write one. `bash tests/rule
 - Everything on a page inside a layout grid, so nothing touches the edge of the window (`EDGE01`).
 - A URL on every page that is not a pop-up, whenever Mendix allows one (no non-persistent parameter), so it can be bookmarked, shared and reloaded (`URL01`).
 - A heading on every page (`HEAD01`, a warning).
+- Browser tests wait for what happens, not for time (`WAIT01`, a warning); `filter_list` filters any list and answers as soon as the list does.
 - Pages checked as they render: after every test the gate measures the page for widgets
   that overlap, sideways scrolling, cut-off text and charts that do not fit one screen
   (`VIS01`-`04`), and flags an alert

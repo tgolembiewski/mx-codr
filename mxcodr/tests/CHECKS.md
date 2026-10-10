@@ -13,4 +13,4 @@ exceptions: `tests/rulebook/<group>/<CODE>.md`; all of them: `bash tests/rules.s
 | paths | `tests/checks/paths.md` | ISO01, OUTCOME01, ROLE01, SVC01, WF01, WF02 |
 | catalog | `tests/checks/catalog.md` | LINT01, SEC007, UI001 |
 | folders | `tests/checks/folders.md` | FOLDER01 |
-| mx, coverage, precheck, scope, unused, tests | `tests/checks/app.md` | COVERAGE01, LOOK01, LOOK02, MX01, RUNTIME01, SCOPE01, SCRIPT01, STALE01, TEST01, TESTS01, UNUSED01, VIS01, VIS02, VIS03, VIS04, CE0582, CE0106, CE0557, CE0007, CE0117, CE0161, CE0642, CE1613, CE2729, CE7247 |
+| mx, coverage, precheck, scope, unused, tests | `tests/checks/app.md` | COVERAGE01, LOOK01, LOOK02, MX01, RUNTIME01, SCOPE01, SCRIPT01, STALE01, TEST01, TESTS01, UNUSED01, VIS01, VIS02, VIS03, VIS04, WAIT01, CE0582, CE0106, CE0557, CE0007, CE0117, CE0161, CE0642, CE1613, CE2729, CE7247 |
