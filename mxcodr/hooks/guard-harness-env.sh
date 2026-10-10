@@ -125,8 +125,8 @@ fi
 if [ "$what" = "env" ]; then reason="writes tests/harness.env"; else reason="sets a gate switch for this run"; fi
 
 cat >&2 <<MSG
-Blocked: this call $reason. tests/harness.env holds the gate's switches (MDL_REQUIRE_PRODUCTION,
-MDL_ALLOW_GREEN_FIRST, MDL_VISUAL, ...) and belongs to the person, not the session: a switch a
+Blocked: this call $reason. tests/harness.env holds the gate's switches (MDL_ALLOW_GREEN_FIRST,
+MDL_PRECHECK, MDL_DB_RESET, ...) and belongs to the person, not the session: a switch a
 session sets stays for every later session, whatever it is asked to build. Do not work around the
 check -- meet it:
   - security: turn it on (alter project security level PRODUCTION) with a role per kind of user;

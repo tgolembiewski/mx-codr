@@ -139,7 +139,7 @@ caption that is still the generated default. The gate runs it over every microfl
 and nanoflow in the app's own modules on every full run (the `naming:` line of its
 summary), so there is nothing to run by hand after a flow lands; the command below is
 for checking one draft before it goes in. In the gate the caption rules are warnings
-(they do not block DONE; `MDL_CAPTIONS=error` in `tests/harness.env` makes them block),
+(they do not block DONE; `level: block` in the cards' `## Local` makes them block),
 and variable names still fail -- write the captions as you go all the same.
 
 ## Decision captions

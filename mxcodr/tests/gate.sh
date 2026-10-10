@@ -19,9 +19,9 @@
 # Env: BASE_URL (else 8081 then 8080), APP_PORT (8081), SCRIPT_TIMEOUT (90s),
 #      BOOT_TIMEOUT (180s), RUNTIME_LOG, ADMIN_PORT, ADMIN_PASSWORD, SERVE_PORT,
 #      ALLOW_BUSY_SESSION=1, MDL_GATE_CACHE=0, MDL_BOOT_COMMAND (replaces mxcli run),
-#      MDL_MXBUILD_PATH, MDL_DB_*, MDL_PSQL, MDL_VISUAL|MDL_RUNTIME_ERRORS=warn|error|0,
-#      MDL_VISUAL_REVIEW=agent, MDL_CAPTIONS|MDL_SCOPE|MDL_WIDGET_NAMES=warn|error, MDL_CLOSE_BROWSER=1,
-#      MDL_KEEP_UNUSED, MDL_UNTESTED, MDL_PATHS=error, MDL_DB_RESET=session -- also in tests/harness.env.
+#      MDL_MXBUILD_PATH, MDL_DB_*, MDL_PSQL, MDL_VISUAL_REVIEW=agent, MDL_CLOSE_BROWSER=1,
+#      MDL_DB_RESET=session -- also in tests/harness.env. A rule's level and exceptions: its card
+#      in tests/rulebook/ (bash tests/rules.sh lists them).
 # Lines 2-24 are printed by --help; keep them 23 lines.
 
 # How to read this file: main() at the bottom is the whole gate, step by step. The steps
@@ -121,7 +121,7 @@ print_warnings() {
   local file shown=0
   for file in "$WORK"/*.warnings; do
     [ -s "$file" ] || continue
-    [ "$shown" = "0" ] && { echo; echo "== warnings (they do not block DONE; fix them together with your next fix, not in a gate run of their own -- MDL_VISUAL, MDL_RUNTIME_ERRORS, MDL_CAPTIONS or MDL_SCOPE=error makes them block)"; }
+    [ "$shown" = "0" ] && { echo; echo "== warnings (they do not block DONE; fix them together with your next fix, not in a gate run of their own -- level: block in a rule's card in tests/rulebook/ makes it block)"; }
     shown=1
     head -12 "$file"
   done
@@ -328,6 +328,12 @@ main() {
   fi
 
   preflight_films
+  # Keys of tests/harness.env that once set a rule's level: no longer read (portable.sh).
+  if [ -n "${MDL_RETIRED_KEYS:-}" ]; then
+    { echo "   - tests/harness.env: $MDL_RETIRED_KEYS no longer read -- a rule's level and exceptions are in its"
+      echo "     card in tests/rulebook/ (## Local); re-running the installer moves them there"
+    } > "$WORK/harness-env.warnings"
+  fi
   declare -F dbsnap_take >/dev/null && dbsnap_take
   # 1. The model checks need no app: start them now, they run while the suite does.
   if [ "$TESTS_ONLY" = "0" ] && [ -z "$ONLY" ]; then

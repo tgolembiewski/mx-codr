@@ -101,13 +101,12 @@ security_rules() {
 # microflow access and the read/write rights, but IGNORES the XPath constraint on an access rule --
 # the row-level rule is stored, passes mx check, and lets every row through. Two sessions
 # built customer isolation on rules that did nothing. Production is therefore the level the gate
-# requires; MDL_REQUIRE_PRODUCTION=0 in tests/harness.env is for an app that deliberately has no
-# users at all.
+# requires; PRODUCTION01 `off` in tests/rulebook/security/PRODUCTION01.md is for an app that
+# deliberately has no users at all.
 security_level() {
   local level rules entity views
-  # PRODUCTION01 in the rulebook (tests/rulebook/security/PRODUCTION01.md): `off` skips the level and VIEW01,
-  # as MDL_REQUIRE_PRODUCTION=0 did; the security rules (CRED01 ...) run either way.
-  [ "${MDL_REQUIRE_PRODUCTION:-1}" = "0" ] && { echo "security: not checked (MDL_REQUIRE_PRODUCTION=0)" > "$WORK/security.summary"; return 0; }
+  # PRODUCTION01 in the rulebook (tests/rulebook/security/PRODUCTION01.md): `off` skips the level and
+  # VIEW01; the security rules (CRED01 ...) run either way.
   [ "$(mdl_rule_level PRODUCTION01 block)" = "off" ] && { echo "security: not checked (PRODUCTION01 is off in tests/rulebook)" > "$WORK/security.summary"; return 0; }
   level="$("$MXCLI" -p "$MPR" -c "SHOW PROJECT SECURITY" 2>/dev/null | sed -n 's/^Security Level:[[:space:]]*//p' | head -1)"
   if [ -z "$level" ]; then

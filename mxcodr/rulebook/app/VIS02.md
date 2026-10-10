@@ -11,7 +11,7 @@ key: none
 The page does not scroll sideways.
 
 ## Fix
-A negative margin or a fixed width wider than the screen (`MDL_VISUAL=error` blocks).
+A negative margin or a fixed width wider than the screen (`level: block` in ## Local blocks).
 
 ## Local
 # level: warn

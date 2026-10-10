@@ -92,7 +92,7 @@ check_coverage() {
 }
 
 # Runs check_mdl.cjs --skill naming over the described microflows and nanoflows. Caption rules are
-# warnings unless MDL_CAPTIONS=error: 286 of them once landed on a session with no test green.
+# warnings unless the CAPTION cards are at `block`: 286 of them once landed on a session with no test green.
 check_naming() {
   [ -f tools/mdl-checks/check_mdl.cjs ] || {
     echo "naming: could not run -- tools/mdl-checks/check_mdl.cjs is missing" > "$WORK/naming.summary"
@@ -113,8 +113,14 @@ check_naming() {
     echo "naming: no microflow or nanoflow to check" > "$WORK/naming.summary"; return 0
   fi
   rulebook_ok naming || return 2
-  local captions=warn total
-  [ "${MDL_CAPTIONS:-warn}" = "error" ] && captions=error
+  # The six baseline caption cards (tests/rulebook/naming/CAPTION01..06) all at `block`: every caption
+  # finding blocks, not only on a microflow new or changed since the last DONE. One of them at `block`
+  # alone is raised by --levels below.
+  local captions=error total code_ levels_
+  levels_="$(mdl_rulebook levels naming 2>/dev/null)"
+  for code_ in CAPTION01 CAPTION02 CAPTION03 CAPTION04 CAPTION05 CAPTION06; do
+    case "$levels_" in *"\"$code_\":\"block\""*) ;; *) captions=warn; break ;; esac
+  done
   local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args naming)
   # PERF07 reads the entities' indexes and the pages' data sources as well.
   rm -f "$WORK/naming.unread"
@@ -154,7 +160,7 @@ check_naming() {
     { cat "$WORK/naming.unread" 2>/dev/null
       [ -n "$perf_lines" ] && printf '%s\n' "$perf_lines"
       printf '%s\n' "$out" | grep -E '^\s+! ' | grep -vE '\[(PERF|EVENT|ERR)' | head -8 | sed -E 's/^[[:space:]]+! /   - /'
-      [ "$other_total" -gt 8 ] && echo "   ... 8 of $other_total naming warnings shown (MDL_CAPTIONS=error makes caption rules block)"
+      [ "$other_total" -gt 8 ] && echo "   ... 8 of $other_total naming warnings shown (level: block in tests/rulebook/naming/CAPTION01..06.md makes them block)"
     } > "$WORK/naming.warnings"
   fi
   return "$gate"
@@ -162,7 +168,7 @@ check_naming() {
 
 # SCOPE01: a page's data source microflow returns rows its role may not read -- a microflow does
 # not apply entity access, so an XPath-scoped access rule does not reach them. A warning unless
-# MDL_SCOPE=error: a DeepSeek portal leaked another customer's invoice this way, and only its
+# SCOPE01 is at `block`: a DeepSeek portal leaked another customer's invoice this way, and only its
 # verify test caught it.
 check_scope() {
   local status out code total
@@ -174,7 +180,7 @@ check_scope() {
     echo "scope: could not run -- $(printf '%s\n' "$out" | tail -1)" > "$WORK/scope.summary"; return 2
   fi
   # 0 passes and 1 has findings, each under a PASS or WARN line; anything else (a traceback
-  # exits 1 too) did not check the model, and counted as "findings", a pass while MDL_SCOPE=warn.
+  # exits 1 too) did not check the model, and counted as "findings", a pass while SCOPE01 warned.
   if { [ "$code" != "0" ] && [ "$code" != "1" ]; } || ! printf '%s\n' "$out" | head -1 | grep -qE '^(PASS|WARN|FAIL) '; then
     echo "scope: could not run -- check_scope.cjs exited $code" > "$WORK/scope.summary"
     printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 > "$WORK/scope.detail"
@@ -182,8 +188,8 @@ check_scope() {
   fi
   echo "scope: $(printf '%s\n' "$out" | head -1)" > "$WORK/scope.summary"
   [ "$code" = "0" ] && return 0
-  # SCOPE01 at `block` (tests/rulebook, or MDL_SCOPE=error while it exists): the checker says FAIL.
-  if [ "${MDL_SCOPE:-warn}" = "error" ] || printf '%s\n' "$out" | head -1 | grep -q '^FAIL '; then
+  # SCOPE01 at `block` (tests/rulebook/app/SCOPE01.md): the checker says FAIL.
+  if printf '%s\n' "$out" | head -1 | grep -q '^FAIL '; then
     printf '%s\n' "$out" | grep -E '^\s+- ' > "$WORK/scope.detail"
     return 1
   fi
@@ -198,13 +204,11 @@ check_scope() {
 # XPath, probes, a reset flow no button called). Three proofs, all on a copy of the project:
 # check_unused.cjs finds no reference in the catalog and the name in no other document, Java,
 # JavaScript, theme or test file (a test's `# covers:` line declares, it does not use); then every one of them is dropped on the copy and mx check must
-# still report 0 errors. A document Mendix still needs is never reported. MDL_KEEP_UNUSED in
-# tests/harness.env (Mod.Doc,Mod.Other) keeps one on purpose.
+# still report 0 errors. A document Mendix still needs is never reported. An `except:` line in
+# tests/rulebook/app/UNUSED01.md keeps one on purpose.
 check_unused() {
   local status out found code scratch="$WORK/unusedcheck" count errors
-  local -a extra=()
-  [ -n "${MDL_KEEP_UNUSED:-}" ] && extra+=(--keep "$MDL_KEEP_UNUSED")
-  step_run unused unused check_unused.cjs copy ${extra[@]+"${extra[@]}"}; status=$?
+  step_run unused unused check_unused.cjs copy; status=$?
   [ "$status" = "3" ] && return 0
   [ "$status" = "0" ] || return "$status"
   found="$STEP_OUT"; code="$STEP_CODE"
@@ -249,8 +253,9 @@ check_unused() {
     echo "   Dropping one can leave what only it called unused: run the gate again after."
     echo "   Its source in mdlsource/ goes too, or a re-run brings it back; and its name on a # covers: line"
     echo "   of tests/verify-*.test.sh (a covers: line is no use -- coverage fails on a name not in the model)."
-    echo "   Kept on purpose (an API for later, a page opened by URL)? The person adds it to tests/harness.env:"
-    echo "     MDL_KEEP_UNUSED=$(sed -n 's/^drop [a-z ]* \([^ ;]*\);$/\1/p' "$WORK/unused.drop.mdl" | head -1)"
+    echo "   Kept on purpose (an API for later, a page opened by URL)? The person adds a line under ## Local"
+    echo "   in tests/rulebook/app/UNUSED01.md:"
+    echo "     except: $(sed -n 's/^drop [a-z ]* \([^ ;]*\);$/\1/p' "$WORK/unused.drop.mdl" | head -1)   # why it stays"
   } > "$WORK/unused.detail"
   return 1
 }
@@ -260,13 +265,11 @@ check_unused() {
 # published service needs a test that walks it -- read from the model, so it holds for any app.
 # Paths that existed when the harness was installed (.mxcli/gate-cache/paths-baseline.json, written
 # by the installer) and have not changed since are warnings; new or changed ones block. WF01 (a
-# workflow task anyone can decide) always blocks. MDL_UNTESTED in tests/harness.env: the person's
-# list of paths deliberately left without a test.
+# workflow task anyone can decide) always blocks. The person's paths deliberately left without a
+# test are `except:` lines in the paths cards (tests/rulebook/paths/).
 check_paths() {
   local status
   local -a extra=(--baseline "$CACHE_DIR/paths-baseline.json")
-  [ -n "${MDL_UNTESTED:-}" ] && extra+=(--untested "$MDL_UNTESTED")
-  [ "${MDL_PATHS:-}" = "error" ] && extra+=(--all-fail)
   step_run paths paths check_paths.cjs copy "${extra[@]}"; status=$?
   [ "$status" = "3" ] && return 0
   [ "$status" = "0" ] || return "$status"

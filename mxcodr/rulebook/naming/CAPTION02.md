@@ -12,7 +12,7 @@ baseline: captions
 No activity keeps the caption Mendix gives it by default, like "Retrieve Invoice" or "Commit object".
 
 ## Fix
-Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`MDL_CAPTIONS=error`: all block).
+Warns until the first DONE; a microflow new or changed since the last DONE then blocks (`level: block` on CAPTION01-06: all block).
 
 ## Local
 # level: warn

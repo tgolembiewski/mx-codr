@@ -1,6 +1,14 @@
 # install/step_prereqs.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Step 11: check and install the prerequisites. Runs as it is read.
 
+# The project's tests/harness.env as it was, before the steps below rewrite it (setup_docker_mode
+# writes it from scratch): step_harness moves its old rule switches into the rulebook's cards.
+OLD_HARNESS_ENV=""
+if [ -f "$APP/tests/harness.env" ]; then
+  OLD_HARNESS_ENV="${TMPDIR:-/tmp}"; OLD_HARNESS_ENV="${OLD_HARNESS_ENV%/}/mdl-old-harness-env.$$"
+  cp "$APP/tests/harness.env" "$OLD_HARNESS_ENV" 2>/dev/null && chmod 600 "$OLD_HARNESS_ENV" 2>/dev/null || OLD_HARNESS_ENV=""
+fi
+
 # --- 11. Step: prerequisites (Node, Playwright, mxcli, MxBuild, PostgreSQL, Docker, JDK) ---
 # Missing tools are collected and reported in the summary.
 DEPS_LOG="${TMPDIR:-/tmp}"; DEPS_LOG="${DEPS_LOG%/}/mdl-skills-deps.log"

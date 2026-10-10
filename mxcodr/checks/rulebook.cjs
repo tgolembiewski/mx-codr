@@ -37,6 +37,8 @@
 //        rulebook.cjs <dir> explain <CODE>   the card
 //        rulebook.cjs <dir> docs <tests-dir> write tests/checks/<step>.md and tests/CHECKS.md from the cards
 //        rulebook.cjs <dir> merge <app-dir>  install: new card text, the app's ## Local kept word for word
+//        rulebook.cjs <dir> migrate <env>    install: the old MDL_* switches of <env> as ## Local lines
+//        rulebook.cjs <dir> retired <env>    the old MDL_* switches set in <env>
 // Exit 2 when the directory is missing or a card is broken (the message names the card and line).
 'use strict';
 const fs = require('fs');
@@ -182,15 +184,18 @@ function excepts(cards, step) {
 
 // Only what the person changed: codes whose effective level differs from the card's default. The
 // checkers take these as --levels and keep their own behaviour for every other code, so an
-// untouched rulebook changes nothing.
+// untouched rulebook changes nothing. A baseline card (the paths cards: `level: block` with
+// `baseline: paths`) blocks only what is new since the baseline; an explicit `level: block` in its
+// ## Local means every finding blocks, as MDL_PATHS=error did, so it is passed on too.
+const overridden = c => c.local.level && (c.local.level !== c.header.level || (c.header.baseline && c.local.level === 'block'));
 function overrides(cards, step) {
   const out = {};
-  for (const c of Object.values(cards)) if ((!step || c.header.step === step) && c.local.level && c.local.level !== c.header.level) out[c.code] = c.local.level;
+  for (const c of Object.values(cards)) if ((!step || c.header.step === step) && overridden(c)) out[c.code] = c.local.level;
   return out;
 }
 
 function digest(cards, step) {
-  return crypto.createHash('sha256').update(JSON.stringify([levels(cards, step), excepts(cards, step)])).digest('hex').slice(0, 16);
+  return crypto.createHash('sha256').update(JSON.stringify([levels(cards, step), excepts(cards, step), overrides(cards, step)])).digest('hex').slice(0, 16);
 }
 
 // What the person changed, for the step's summary line: "2 excepted (UNUSED01 Orders.X), WRITE01 raised to block".
@@ -203,6 +208,8 @@ function changes(cards, step) {
     if (c.local.level && c.local.level !== c.header.level) {
       const up = ['off', 'info', 'warn', 'block'];
       parts.push(`${c.code} ${up.indexOf(c.local.level) > up.indexOf(c.header.level) ? 'raised' : 'lowered'} to ${c.local.level}`);
+    } else if (overridden(c)) {
+      parts.push(`${c.code} at block for every finding, old ones too`);
     }
   }
   if (ex.length) parts.unshift(`${ex.length} excepted (${ex.join(', ')})`);
@@ -269,6 +276,72 @@ function merge(src, dstDir) {
   fs.rmSync(path.join(dstDir, '_app-appendix.md'), { force: true });
   for (const code of installed.keys()) if (!bundle.has(code)) out.left++;
   return out;
+}
+
+// The tests/harness.env switches that set a rule's level before the rulebook (bundles up to
+// 2026.10.10.2), as `## Local` lines: {KEY: {value: [[CODE, 'level', level], ...]}}. A value not
+// listed (the default, or one the switch never had) moves nothing.
+const VISUAL = ['VIS01', 'VIS02', 'VIS03', 'VIS04', 'LOOK01', 'LOOK02', 'ALERT01'];
+const CAPTIONS = ['CAPTION01', 'CAPTION02', 'CAPTION03', 'CAPTION04', 'CAPTION05', 'CAPTION06'];
+const PATHS = ['OUTCOME01', 'ROLE01', 'ISO01', 'SVC01', 'WF01', 'WF02'];
+const SWITCHES = {
+  MDL_VISUAL: { error: VISUAL.map(c => [c, 'block']), 0: VISUAL.map(c => [c, 'off']) },
+  MDL_RUNTIME_ERRORS: { error: [['RUNTIME01', 'block']], 0: [['RUNTIME01', 'off']] },
+  MDL_SCOPE: { error: [['SCOPE01', 'block']] },
+  MDL_CAPTIONS: { error: CAPTIONS.map(c => [c, 'block']) },
+  MDL_WIDGET_NAMES: { error: [['NAME02', 'block']], 0: [['NAME01', 'off'], ['NAME02', 'off']], off: [['NAME01', 'off'], ['NAME02', 'off']] },
+  MDL_PATHS: { error: PATHS.map(c => [c, 'block']) },
+  MDL_REQUIRE_PRODUCTION: { 0: [['PRODUCTION01', 'off']] },
+  MDL_TEST_FIRST: { 0: [['TEST01', 'off']] },
+};
+// MDL_UNTESTED=key,key: the card whose findings have that key's shape (check_paths.cjs joins every
+// paths card's except: lines, so the card only says where a reader looks).
+const untestedCard = key => key.startsWith('role:') ? 'ROLE01' : key.includes('|') ? 'ISO01' : /[/#]/.test(key) ? 'WF02' : 'OUTCOME01';
+const RETIRED = [...Object.keys(SWITCHES), 'MDL_UNTESTED', 'MDL_KEEP_UNUSED'];
+
+// KEY=value lines of a harness.env (one layer of quotes, as portable.sh reads it).
+function envValues(file) {
+  const out = {};
+  if (!file || !fs.existsSync(file)) return out;
+  for (const raw of fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n').split('\n')) {
+    const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=(.*)$/.exec(raw);
+    if (!m) continue;
+    let v = m[2].trim();
+    if (/^".*"$/.test(v) || /^'.*'$/.test(v)) v = v.slice(1, -1);
+    out[m[1]] = v;
+  }
+  return out;
+}
+
+// migrate: the retired switches of <env-file> become `## Local` lines of the app's cards. A card whose
+// ## Local already sets a level keeps it; an except: already there is not repeated. Returns the
+// lines written, as "CODE: level: x" / "CODE: except: y", for the install summary.
+function migrate(dir, envFile) {
+  const env = envValues(envFile);
+  const want = [];   // [code, 'level'|'except', value, from]
+  for (const [key, byValue] of Object.entries(SWITCHES)) {
+    if (!(key in env)) continue;
+    for (const [code, level] of byValue[env[key]] || []) want.push([code, 'level', level, key]);
+  }
+  const list = v => String(v || '').split(/[,\s]+/).filter(Boolean);
+  for (const k of list(env.MDL_UNTESTED)) want.push([untestedCard(k), 'except', k, 'MDL_UNTESTED']);
+  for (const d of list(env.MDL_KEEP_UNUSED)) want.push(['UNUSED01', 'except', d, 'MDL_KEEP_UNUSED']);
+  const files = {};
+  for (const file of fs.existsSync(dir) ? cardFiles(dir) : []) files[path.basename(file, '.md')] = file;
+  const written = [];
+  for (const [code, kind, value, from] of want) {
+    const file = files[code];
+    if (!file) continue;
+    const card = parseCard(file);
+    if (kind === 'level' && card.local.level) continue;
+    if (kind === 'except' && card.local.except.includes(value)) continue;
+    let text = fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+    if (!/^##\s+Local\s*$/m.test(text)) text += '\n\n## Local';
+    text += `\n${kind}: ${value}   # moved from ${from} in tests/harness.env\n`;
+    fs.writeFileSync(file, text);
+    written.push(`${code}: ${kind}: ${value}`);
+  }
+  return written;
 }
 
 const section = (card, name) => { const m = new RegExp('^## ' + name + '\\n([\\s\\S]*?)(?=\\n## |$)', 'm').exec(card.doc); return m ? m[1].trim().replace(/\s*\n\s*/g, ' ') : ''; };
@@ -340,6 +413,15 @@ function main() {
       if (!arg) { process.stderr.write('usage: rulebook.cjs <dir> docs <tests-dir>\n'); return 2; }
       process.stdout.write(`rulebook: ${docs(cards, dir, arg)} file(s) and CHECKS.md written under ${arg}\n`); return 0;
     }
+    case 'migrate': {
+      // rulebook.cjs <app>/tests/rulebook migrate <old harness.env>
+      for (const line of migrate(dir, arg)) process.stdout.write(`moved ${line}\n`);
+      return 0;
+    }
+    case 'retired': {
+      // The retired switches set in <harness.env>, space-separated (the installer drops them).
+      process.stdout.write(RETIRED.filter(k => k in envValues(arg)).join(' ') + '\n'); return 0;
+    }
     case 'merge': {
       if (!arg) { process.stderr.write('usage: rulebook.cjs <dir> merge <app-dir>\n'); return 2; }
       const r = merge(dir, path.join(arg, 'tests', 'rulebook'));
@@ -352,4 +434,4 @@ function main() {
 // `rulebook.cjs ... list | head` closes stdout early: not an error.
 process.stdout.on('error', e => { if (e.code === 'EPIPE') process.exit(0); throw e; });
 if (require.main === module) process.exitCode = main();
-module.exports = { parseCard, load, cardFiles, groupOf, levels, overrides, excepts, digest, changes, effective, levelArgs, levelOf, withoutLocal, localOf, merge, docs, RulebookError, LEVELS, STEPS };
+module.exports = { migrate, envValues, RETIRED, parseCard, load, cardFiles, groupOf, levels, overrides, excepts, digest, changes, effective, levelArgs, levelOf, withoutLocal, localOf, merge, docs, RulebookError, LEVELS, STEPS };

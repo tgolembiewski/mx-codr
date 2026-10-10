@@ -11,7 +11,7 @@ key: none
 On the page a test ends on, no two widgets lie on top of each other.
 
 ## Fix
-Usually a box class on inline text or a negative margin (`MDL_VISUAL=error` blocks).
+Usually a box class on inline text or a negative margin (`level: block` in ## Local blocks).
 
 ## Local
 # level: warn
