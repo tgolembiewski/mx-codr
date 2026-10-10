@@ -19,8 +19,8 @@
 // Old documents do not block: --baseline names a file of {key: hash} from the model as it was when
 // the harness was installed (--write-baseline writes it). A finding on a key that is new or changed
 // since then fails; one on an unchanged key is a warning, the backlog to clear. No baseline file:
-// every finding fails. MDL_UNTESTED (keys, comma-separated) is the person's list of paths that are
-// deliberately left without a test.
+// every finding fails. The paths cards' `except:` lines (tests/rulebook/paths/, passed as --except)
+// are the person's paths deliberately left without a test; --untested takes the same keys.
 //
 // Usage: check_paths.cjs <app_dir> <Module>... [--mpr <copy.mpr>] [--baseline <file>]
 //          [--write-baseline <file>] [--untested Key,Key] [--no-refresh] [--all-fail]

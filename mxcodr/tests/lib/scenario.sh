@@ -9,6 +9,8 @@ scenario() {
   local body="$1"
   local code_file output
   code_file="$(mdl_tmpfile mdl-scenario)"
+  # The visual checks' mode, once per test script (the gate exports it for the whole suite).
+  [ -n "${_MDL_VISUAL_MODE:-}" ] || _MDL_VISUAL_MODE="$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)"
   # Written to a file: bodies contain double quotes.
   _mdl_scenario_js "$body" > "$code_file"
 
@@ -91,8 +93,8 @@ _mdl_js_settings() {
   printf '  const ACTION_TIMEOUT = %s;\n' "$(mdl_json_number "${ACTION_TIMEOUT_MS:-8000}" 8000)"
   printf '  const RELEASE = %s;\n' "$_MDL_RELEASE"
   printf '  const REUSE = %s;\n' "$_MDL_REUSE"
-  # look(): MDL_VISUAL=0 turns the measuring off; MDL_VISUAL_REVIEW=agent adds screenshots.
-  printf '  const VISUAL = %s;\n' "$([ "${MDL_VISUAL:-warn}" = "0" ] && echo false || echo true)"
+  # look(): VIS01..VIS04 all `off` in tests/rulebook turns the measuring off; MDL_VISUAL_REVIEW=agent adds screenshots.
+  printf '  const VISUAL = %s;\n' "$([ "$(_mdl_visual_mode)" = "0" ] && echo false || echo true)"
   printf '  const VISUAL_DIR = %s;\n' "$(mdl_json_string "$(_mdl_visual_dir)")"
   printf '  const TEST_NAME = %s;\n' "$(mdl_json_string "$(_mdl_test_name)")"
   # vars.<NAME>: every SV_<NAME> shell variable, JSON-encoded -- `SV_PW="$pw" scenario '...'`, then
@@ -156,9 +158,14 @@ _mdl_js_film_pace() {
 PACE
 }
 
+# The visual checks' mode from the rulebook (warn, error or 0), read once per test run.
+_mdl_visual_mode() {
+  printf '%s\n' "${_MDL_VISUAL_MODE:-$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)}"
+}
+
 # Where look() saves screenshots; empty unless MDL_VISUAL_REVIEW=agent.
 _mdl_visual_dir() {
-  [ "${MDL_VISUAL_REVIEW:-}" = "agent" ] && [ "${MDL_VISUAL:-warn}" != "0" ] || return 0
+  [ "${MDL_VISUAL_REVIEW:-}" = "agent" ] && [ "$(_mdl_visual_mode)" != "0" ] || return 0
   mkdir -p "$APP_DIR/.mxcli/visual" 2>/dev/null && printf '%s' "$APP_DIR/.mxcli/visual"
 }
 

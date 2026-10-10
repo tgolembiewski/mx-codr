@@ -129,7 +129,7 @@ write_harness_env() {    # write_harness_env <mendix-install-dir>
     MDL_DB_PASSWORD="${login#*:}"
   fi
   mkdir -p "$APP/tests"
-  # The person's own switches (MDL_DB_RESET, MDL_UNTESTED, MDL_PATHS, ...) survive a reinstall: every
+  # The person's own switches (MDL_DB_RESET, MDL_CLOSE_BROWSER, ...) survive a reinstall: every
   # KEY=value line of the old file whose key this one does not write is kept. Until 2026-10-07 a
   # reinstall wrote the file from scratch, and a B2B's MDL_DB_RESET=session was gone after it.
   local previous=""
@@ -173,6 +173,9 @@ write_harness_env() {    # write_harness_env <mendix-install-dir>
       [ "$key" != "$line" ] || continue
       case "$key" in *[!A-Za-z0-9_]*) continue ;; esac
       grep -q "^${key}=" "$APP/tests/harness.env.new" && continue
+      # A rule's level and exceptions live in its card now (step_harness moves them there).
+      case "$key" in MDL_VISUAL|MDL_RUNTIME_ERRORS|MDL_SCOPE|MDL_CAPTIONS|MDL_WIDGET_NAMES|MDL_PATHS| \
+        MDL_REQUIRE_PRODUCTION|MDL_TEST_FIRST|MDL_UNTESTED|MDL_KEEP_UNUSED) continue ;; esac
       kept="${kept}${line}"$'\n'
     done <<< "$previous"
     [ -n "$kept" ] && printf '\n# Kept from the previous tests/harness.env: the person'"'"'s own switches.\n%s' "$kept" >> "$APP/tests/harness.env.new"

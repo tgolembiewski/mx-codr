@@ -408,9 +408,10 @@ function tokenRead(command) {
   return null;
 }
 
-const SWITCHES = ['MDL_REQUIRE_PRODUCTION', 'MDL_ALLOW_GREEN_FIRST', 'MDL_VISUAL', 'MDL_VISUAL_REVIEW',
-  'MDL_RUNTIME_ERRORS', 'MDL_PRECHECK', 'MDL_GATE_CACHE', 'MDL_HARNESS_EDITS', 'MDL_CAPTIONS',
-  'MDL_SCOPE', 'MDL_MARKETPLACE_LOGIN', 'MDL_WIDGET_NAMES', 'MDL_KEEP_UNUSED', 'MDL_UNTESTED', 'MDL_PATHS', 'MDL_DB_RESET'];
+// The gate's switches a session must not set for one run. A rule's level is in its card
+// (tests/rulebook/, guarded above), not here.
+const SWITCHES = ['MDL_ALLOW_GREEN_FIRST', 'MDL_VISUAL_REVIEW', 'MDL_PRECHECK', 'MDL_GATE_CACHE',
+  'MDL_HARNESS_EDITS', 'MDL_MARKETPLACE_LOGIN', 'MDL_DB_RESET'];
 let hit = null;
 if (tool === 'bash') {
   const command = String(args.command || '');

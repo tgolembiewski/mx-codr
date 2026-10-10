@@ -561,8 +561,8 @@ layout: PASS  0 failure(s) over 6 page(s)
 `LOOK02` | warning | with review on: a screenshot you rejected; the line repeats your own fix |
 
 The warnings list under `== warnings` in the gate's output and do not block DONE yet;
-`MDL_VISUAL=error` in `tests/harness.env` makes them block, `MDL_VISUAL=0` turns them off -- the
-person's switches: a session does not edit that file.
+`level: block` in the `## Local` of `tests/rulebook/app/VIS01.md`..`VIS04.md` makes them block,
+`level: off` turns them off -- the person's cards: a session does not edit them.
 
 ## What this cannot see
 

@@ -52,7 +52,17 @@ if [ -d "$SRC/rulebook" ]; then
   rulebook_note="$("$NODE" "$SRC/checks/rulebook.cjs" "$SRC/rulebook" merge "$APP" 2>&1 | tail -1)"
   rulebook_note="${rulebook_note#rulebook: }"
   ui_done "rulebook" "$rulebook_note $I_ARROW tests/rulebook/"
+  # The switches that set a rule's level in tests/harness.env (bundles up to 2026.10.10.2) become
+  # ## Local lines of the cards; a card that already sets its level keeps it. The rewritten
+  # harness.env no longer has them (write_harness_env, setup_docker_mode).
+  if [ -n "${OLD_HARNESS_ENV:-}" ] && [ -f "$OLD_HARNESS_ENV" ]; then
+    moved="$("$NODE" "$SRC/checks/rulebook.cjs" "$APP/tests/rulebook" migrate "$OLD_HARNESS_ENV" 2>/dev/null)" || moved=""
+    while IFS= read -r line; do
+      [ -n "$line" ] && ui_note "${line#moved }  (from tests/harness.env into the card's ## Local)"
+    done <<< "$moved"
+  fi
 fi
+[ -n "${OLD_HARNESS_ENV:-}" ] && rm -f "$OLD_HARNESS_ENV"
 
 # The syntax digest, now rather than at the first orient: Claude Code reads .claude/rules/ only
 # when a session starts, so a digest written during the first session would reach only the

@@ -222,6 +222,8 @@ close_browser_if_asked() {
 # run_suite <target>... -- the runner's output; its exit code is the suite's.
 run_suite() {
   export PY MXCLI BASE_URL SCRIPT_TIMEOUT
+  # The visual checks' mode from the rulebook, read once for the suite instead of in every test.
+  _MDL_VISUAL_MODE="$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)"; export _MDL_VISUAL_MODE
   export_test_module
   # One licence session: a full run reuses it; --only keeps it signed in between runs.
   if [ -n "$ONLY" ]; then
@@ -307,12 +309,12 @@ record_suite_result() {
 
 # What the pages looked like when the tests left them (look() in scenario-helpers.js): overlapping
 # widgets, sideways scroll, cut-off text -- and, with MDL_VISUAL_REVIEW=agent, screenshots the
-# agent must judge. Warnings by default (MDL_VISUAL=warn); MDL_VISUAL=error makes them block DONE.
+# agent must judge. Warnings by default; VIS01..VIS04 at `block` in tests/rulebook make them block DONE.
 # A cancellation notice drew its red box over the order summary and the gate said DONE.
 step_visual() {
-  # The level comes from the rulebook (tests/rulebook/app/VIS01..VIS04.md, LOOK01/02); MDL_VISUAL in
-  # tests/harness.env still wins while it exists.
-  local mode="${MDL_VISUAL:-$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)}" out
+  # The level comes from the rulebook (tests/rulebook/app/VIS01..VIS04.md, LOOK01/02).
+  local mode out
+  mode="$(mdl_rule_mode VIS01 VIS02 VIS03 VIS04 LOOK01 LOOK02)"
   [ "$mode" = "0" ] && return 0
   [ -z "${ONLY:-}" ] && [ "${TESTS_ONLY:-0}" != "1" ] || return 0
   local -a review=()
@@ -334,7 +336,7 @@ step_visual() {
     collect visual "visual"
   else
     printf '%s\n' "$out" > "$WORK/visual.warnings"
-    summary+=("visual: $(printf '%s\n' "$out" | grep -c .) warning(s) -- see == warnings (MDL_VISUAL=error makes them block DONE)")
+    summary+=("visual: $(printf '%s\n' "$out" | grep -c .) warning(s) -- see == warnings (level: block in tests/rulebook/app/VIS01..VIS04.md makes them block DONE)")
   fi
 }
 
@@ -360,9 +362,10 @@ note_microflow_tests() {
 
 # What the server logged as ERROR while the suite ran. A page action that throws shows a generic
 # dialog, and a test that does not look for it passes; the runtime log has the real error. A
-# warning while MDL_RUNTIME_ERRORS=warn (the default); =error blocks DONE, =0 turns it off.
+# warning by default; RUNTIME01 at `block` in tests/rulebook blocks DONE, `off` turns it off.
 step_runtime_errors() {
-  local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}" mode="${MDL_RUNTIME_ERRORS:-$(mdl_rule_mode RUNTIME01)}" out
+  local log="${RUNTIME_LOG:-$APP_DIR/.mxcli/runtime.log}" mode out
+  mode="$(mdl_rule_mode RUNTIME01)"
   [ "$mode" = "0" ] && return 0
   [ -f "$log" ] && [ -s "$WORK/tests.started" ] || return 0
   out="$(gate_helper runtime-errors "$log" "$(cat "$WORK/tests.started")" 2>"$WORK/runtime.error")" || {

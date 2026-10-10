@@ -11,7 +11,7 @@ key: none
 A chart fits on one screen, in height and in width.
 
 ## Fix
-A chart height that fits one screen (`MDL_VISUAL=error` blocks).
+A chart height that fits one screen (`level: block` in ## Local blocks).
 
 ## Local
 # level: warn

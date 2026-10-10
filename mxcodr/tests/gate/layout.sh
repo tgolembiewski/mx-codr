@@ -120,8 +120,13 @@ check_layout() {
   describe_entities_into "$WORK/layout-entities" || layout_unread entities "TEXT01, TEXT02"
   ls "$WORK"/layout-entities/*.mdl >/dev/null 2>&1 && nav_args+=(--entities "$WORK/layout-entities")
   # Widget names (NAME01/02): warnings until the first DONE, then a new or changed page needs them.
-  case "${MDL_WIDGET_NAMES:-warn}" in
-    0|off) ;;
+  # tests/rulebook/layout/NAME02.md at `block`: every page needs them; NAME01 and NAME02 `off`: not checked.
+  local names_levels names_mode=warn
+  names_levels="$(mdl_rulebook levels layout 2>/dev/null)"
+  case "$names_levels" in *'"NAME02":"block"'*) names_mode=error ;; esac
+  case "$names_levels" in *'"NAME01":"off"'*) case "$names_levels" in *'"NAME02":"off"'*) names_mode=0 ;; esac ;; esac
+  case "$names_mode" in
+    0) ;;
     error) nav_args+=(--names error --page-hashes "$CACHE_DIR/layout.pages.json") ;;
     *) nav_args+=(--names warn --page-hashes "$CACHE_DIR/layout.pages.json")
        [ -f "$CACHE_DIR/names-baseline.json" ] && nav_args+=(--names-baseline "$CACHE_DIR/names-baseline.json") ;;
@@ -145,10 +150,10 @@ check_layout() {
   local shown total
   shown="$(grep -c . "$WORK/layout.detail")"; total="$(printf '%s\n' "$out" | grep -cE '^\s+[-!] ')"
   [ "$total" -gt "$shown" ] && echo "   ... $shown of $total findings shown; all of them: .mxcli/layout.txt" >> "$WORK/layout.detail"
-  # How a page renders (ALERT01) is a warning while MDL_VISUAL=warn, a failure with MDL_VISUAL=error.
+  # How a page renders (ALERT01) is a warning, a failure at `block` in tests/rulebook/layout/ALERT01.md.
   local look
   look="$(printf '%s\n' "$out" | grep -E '^[[:space:]]+! \[ALERT01\]' | sed -E 's/^[[:space:]]+! /   - /')"
-  local alert; alert="${MDL_VISUAL:-$(mdl_rule_mode ALERT01)}"
+  local alert; alert="$(mdl_rule_mode ALERT01)"
   if [ -n "$look" ] && [ "$alert" = "error" ]; then
     printf '%s\n' "$look" >> "$WORK/layout.detail"
     gate=1

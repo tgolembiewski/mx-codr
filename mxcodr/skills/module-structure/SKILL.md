@@ -254,8 +254,8 @@ The gate fails `UNUSED01` on a microflow, nanoflow, page, snippet, enumeration o
 the app's own modules only when three proofs agree: no reference in the model (calls, pages,
 navigation, settings, scheduled events, published services), its name in no other document, Java,
 JavaScript, theme or test file (a `# covers:` line does not count: drop the name there too), and mx check still passing with all of them dropped on a copy.
-Kept on purpose (an API for later, a page opened only by URL)? The person lists it in
-`tests/harness.env`: `MDL_KEEP_UNUSED=Shop.DS_Customers,Shop.Old_Page`.
+Kept on purpose (an API for later, a page opened only by URL)? The person adds a line under
+`## Local` in `tests/rulebook/app/UNUSED01.md`: `except: Shop.DS_Customers`.
 
 ## Check it
 
