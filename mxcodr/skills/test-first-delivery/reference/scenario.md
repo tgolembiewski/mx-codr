@@ -104,8 +104,11 @@ Rules that keep it that way:
 
 A Mendix *Show message* renders a modal with an OK button, and it swallows the next
 click. Dismiss it (`dismiss_dialog` in `tests/lib.sh`) before acting again; reuse the
-helpers there — `open_app`, `fill`, `pick_combo`, `row_action`, `menu`,
+helpers there — `open_app`, `fill`, `pick_combo`, `row_action`, `filter_list`, `menu`,
 `await_message`, `dismiss_dialog`, `page_text` — rather than reinventing them per test.
+A filtered list answers through `filter_list`, which returns the matching row as soon as the list
+has it; a `waitForTimeout` or a `waitFor(...).catch(() => false)` retry pays its full time on every
+run, and the gate lists each one (WAIT01).
 
 
 ## Reading the failure

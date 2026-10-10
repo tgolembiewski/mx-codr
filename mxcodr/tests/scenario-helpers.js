@@ -9,6 +9,8 @@
 //   fill('widget', value)              type into a text box/area, then tab out
 //   pick_combo('widget', 'option')     choose a combo box option
 //   row_action('grid', 'text', 'btn')  click a button in the first grid row containing text
+//   filter_list('list', 'filter', 'x') type x into a list's filter, wait for its answer; returns the
+//                                      first item showing x (Data grid 2, Gallery, List view)
 //   await_message(/regex/[, ms])       wait for an app message the last action brought; returns it
 //   sign_in_as('user')                 sign out and in as another demo user (TEST_PASSWORD_<user>)
 //   dismiss_dialog()                   click OK on an open dialog
@@ -221,6 +223,46 @@
     await item.waitFor({timeout: 10000});
     await item.click();
   };
+  // filter_list('list', 'filter', 'text') -- type into a list's filter and wait for its answer:
+  // the first item that shows the text, as a locator to click inside. Any Mendix list (Data grid 2
+  // rows, Gallery items, List view items) and any text or number filter. It waits for the list's
+  // items to change and settle, not a fixed time, and says what the list showed when no item
+  // matches, instead of a retry loop that waits out a timeout on every run.
+  const LIST_ITEMS = '[role=row]:not(:has([role=columnheader])), .widget-gallery-item, .mx-listview-item';
+  const filter_list = async (list, filter, text, timeout) => {
+    const root = page.locator('.mx-name-' + list).first();
+    await root.waitFor({timeout: timeout || ACTION_TIMEOUT});
+    const items = root.locator(LIST_ITEMS);
+    const shown = async () => (await items.allInnerTexts().catch(() => [])).map((t) => t.replace(/\s+/g, ' ').trim());
+    const input = page.locator('.mx-name-' + filter + ' input, .mx-name-' + filter + ' textarea').first();
+    if (!(await input.count())) {
+      throw new Error('filter_list: no text or number input in .mx-name-' + filter + ' -- for a drop-down filter use pick_combo');
+    }
+    const before = JSON.stringify(await shown());
+    await input.fill(String(text));
+    await input.press('Tab');
+    const match = items.filter({hasText: String(text)}).first();
+    const started = Date.now(), deadline = started + (timeout || ACTION_TIMEOUT);
+    let last = before, stable_since = started;
+    for (;;) {
+      const now = JSON.stringify(await shown());
+      if (now !== last) { last = now; stable_since = Date.now(); }
+      const answered = now !== before, still = Date.now() - stable_since;
+      // The list answered and is still: the matching item, or none. A match that was already on
+      // screen before the filter is not taken at once -- the list may be about to redraw it -- but
+      // a list that does not change at all (the filter changed nothing) is believed after 1 s.
+      if ((answered && still >= 300) || (!answered && Date.now() - started >= 1000)) {
+        if (await match.count()) return match;
+        if (answered && still >= 500) break;
+      }
+      if (Date.now() > deadline) break;
+      await page.waitForTimeout(100);
+    }
+    const now = await shown();
+    throw new Error('filter_list: ' + list + ' shows ' + now.length + ' item(s) for "' + text + '" in ' + filter
+      + ', none containing it' + (now.length ? ': ' + now.slice(0, 3).map((t) => '"' + t.slice(0, 60) + '"').join(', ') : '')
+      + (JSON.stringify(now) === before ? ' (the list did not change after the filter was typed)' : ''));
+  };
   const row_action = async (grid, row_text, widget) => {
     const row = page.locator('.mx-name-' + grid + ' [role=row]', {hasText: row_text}).first();
     await row.waitFor({timeout: 15000});
@@ -263,8 +305,22 @@
     }
     const before = (await page.locator('.mx-page').first().innerText().catch(() => '')).slice(0, 300);
     const url_before = page.url();
+    if (ready) {
+      // The menu item of the page a test is on opens that page anew, about 100 ms after the
+      // click (measured on Mendix 11). Its widgets were still on screen, so `ready` was found at
+      // once and the next action landed on the page being replaced: a filter typed there was
+      // lost, and the tests that met it waited 6 s and typed again. The widgets on screen before
+      // the click are marked, and a fresh one is awaited; a page that is not opened anew is
+      // accepted as before after 3 s.
+      await page.evaluate((sel) => document.querySelectorAll(sel).forEach((el) => el.setAttribute('data-mdl-before-menu', '')),
+        '.mx-name-' + ready).catch(() => {});
+      await link.click();
+      const fresh = await page.locator('.mx-name-' + ready + ':not([data-mdl-before-menu])').first()
+        .waitFor({timeout: 3000}).then(() => true).catch(() => false);
+      if (!fresh) await landed(ready, "menu '" + label + "'");
+      return;
+    }
     await link.click();
-    if (ready) { await landed(ready, "menu '" + label + "'"); return; }
     const deadline = Date.now() + 3000;
     for (;;) {
       const after = (await page.locator('.mx-page').first().innerText().catch(() => '')).slice(0, 300);

@@ -70,10 +70,10 @@ source "$(dirname "$0")/lib.sh"      # after the `# covers:` header
 # inside a scenario body: await open_app()  menu('Invoices', 'invoiceGrid')
 #         fill('txtName', 'x')  pick_combo('cmbCustomer', 'Northwind')
 #         row_action('invoiceGrid', 'INV-1', 'btnSend')  await_message(/sent/i)
-#         dismiss_dialog()  page_text()  reopen_app()   -- plus Playwright's `page`
+#         filter_list('invoiceGrid', 'fltNo', 'INV-1')  dismiss_dialog()  page_text()
+#         reopen_app()  -- plus Playwright's `page`; never waitForTimeout
 # just looking, not asserting: bash tests/peek.sh 'Invoices' [widget] (no test file, no record)
-# every helper, with its arguments: the header of tests/scenario-helpers.js (JS) and
-#         tests/lib.sh (shell) -- the header only, the bodies add nothing a test needs
+# every helper: the headers of tests/scenario-helpers.js and tests/lib.sh
 ```
 
 Three things about the gate that a test has to match, so there is no need to read

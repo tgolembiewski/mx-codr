@@ -189,6 +189,15 @@ every `gradle-*` into the mxbuild cache, writes the JDK the app's Mendix version
 longer asks for a Temurin 25 that Studio Pro already carries. `orient.sh` counts the cards in their
 folders (it said "0 rules").
 
+Bundle 2026.10.10.2: faster browser tests. On InvoiceB2B two tests paid 6 s per order they opened:
+`menu()` returned on the page the menu was about to open anew (Mendix replaces the page about 100 ms
+after a click on the item of the page you are on), the filter typed next was lost with it, and the
+tests waited 6 s and typed again. `menu()` now waits for the fresh page; `filter_list(list, filter,
+text)` filters any Mendix list (Data grid 2, Gallery, List view) and returns the matching item as soon
+as the list has answered, or says what the list showed. `WAIT01` (coverage step, a warning) lists
+tests that wait for time instead of for events: a `waitForTimeout` over 500 ms, or a wait that may
+end in nothing. Measured on InvoiceB2B: opening an order 6.8 s before, 0.85 s after.
+
 Next bundle: the switches migrate into `## Local` and disappear; `check: pattern` cards for a
 team's own rule; the "kept on purpose?" line a finding prints for the person to paste.
 

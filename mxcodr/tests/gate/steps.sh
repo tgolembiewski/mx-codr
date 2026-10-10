@@ -46,6 +46,22 @@ check_catalog() {
 }
 
 # Every page and ACT_ microflow must be named by a verify-*.test.sh `# covers:` line.
+# WAIT01 (test_rules.cjs): tests that wait for time instead of for what happens -- under the coverage
+# step's warnings by default; at `block` in the rulebook the coverage step fails on them.
+coverage_waits() {
+  [ -f tools/mdl-checks/test_rules.cjs ] || return 0
+  local waits total line
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args coverage)
+  waits="$("$NODE" tools/mdl-checks/test_rules.cjs tests ${rb[@]+"${rb[@]}"} 2>/dev/null)" || {
+    printf '%s\n' "$waits" | grep '^  - ' | sed 's/^  /   /' >> "$WORK/coverage.detail"
+    return 1; }
+  total="$(printf '%s\n' "$waits" | grep -c '^  ~ ')"
+  [ "$total" -gt 0 ] || return 0
+  printf '%s\n' "$waits" | grep '^  ~ ' | head -6 | sed -E 's/^  ~ /   - /' > "$WORK/coverage.warnings"
+  [ "$total" -gt 6 ] && echo "   ... 6 of $total waits for time shown: node tools/mdl-checks/test_rules.cjs tests" >> "$WORK/coverage.warnings"
+  return 0
+}
+
 check_coverage() {
   [ -f tools/mdl-checks/check_test_coverage.cjs ] || {
     echo "coverage: could not run -- tools/mdl-checks/check_test_coverage.cjs is missing" > "$WORK/coverage.summary"
@@ -62,6 +78,7 @@ check_coverage() {
   out="$("$NODE" tools/mdl-checks/check_test_coverage.cjs . $USER_MODULES 2>&1)"; code=$?
   printf '%s\n' "$out" | grep -E '^(PASS|FAIL|ERROR) ' | sed 's/^/coverage /' > "$WORK/coverage.summary"
   printf '%s\n' "$out" | grep -E '^[[:space:]]+- ' | head -10 > "$WORK/coverage.detail"
+  coverage_waits || { [ "$code" = "0" ] && return 1; }
   case "$code" in
     0) return 0 ;;
     1) grep -q '^coverage FAIL ' "$WORK/coverage.summary" && return 1 ;;
