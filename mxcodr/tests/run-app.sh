@@ -117,7 +117,9 @@ build_deployment() {
     rm -f "$BUILT_MODEL"   # mxbuild writes model.mdp before the Java compile; a half-built deployment is not current
     echo "== build FAILED -- full output: $build_log"
     # A Java compile error is in Gradle's own log; its first lines say what is missing.
-    grep -h -m5 'error:' "$DEPLOYMENT"/log/*gradle_log.txt 2>/dev/null | sed 's/^/   /'
+    # No Gradle log (mxbuild failed before the compile): grep fails, and under set -e the boot ended
+    # with exit 2 before saying "start FAILED".
+    { grep -h -m5 'error:' "$DEPLOYMENT"/log/*gradle_log.txt 2>/dev/null || true; } | sed 's/^/   /'
     echo "== start FAILED" >&2
     exit 1
   fi

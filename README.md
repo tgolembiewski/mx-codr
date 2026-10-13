@@ -331,6 +331,7 @@ The default is in bold. A key you leave out takes its default.
 | `MDL_DB_HOST`, `MDL_DB_NAME`, `MDL_DB_USER`, `MDL_DB_PASSWORD` | set by the installer | The app's PostgreSQL database. |
 | `MDL_PSQL` | a path to `psql` | Which PostgreSQL client to use when it is not on the `PATH`. |
 | `MDL_MXBUILD_PATH`, `JAVA_HOME`, `MDL_BOOT_COMMAND`, `MX_VERSION` | set by the installer | How the app is built and booted, and which Studio Pro version to use when there are several. |
+| `GRADLE_HOME` | the newest `gradle-*` beside mxbuild | The Gradle the Windows boot (`tests/run-app.sh`) builds with, when another one is needed. |
 | `MDL_DB_RESET` | **`done`** · `session` · `off` | `done`: the database is saved when the app first boots and put back after every DONE, so the person never sees test data; a full gate after a red one also starts its tests on the saved data (`--reset-data` does it for `--only`). `session`: put back only after a session's first DONE. `off`: the data stays. Local mode only. |
 | `MDL_CLOSE_BROWSER` | **`0`** · `1` | `0`: the test browser stays open, so the next run starts faster. `1`: it closes after each gate run. |
 | `MDL_REQUIREMENTS` | **`ask`** · `assume` · `off` | `ask`: before the first feature the agent asks you what the app must do and waits. `assume`: nobody answers (a benchmark); it takes its recommended answers as assumptions, listed at DONE. `off`: no interview. |
