@@ -114,6 +114,7 @@ build_deployment() {
     echo "   (Studio Pro's local database kept across the build)"
   fi
   if [ "$build_ok" = "0" ]; then
+    rm -f "$BUILT_MODEL"   # mxbuild writes model.mdp before the Java compile; a half-built deployment is not current
     echo "== build FAILED -- full output: $build_log"
     # A Java compile error is in Gradle's own log; its first lines say what is missing.
     grep -h -m5 'error:' "$DEPLOYMENT"/log/*gradle_log.txt 2>/dev/null | sed 's/^/   /'

@@ -733,14 +733,20 @@ const tools = {
   'config-json'(...args) {
     if (args.length < 7) raise('ValueError', 'not enough values to unpack');
     const [base, runtime, port, host, name, user, password] = args;
+    // The constants mxbuild wrote to model/config.json: model defaults and the Default configuration's overrides.
+    const constants = new Map([
+      ['FeedbackModule.LocalStorageKey', 'mxfeedback-form-data'],
+      ['FeedbackModule.ClientIdentifier', 'Feedback Module 4.0.2']]);
+    try {
+      const built = item(loads(readStrict(py.join(base, 'model', 'config.json'))), 'Constants');
+      if (isMap(built)) for (const [k, v] of built) constants.set(k, v);
+    } catch (e) { /* no config.json yet: pass the Feedback constants only */ }
     print(dumps(new Map([['action', 'update_configuration'], ['params', new Map([
       ['BasePath', base], ['RuntimePath', runtime], ['DTAPMode', 'D'],
       ['DatabaseType', 'PostgreSQL'], ['DatabaseHost', host], ['DatabaseName', name],
       ['DatabaseUserName', user], ['DatabasePassword', password],
       ['ApplicationRootUrl', `http://localhost:${port}/`],
-      ['MicroflowConstants', new Map([
-        ['FeedbackModule.LocalStorageKey', 'mxfeedback-form-data'],
-        ['FeedbackModule.ClientIdentifier', 'Feedback Module 4.0.2']])],
+      ['MicroflowConstants', constants],
     ])]])));
   },
   // examples/verify-customer-unpaid.test.sh: the Total of the first row, 0 when none.
