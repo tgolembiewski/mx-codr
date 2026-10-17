@@ -1,21 +1,7 @@
 # install/mxcli.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # mxcli: find the newest runnable one, download and verify a release, offer an update.
 
-# --- 7. Report-only prerequisites, and mxcli: download, verify, choose, update ---
-# Report-only: a reboot or licence click stands between the install command and a working tool.
-dep_report_only() {      # dep_report_only <label> <detect> <winget> <brew> <apt>
-  eval "$2" >/dev/null 2>&1 && return 0
-  local command=""
-  case "$(pkg_manager)" in
-    winget) command="winget install -e --id $3" ;;
-    brew)   command="brew install $4" ;;
-    apt)    command="${SUDO}apt-get install -y $5" ;;
-    dnf)    command="${SUDO}dnf install -y $5" ;;
-  esac
-  DEPS_MISSING+=("$1 -- ${command:-install it by hand}  (not installed for you)")
-  return 1
-}
-
+# --- mxcli: download, verify, choose, update ---
 # The harness is verified against ONE mxcli release, named by $SRC/MXCLI_TESTED ("<tag> <build-date>").
 # The installer downloads that release and offers to swap any other ./mxcli for it -- a newer
 # mxcli can change what DESCRIBE prints, and a checker that cannot read it goes quiet instead of
@@ -47,7 +33,6 @@ mxcli_release_url() {
     "$(mxcli_compat_tag || echo v0.27.0)" "$os" "$arch" "$EXE"
 }
 
-# ui_fail when the sha256 differs from MXCLI_SHA256; with it unset the download is only reported.
 # sha256_of <file> -- the file's SHA-256, or nothing; never fails. Git for Windows has
 # sha256sum but no shasum, macOS the other way round. Under set -e and pipefail the missing one
 # ended the install silently, right after the mxcli download.
@@ -59,6 +44,7 @@ sha256_of() {
   printf '%s\n' "$sum"
 }
 
+# ui_fail when the sha256 differs from MXCLI_SHA256; with it unset the download is only reported.
 mxcli_verify_download() {   # mxcli_verify_download <file>
   local want="${MXCLI_SHA256:-}" got
   if [ -z "$want" ]; then
@@ -216,7 +202,6 @@ mxcli_for_project() {
     printf '%s\n' "$MXCLI_BEST"
   elif mxcli_describe "$APP/mxcli$EXE" >/dev/null; then
     printf '%s\n' "$APP/mxcli$EXE"
-    printf '%s\n' "$MXCLI_BEST"
   else
     # Nothing answered --version.
     first_executable "${MXCLI_CANDIDATES[@]}"

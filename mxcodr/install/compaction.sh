@@ -38,6 +38,7 @@ choose_compaction() {
 # apply_compaction -- writes each host's setting when COMPACTION is on, and records the choice.
 apply_compaction() {
   [ -n "${COMPACTION:-}" ] || return 0
+  ui_begin "setting agent compaction"
   if [ -f "$APP/tests/harness.env" ] && ! grep -q '^MDL_COMPACTION=' "$APP/tests/harness.env"; then
     printf '\n# When the coding agents compact their context (install/compaction.sh): on = at 70%% of the window.\nMDL_COMPACTION=%s\n' "$COMPACTION" >> "$APP/tests/harness.env"
   fi

@@ -21,12 +21,8 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 # Marker: the stop hook runs the gate only for sessions that changed the model.
 session_id="$(printf '%s' "$input" | "$NODE" "$HOOK_TOOL" get-default session_id 2>/dev/null)"
-if [ -n "$session_id" ]; then
-  state_dir="${TMPDIR:-/tmp}/mendix-mdl-codex-hooks"
-  safe_session="$(printf '%s' "$session_id" | tr -cd 'A-Za-z0-9._-')"
-  if [ -n "$safe_session" ] && mkdir -p "$state_dir" 2>/dev/null; then
-    printf '%s\n' "$repo_root" > "$state_dir/$safe_session.gate-required"
-  fi
+if marker="$(gate_marker codex "$session_id")" && mkdir -p "${marker%/*}" 2>/dev/null; then
+  printf '%s\n' "$repo_root" > "$marker"
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

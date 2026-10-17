@@ -4,24 +4,15 @@
 # which Cursor auto-submits (loop_limit in .cursor/hooks.json caps repeats). Exit 0.
 set -uo pipefail
 
-# NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message).
+# NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message); payload_field
+# and gate_marker.
 . "$(dirname "${BASH_SOURCE[0]}")/hook-env.sh"
 
 input="$(cat)"
 nothing() { printf '{}\n'; exit 0; }
 
-# A top-level value of the event payload, or "" when absent or unparsable.
-payload_field() {
-  printf '%s' "$input" | "$NODE" "$HOOK_TOOL" get "$1" 2>/dev/null
-}
-
 conversation="$(payload_field conversation_id)"
-[ -n "$conversation" ] || nothing
-
-state_dir="${TMPDIR:-/tmp}/mendix-mdl-cursor-hooks"
-safe="$(printf '%s' "$conversation" | tr -cd 'A-Za-z0-9._-')"
-[ -n "$safe" ] || nothing
-marker="$state_dir/$safe.gate-required"
+marker="$(gate_marker cursor "$conversation")" || nothing
 [ -f "$marker" ] || nothing
 
 # An aborted or errored turn is the user stopping, not a finished feature.

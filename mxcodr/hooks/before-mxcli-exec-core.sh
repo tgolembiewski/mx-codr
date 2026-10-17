@@ -2,8 +2,10 @@
 # hooks/before-mxcli-exec-core.sh -- the part of the before-exec hook every host shares. Sourced by
 # before-mxcli-exec.sh (Claude Code) and before-mxcli-exec-cursor.sh (Cursor); never run on
 # its own. The two hooks differed only in how they read the call and answer it, and three changes
-# in one day were made twice each. Provides: NODE, HOOK_TOOL, hook_sleep_message, inline_mdl,
-# steps_before_exec, hook_scripts, hook_heredoc_write, script_written_before_exec, hook_marketplace_wait, HOOK_VARIABLE_MESSAGE, HOOK_BLOCKED_HEAD, hook_precheck.
+# in one day were made twice each. Provides: NODE, HOOK_TOOL, hook_sleep_message,
+# hook_binary_message, hook_source_message, inline_mdl, steps_before_exec, hook_scripts,
+# hook_heredoc_write, script_written_before_exec, hook_marketplace_wait, HOOK_VARIABLE_MESSAGE,
+# HOOK_BLOCKED_HEAD, hook_precheck.
 
 # NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message).
 . "$(dirname "${BASH_SOURCE[0]}")/hook-env.sh"

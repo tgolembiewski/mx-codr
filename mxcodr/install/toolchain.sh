@@ -1,7 +1,7 @@
 # install/toolchain.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # The Playwright browser, the JDK, MxBuild and the runtime, and the no-Docker build mode.
 
-# --- 9. Playwright browser and JDK lookup ---
+# --- Playwright browser and JDK lookup ---
 # playwright_browser_command -- the devcontainer's browser install; $(npm root -g) expands when dep_apply evals it.
 playwright_browser_command() {
   printf 'node "$(npm root -g)/@playwright/cli/node_modules/playwright-core/cli.js" install chromium chromium-headless-shell\n'
@@ -79,19 +79,26 @@ playwright_browser_present() {
   return 1
 }
 
-# --- 9b. Prerequisite step helpers (want_mx, MxBuild, no-Docker mode, JDK) ---
+# --- Prerequisite step helpers (want_mx, MxBuild, no-Docker mode, JDK) ---
+# new_app_mx_version -- the Mendix version a new app is created with: MX_VERSION; else on Windows the
+# newest installed Studio Pro (mxcli new can only build that one), nothing when there is none; else
+# DEFAULT_MX_VERSION. choose_want_mx and create_app (step_app.sh) both use it.
+new_app_mx_version() {
+  if [ -n "${MX_VERSION:-}" ]; then
+    printf '%s\n' "$MX_VERSION"
+  elif [ "$IS_WINDOWS" = "1" ]; then
+    studio_pro_versions | tail -1
+  else
+    printf '%s\n' "$DEFAULT_MX_VERSION"
+  fi
+}
+
 # choose_want_mx -- set want_mx: the .mpr's Mendix version, or for a new app the one it will be created with.
 choose_want_mx() {
   if [ "$mpr_count" = "0" ]; then
-    # Same version rule as create_app.
-    if [ -n "${MX_VERSION:-}" ]; then
-      want_mx="$MX_VERSION"
-    elif [ "$IS_WINDOWS" = "1" ]; then
-      want_mx="$(studio_pro_versions | tail -1)"
-      want_mx="${want_mx:-$DEFAULT_MX_VERSION}"
-    else
-      want_mx="$DEFAULT_MX_VERSION"
-    fi
+    # Windows without a Studio Pro: the default, though create_app will stop there.
+    want_mx="$(new_app_mx_version)"
+    want_mx="${want_mx:-$DEFAULT_MX_VERSION}"
   else
     # Print the Mendix version stored in the project's .mpr (SQLite).
     want_mx="$("$NODE" "$SRC/install/install_tool.cjs" app-mx-version "$APP" 2>/dev/null || true)"
@@ -128,7 +135,7 @@ ensure_mxbuild_and_runtime() {
   fi
 }
 
-# setup_local_build -- with no Docker daemon: use a local Studio Pro or cached mxbuild plus PostgreSQL, and install Docker.
+# setup_local_build -- the local run mode: a local Studio Pro or cached mxbuild plus PostgreSQL, written to tests/harness.env.
 setup_local_build() {
   local studio_dir="" studio_mx
   if [ -n "${want_mx:-}" ] && [ "$IS_WINDOWS" = "1" ]; then
@@ -140,7 +147,7 @@ setup_local_build() {
     studio_dir="$HOME/.mxcli/mxbuild/$want_mx"
   fi
 
-  # A local mxbuild or Studio Pro is always set up; Docker is still installed below.
+  # Only with a local mxbuild or Studio Pro; without one there is nothing to set up here.
   if [ -n "$studio_dir" ]; then
     if ! postgres_answers; then
       if psql_path >/dev/null 2>&1; then

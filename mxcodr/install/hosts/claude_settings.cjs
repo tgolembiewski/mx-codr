@@ -1,18 +1,13 @@
 // Merge the harness hooks into .claude/settings.local.json; adds only missing entries.
 'use strict';
 const fs = require('fs');
-const { dumps, load } = require('./json_file.cjs');
+const { dumps, loadOrExit } = require('./json_file.cjs');
 
 const path = process.argv[2];
-let settings;
-try {
-  settings = load(path) || {};
-} catch (error) {
-  // Replacing it would throw away whatever the developer had; the Codex and Cursor
-  // mergers below refuse for the same reason.
-  process.stderr.write(`   !! ${path} is not valid JSON (${error.message}); leaving it alone. Fix it and re-run.\n`);
-  process.exit(1);
-}
+// Replacing it would throw away whatever the developer had; the Codex and Cursor
+// mergers refuse for the same reason.
+const settings = loadOrExit(path, error =>
+  `   !! ${path} is not valid JSON (${error.message}); leaving it alone. Fix it and re-run.\n`);
 if (!('hooks' in settings)) settings.hooks = {};
 const hooks = settings.hooks;
 const wanted = [

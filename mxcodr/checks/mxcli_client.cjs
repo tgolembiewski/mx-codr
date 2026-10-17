@@ -99,4 +99,8 @@ function catalogArgs(argv) {
   return { appDir, modules, mpr: mpr ? path.resolve(mpr) : findMpr(appDir), refresh };
 }
 
-module.exports = { ModelReadError, binary, mxcli, findMpr, moduleRolesOf, catalogArgs };
+// A document's describe text without its folder: a move (FOLDER01) changes where a document is, not
+// what it does. Every version and hash of a document is taken over this text.
+const withoutFolder = text => String(text || '').replace(/\bfolder\s*:?\s*'(?:[^']|'')*'\s*,?/gi, '');
+
+module.exports = { ModelReadError, binary, mxcli, findMpr, moduleRolesOf, catalogArgs, withoutFolder };

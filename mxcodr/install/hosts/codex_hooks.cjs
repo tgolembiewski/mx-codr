@@ -1,16 +1,10 @@
 // Merge the harness hooks into .codex/hooks.json, replacing an earlier registration of each script.
 'use strict';
 const fs = require('fs');
-const { dumps, load } = require('./json_file.cjs');
+const { dumps, loadOrExit } = require('./json_file.cjs');
 
 const path = process.argv[2];
-let settings;
-try {
-  settings = load(path) || {};
-} catch (error) {
-  process.stderr.write(`invalid existing ${path}: ${error.message}\n`);
-  process.exit(1);
-}
+const settings = loadOrExit(path, error => `invalid existing ${path}: ${error.message}\n`);
 
 if (!('description' in settings)) settings.description = 'Mendix MDL skills and delivery gates';
 if (!('hooks' in settings)) settings.hooks = {};

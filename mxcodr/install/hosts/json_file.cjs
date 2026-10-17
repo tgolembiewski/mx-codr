@@ -33,4 +33,15 @@ function load(path) {
   return JSON.parse(text);
 }
 
-module.exports = { dumps, load, sorted };
+// The parsed file, {} when it does not exist. A file that cannot be read or parsed is never
+// replaced: message(error) goes to stderr and the process exits 1.
+function loadOrExit(path, message) {
+  try {
+    return load(path) || {};
+  } catch (error) {
+    process.stderr.write(message(error));
+    process.exit(1);
+  }
+}
+
+module.exports = { dumps, load, loadOrExit, sorted };

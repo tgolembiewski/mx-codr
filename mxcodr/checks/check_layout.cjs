@@ -11,8 +11,6 @@
 // --json keys: verdict, pages, sources, failures, warnings.
 // Exit: 0 no errors (warnings allowed), 1 errors or no MDL found, 2 bad arguments.
 //
-// The Node port of check_layout.py (2026-10-05): the same output, byte for byte, on the same input.
-//
 // What each code checks, its level and its fix: its card, rulebook/layout/<CODE>.md (and
 // rulebook/naming/ for NAME01-02). The rules live in layout_rules/, one file per topic; this file
 // reads the arguments, runs check() from spacing.cjs and verticalFindings(), then LAYOUT_RULES in
@@ -37,7 +35,8 @@ const { listTabsFindings } = require('./layout_rules/list_tabs.cjs');
 const { verticalFindings } = require('./layout_rules/vertical.cjs');
 const { nameFindings, documentHashes } = require('./layout_rules/names.cjs');
 const { urlFindings } = require('./layout_rules/urls.cjs');
-const { offlineFindings, phoneMenuFindings, webPhoneLayoutFindings, phoneGridFindings, stickyBarFindings, loginWidthFindings, tabsFindings } = require('./layout_rules/offline.cjs');
+const { offlineFindings } = require('./layout_rules/offline.cjs');
+const { phoneMenuFindings, webPhoneLayoutFindings, phoneGridFindings, stickyBarFindings, loginWidthFindings, tabsFindings } = require('./layout_rules/phone.cjs');
 const { levelArgs } = require('./rulebook.cjs');
 const { layoutMenuFindings, oneLayoutFindings } = require('./layout_rules/layouts.cjs');
 const { PROFILE_RE, duplicateIconFindings, menuIconFindings, readMenuAccess, roleHomeFindings, signOutFindings } = require('./layout_rules/navigation.cjs');

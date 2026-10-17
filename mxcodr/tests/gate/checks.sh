@@ -52,6 +52,35 @@ checker_verdict() {
   return 2
 }
 
+# checker_failed <step> <checker.cjs> <exit code> <its output> -- a checker that did not check the
+# model: the step's summary says "could not run" with the exit code, its detail the last three lines.
+checker_failed() {
+  echo "$1: could not run -- $2 exited $3" > "$WORK/$1.summary"
+  printf '%s\n' "$4" | grep -v '^[[:space:]]*$' | tail -3 > "$WORK/$1.detail"
+}
+
+# describe_step_begin <step> <checker.cjs> <dir> <kinds> <nothing to check> -- how check_layout and
+# check_naming start: the checker is there, the project has modules of its own, and every document
+# of <kinds> is described into <dir>. 0 go on; 3 nothing to check, a pass (no user module, or no
+# document: "<step>: <nothing to check>"); 2 could not run. The summary is written for 2 and 3.
+describe_step_begin() {
+  local step="$1" checker="$2" dir="$3" kinds="$4" nothing="$5" gate
+  [ -f "tools/mdl-checks/$checker" ] || {
+    echo "$step: could not run -- tools/mdl-checks/$checker is missing" > "$WORK/$step.summary"
+    return 2; }
+  modules_or_status "$step"; gate=$?
+  [ "$gate" = "0" ] || return "$gate"
+  if ! describe_all "$step" "$dir" "$kinds"; then
+    echo "$step: could not run -- $(head -1 "$WORK/$step.broken")" > "$WORK/$step.summary"
+    head -5 "$WORK/$step.broken" | sed 's/^/  - /' > "$WORK/$step.detail"
+    return 2
+  fi
+  if ! ls "$dir"/*.mdl >/dev/null 2>&1; then
+    echo "$step: $nothing" > "$WORK/$step.summary"; return 3
+  fi
+  return 0
+}
+
 # describe_one <kind> <document> -- its MDL, or false. Tried twice: these run beside a boot, and a
 # describe that meets mxbuild touching the project fails once, then works (Windows, --restart).
 describe_one() {
@@ -232,7 +261,6 @@ rulebook_ok() {
   echo "$1: could not run -- $(cat "$WORK/rulebook.broken") (tests/rulebook is the person's file)" > "$WORK/$1.summary"
   return 1
 }
-# rulebook_fingerprint <step> -- `env:RULEBOOK_<step>=<digest of its effective levels and exceptions>`.
 # What the offline rules read beyond the model (OFFLINE01, OFFLINE03), for the layout step's cache key:
 # whether the built app registers a service worker, and how many tests cut the network.
 offline_inputs() {
@@ -245,6 +273,7 @@ offline_inputs() {
   [ -f deployment/web/theme.compiled.css ] && scroll="$(cksum < deployment/web/theme.compiled.css | cut -d' ' -f1)"
   printf '%s|%s|%s' "$sw" "$tests" "$scroll"
 }
+# rulebook_fingerprint <step> -- `env:RULEBOOK_<step>=<digest of its effective levels and exceptions>`.
 rulebook_fingerprint() { printf 'env:RULEBOOK_%s=%s\n' "$1" "$(mdl_rulebook digest "$1" 2>/dev/null || echo none)"; }
 
 # Starts the model checks in the background, each through the cache.
@@ -254,16 +283,16 @@ start_model_checks() {
   wants() { [ "$only" = "  " ] || case "$only" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
   rulebook_prepare
   # Upgrading the gate, its config or mxcli must not replay an old pass.
-  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/gate_values.cjs tools/mdl-checks/gate_scripts.cjs tools/mdl-checks/gate_runtime.cjs tools/mdl-checks/gate_visual.cjs tools/mdl-checks/gate_changed.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/rulebook.cjs tools/mdl-checks/mxcli_client.cjs tests/harness.env "meta:$MXCLI")
+  local -a cache_inputs=(tests/gate.sh tests/gate tools/mdl-checks/gate_helpers.cjs tools/mdl-checks/gate_values.cjs tools/mdl-checks/gate_scripts.cjs tools/mdl-checks/gate_runtime.cjs tools/mdl-checks/gate_visual.cjs tools/mdl-checks/gate_changed.cjs tools/mdl-checks/py_compat.cjs tools/mdl-checks/py_strings.cjs tools/mdl-checks/py_re.cjs tools/mdl-checks/py_shlex.cjs tools/mdl-checks/py_os.cjs tools/mdl-checks/mdl1_spelling.cjs tools/mdl-checks/rulebook.cjs tools/mdl-checks/mxcli_client.cjs tests/harness.env "meta:$MXCLI")
   wants mx && ( run_cached mx       check_mx       "${cache_inputs[@]}" "env:MDL_MXBUILD_PATH=${MDL_MXBUILD_PATH:-}" \
       meta:widgets meta:theme meta:themesource meta:javasource ) &
   wants catalog && ( run_cached catalog  check_catalog  "${cache_inputs[@]}" tools/mdl-checks/catalog_rules.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/layout_rules/offline.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint catalog)" ) &
   wants coverage && ( run_cached coverage check_coverage "${cache_inputs[@]}" tests tools/mdl-checks/check_test_coverage.cjs tools/mdl-checks/test_rules.cjs "$(rulebook_fingerprint coverage)" ) &
-  wants naming && ( run_cached naming   check_naming   "${cache_inputs[@]}" tools/mdl-checks/check_mdl.cjs tools/mdl-checks/perf_rules.cjs tools/mdl-checks/index_rules.cjs tools/mdl-checks/event_rules.cjs tools/mdl-checks/datasource_rules.cjs "$CACHE_DIR/captions-baseline.json" "$(rulebook_fingerprint naming)" ) &
+  wants naming && ( run_cached naming   check_naming   "${cache_inputs[@]}" tools/mdl-checks/check_mdl.cjs tools/mdl-checks/naming_rules.cjs tools/mdl-checks/perf_rules.cjs tools/mdl-checks/index_rules.cjs tools/mdl-checks/event_rules.cjs tools/mdl-checks/datasource_rules.cjs "$CACHE_DIR/captions-baseline.json" "$(rulebook_fingerprint naming)" ) &
   wants layout && ( run_cached layout   check_layout   "${cache_inputs[@]}" tools/mdl-checks/check_layout.cjs tools/mdl-checks/layout_rules "$CACHE_DIR/names-baseline.json" "env:MDL_OFFLINE_INPUTS=$(offline_inputs)" "$(rulebook_fingerprint layout)" ) &
   wants security && ( run_cached security check_security "${cache_inputs[@]}" tools/mdl-checks/view_access.cjs tools/mdl-checks/security_rules.cjs tools/mdl-checks/layout_rules/offline.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint security)" ) &
   wants scope && ( run_cached scope    check_scope    "${cache_inputs[@]}" tools/mdl-checks/check_scope.cjs "$(rulebook_fingerprint scope)" ) &
-  wants paths && ( run_cached paths    check_paths    "${cache_inputs[@]}" tools/mdl-checks/check_paths.cjs tools/mdl-checks/outcome_rules.cjs tools/mdl-checks/check_unused.cjs tests docs/brain .mxcli/brain tests/harness.env "$CACHE_DIR/paths-baseline.json" "$(rulebook_fingerprint paths)" ) &
+  wants paths && ( run_cached paths    check_paths    "${cache_inputs[@]}" tools/mdl-checks/check_paths.cjs tools/mdl-checks/requirement_rules.cjs tools/mdl-checks/outcome_rules.cjs tools/mdl-checks/check_unused.cjs tests docs/brain .mxcli/brain tests/harness.env "$CACHE_DIR/paths-baseline.json" "$(rulebook_fingerprint paths)" ) &
   wants folders && ( run_cached folders  check_folders  "${cache_inputs[@]}" tools/mdl-checks/check_folders.cjs tools/mdl-checks/check_unused.cjs "$(rulebook_fingerprint folders)" ) &
   wants unused && ( run_cached unused   check_unused   "${cache_inputs[@]}" javasource javascriptsource meta:theme meta:themesource tests "$(rulebook_fingerprint unused)" ) &
   if [ "$only" = "  " ]; then
@@ -280,7 +309,7 @@ start_model_checks() {
 # paths codes, which only judge the app once every feature has its test.
 EARLY_CHECKS="catalog naming layout security paths folders"
 
-# early_blockers -- after `wait`: the blocking findings of the early checks, as "== before DONE" lines;
+# print_early_blockers -- after `wait`: the blocking findings of the early checks, as "== before DONE" lines;
 # nothing when they all pass. Paths shows only the findings that name a test --only ran (REQ02).
 print_early_blockers() {
   local name detail lines out="" test base
@@ -304,7 +333,7 @@ print_early_blockers() {
       local rest
       rest="$(grep -vxF -f <(grep -v '^$' <<< "$kept") <<< "$lines" | grep -v '^$')"
       if [ -n "$rest" ]; then
-        EARLY_COVERAGE="$(grep -oE '\[[A-Z]+[0-9]+\]' <<< "$rest" | tr -d '[]' | sort | uniq -c | sort -k1,1nr -k2,2 | awk '{printf "%s%s x%s", (NR>1?", ":""), $2, $1}')"
+        EARLY_COVERAGE="$(grep -oE '\[[A-Z]+[0-9]+\]' <<< "$rest" | tr -d '[]' | codes_by_count)"
         local ids
         ids="$(grep -oE '\[REQ02\] requirement [0-9a-f]+' <<< "$rest" | awk '{print $3}' | tr '\n' ' ' | sed 's/ $//')"
         [ -n "$ids" ] && EARLY_COVERAGE="$EARLY_COVERAGE (REQ02: $ids)"
@@ -324,6 +353,11 @@ print_early_blockers() {
   # For the verdict line: sessions read --only through `tail -3` or `grep PASS`, and a block above it
   # never reached them -- GRID03 then came back at the full gate three times (room-booking n1).
   EARLY_CODES="$(grep -oE '^     - \[[A-Z]+[0-9]+\]' <<< "$out" | sed -E 's/.*\[([A-Z]+[0-9]+)\]/\1/' | sort | uniq -c | awk '{printf "%s%s x%s", (NR>1?", ":""), $2, $1}')"
+}
+
+# codes_by_count -- rule codes on stdin, one a line, as one line most frequent first: "NAME02 x3, URL01 x1".
+codes_by_count() {
+  sort | uniq -c | sort -k1,1nr -k2,2 | awk '{printf "%s%s x%s", (NR > 1 ? ", " : ""), $2, $1}'
 }
 
 # Reads one background check's files into summary, failures or cannot_run, and details.

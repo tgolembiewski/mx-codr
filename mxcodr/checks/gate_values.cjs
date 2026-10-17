@@ -1,6 +1,8 @@
 // Values as the original Python read and printed them -- json.loads/dumps (an integral float stays
 // 1.0, NaN and Infinity parse), str(), repr(), ==, truthiness, text-mode reads, naive datetimes --
 // so gate_helpers' subcommands print what they printed when they were Python. Shared by gate_*.cjs.
+// shell_values.cjs is the same idea for shell_helpers.cjs, kept apart on purpose: each mirrors the
+// Python of its own snippets, and the two differ where those did.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -418,4 +420,8 @@ function parseLstart(text) {
   return naive(Number(m[6]), MONTHS.indexOf(m[1].toLowerCase()) + 1, Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]));
 }
 
-module.exports = { PyFloat, PyError, isDict, typeName, numeric, isNumber, truthy, or, eq, hashKey, iter, head, get, needStr, joinStr, firstChars, floatRepr, NOT_PRINTABLE, strRepr, repr, str, JSONError, WS, skipWs, NUMBER, parseString, rawDecode, loads, dumps, dict, universal, readReplace, readStrict, stdinText, statOf, getmtime, abspath, walk, pyInt, daysIn, naive, nowNaive, roundHalfEven, fromTimestamp, WEEKDAYS, MONTHS, LSTART_RE, parseLstart };
+module.exports = {
+  PyFloat, PyError, isDict, typeName, numeric, isNumber, truthy, or, eq, hashKey, iter, head, get, needStr, joinStr,
+  firstChars, strRepr, str, JSONError, rawDecode, loads, dumps, dict, readReplace, readStrict, stdinText, statOf,
+  getmtime, abspath, walk, pyInt, naive, nowNaive, fromTimestamp, parseLstart,
+};

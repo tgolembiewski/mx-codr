@@ -1,7 +1,7 @@
 ---
 step: layout
 level: block
-check: layout_rules/offline.cjs#webPhoneLayoutFindings
+check: layout_rules/phone.cjs#webPhoneLayoutFindings
 key: none
 ---
 

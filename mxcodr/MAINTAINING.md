@@ -27,8 +27,9 @@ and `rules/mdl-skills.md` to `.claude/rules/`.
 2. **The app.** Found on its port, booted, or restarted (`tests/gate/app.sh`).
 3. **Preflights, then the suite.** Sessions, a stale model, the environment (`tests/gate/preflight.sh`),
    then every `tests/verify-*.test.sh` (`tests/gate/tests.sh`).
-4. **The verdicts.** Collected, then `print_verdict_and_exit` prints `DONE`, `NOT DONE — failed: …`
-   or `NOT DONE — could not run: …`. It writes `.mxcli/last-gate.txt` for the next session.
+4. **The verdicts.** Collected; on a full gate with nothing red the microflow tests run
+   (`tests/gate/mftest.sh`). Then `print_verdict_and_exit` (`tests/gate/verdict.sh`) prints `DONE`,
+   `NOT DONE — failed: …` or `NOT DONE — could not run: …`. It writes `.mxcli/last-gate.txt` for the next session.
 
 `--only <test>` runs one test plus the model checks that need no app, and ends in `PASSED`, never `DONE`.
 

@@ -5,7 +5,6 @@
 // Usage: check_mdl.cjs <file.mdl|dir> ... --skill naming [--captions error|warn] [--json]
 // --json keys: verdict, warnings, skills, sources, lines, failures.
 // Exit: 0 no failures (warnings allowed), 1 failures or no MDL found, 2 bad arguments.
-// Ported from check_mdl.py (2026-10-05); the codes were renamed to the CODE01 scheme in 2026-10-09.
 //
 // Rule codes (FAIL counts against the run, WARN does not):
 //   CAPTION03    FAIL  if/case without @caption
@@ -19,6 +18,7 @@
 //   VAR01        FAIL  $Int1, $List2, $tmp, $x ...
 //   VAR02        FAIL  name ends in _List, _Object or _Obj
 //   REFRESH01    FAIL  a microflow that closes its page commits without `refresh`
+//                      (the CAPTION, VAR and REFRESH rules: naming_rules.cjs)
 //   PERF02 PERF03 PERF05 PERF06  WARN  a loop that only sums a retrieved list; a database call per row
 //                                      in such a loop; a whole table filtered by an `if`; a loop that
 //                                      only keeps the largest value (perf_rules.cjs)
@@ -39,296 +39,14 @@
 const { levelArgs } = require('./rulebook.cjs');
 const crypto = require('crypto');
 const fs = require('fs');
-const path = require('path');
+const { withoutFolder } = require('./mxcli_client.cjs');
 const py = require('./py_compat.cjs');
-const { perfFindings } = require('./perf_rules.cjs');
-const { rx } = require('./py_compat.cjs');
+const { rx } = py;
+const naming = require('./naming_rules.cjs');
+const { finding, stripComments, checkNamingAndRefresh } = naming;
 const { entityHeads, indexFindings, redundantFindings } = require('./index_rules.cjs');
 const { eventFindings } = require('./event_rules.cjs');
 const { dataSourceFindings } = require('./datasource_rules.cjs');
-
-// Any `@word rest`; group 1 is the word (caption, annotation, position).
-const ANNOTATION_RE = rx(String.raw`^\s*@(\w+)\s*(.*)$`);
-const CAPTION_RE = rx(String.raw`^\s*@caption\s+'(.*)'\s*$`, 'i');
-const DECISION_RE = rx(String.raw`^\s*(if|case)\b`, 'i');
-// A `while` is a loop, not a decision: mxcli writes no caption for it -- `@caption` passes
-// `check` and `exec` and is gone from `describe`, with no MDL042 to say so -- while
-// `@annotation` survives. Treated as a decision, it failed CAPTION03 with no way to pass:
-// a Pi session spent 45 minutes on three such findings.
-const LOOP_RE = rx(String.raw`^\s*(loop|while)\b`, 'i');
-// Activity lines; `create` needs a qualified entity so `create microflow` is not matched.
-const ACTION_RE = rx(String.raw`^\s*(?:` +
-  String.raw`retrieve\b|` +
-  String.raw`change\s+\$|` +
-  String.raw`commit\s+\$|` +
-  String.raw`delete\s+\$|` +
-  String.raw`(?:\$\w+\s*=\s*)?create\s+\w+\.|` +
-  String.raw`show\s+page\b|` +
-  String.raw`set\s+\$|` +
-  String.raw`(?:\$\w+\s*=\s*)?call\s+(?:microflow|nanoflow)\b` +
-  ')', 'i');
-// Mendix default captions: verb + one name ("Retrieve Invoice") or a fixed phrase ("Commit object").
-const DEFAULT_ACTION_CAPTION_RE = rx(String.raw`^(?:` +
-  String.raw`(?:Retrieve|Change|Commit|Delete|Create)\s+[A-Z][\w.]*|` +
-  'Change variable|' +
-  'Commit object|' +
-  'Delete object|' +
-  String.raw`Show page(?:\s+\S+)?|` +
-  String.raw`Call (?:microflow|nanoflow)(?:\s+\S+)?` +
-  ')$', 'i');
-// Type word plus digits: $Int1, $List2, $Var10.
-const PLACEHOLDER_VAR_RE = rx(String.raw`\$(?:int|bool|boolean|str|string|dec|decimal|date|datetime|list|obj|object|var|num|item)\d+\b`, 'i');
-const THROWAWAY_VAR_RE = rx(String.raw`\$(?:tmp|temp|foo|bar|x|y|z|aa)\b`, 'i');
-const TYPE_ECHO_VAR_RE = rx(String.raw`\$\w+_(?:list|object|obj)\b`, 'i');
-// A comparison in a caption: <, >, <=, >=, != or " = ".
-const COMPARISON_RE = rx(String.raw`[<>]=?|!=|\s=\s`);
-
-// [regex, rule code, message label] for variable names.
-const VARIABLE_RULES = [
-  [PLACEHOLDER_VAR_RE, 'VAR01', 'placeholder variable name -- name what it holds, e.g. $OpenInvoiceCount'],
-  [THROWAWAY_VAR_RE, 'VAR01', 'throwaway variable name -- name what it holds, e.g. $DueDate'],
-  [TYPE_ECHO_VAR_RE, 'VAR02', 'variable name only restates its type -- name what it holds, e.g. $OverdueInvoices'],
-];
-
-// A finding: {check, message, line}, in that key order (it is printed as JSON).
-const finding = (check, message, line = null) => ({ check, message, line });
-
-// Python's s[:n], by code point.
-const head = (s, n) => [...s].slice(0, n).join('');
-
-function stripComments(text) {
-  text = py.re.sub(String.raw`/\*.*?\*/`, '', text, 0, 's');
-  // Authored scripts quote identifiers, describe output does not; MDL strings use single quotes.
-  text = text.split('"').join('');
-  const kept = py.splitlines(text).filter(line => !py.lstrip(line).startsWith('--'));
-  return kept.join('\n');
-}
-
-// [kind, raw line] of the @-annotations directly above lines[index].
-function precedingAnnotations(lines, index) {
-  const found = [];
-  let cursor = index - 1;
-  while (cursor >= 0) {
-    const line = lines[cursor];
-    if (!py.strip(line)) { cursor -= 1; continue; }
-    const match = ANNOTATION_RE.match(line);
-    if (!match) break;
-    found.push([match.group(1).toLowerCase(), line]);
-    cursor -= 1;
-  }
-  return found;
-}
-
-// Text of the parsable @caption, else "".
-function captionText(annotationLines) {
-  for (const [kind, raw] of annotationLines) {
-    if (kind === 'caption') {
-      const match = CAPTION_RE.match(raw);
-      if (match) return match.group(1);
-    }
-  }
-  return '';  // no @caption, or one that does not parse
-}
-
-const annotationKinds = annotations => annotations.map(([kind]) => kind);
-
-// `mdl 1;` heads every document mxcli v0.25 describes; v0.24 wrote none.
-const MDL1_HEADER = rx(String.raw`^\s*mdl\s+1\s*;\s*$`, 'i');
-const isMdl1 = lines => lines.some(line => MDL1_HEADER.match(line));
-
-// The expression of the split at lines[index]: what Mendix shows as its caption by default. An
-// `if` runs on to its `then`, over several lines when the expression does.
-function splitExpression(lines, index) {
-  const first = py.strip(lines[index]);
-  let text = py.strip(first.slice(py.split(first)[0].length));
-  if (/^(?:if|elsif)\b/i.test(first)) {
-    // v0.24 printed a long caption on one line, a line break as \n and a quote doubled.
-    for (let k = index + 1; !/\bthen$/i.test(text) && k < lines.length; k++) text += '\\n    ' + py.strip(lines[k]);
-    text = py.strip(text.replace(/\s*\bthen$/i, ''));
-  }
-  return text.split("'").join("''");
-}
-
-// v0.25 writes an `if` that is all of an `else` branch as `elsif`; v0.24 wrote the nested `if`,
-// with its caption. Under `mdl 1` an `elsif` is that decision.
-const ELSIF_RE = rx(String.raw`^\s*elsif\b`, 'i');
-
-// Caption rules for an if/case/while; the bool is false when it has no @caption.
-function decisionFindings(lines, index, mdl1 = false) {
-  const line = lines[index];
-  const annotations = precedingAnnotations(lines, index);
-  let text;
-  if (!annotationKinds(annotations).includes('caption')) {
-    // mxcli v0.25 (`mdl 1`) leaves out a caption that is the split's own expression, as it leaves
-    // out every default; v0.24 printed it. A split always has a caption in the model, so a missing
-    // one there is that default, judged as v0.24's printed caption was.
-    if (!mdl1) {
-      return [[finding('CAPTION03',
-        `decision without @caption -- put @caption '<the question it answers?>' on the line above: ${head(py.strip(line), 70)}`,
-        index + 1)], [], false];
-    }
-    text = splitExpression(lines, index);
-  } else {
-    text = captionText(annotations);
-  }
-  if (!text) return [[], [], true];
-  const stripped = py.strip(line);
-  const expression = py.strip(stripped.slice(py.split(stripped)[0].length));
-  const isEnumSplit = stripped.toLowerCase().startsWith('case');
-  if (isEnumSplit && py.strip(text) === expression) {
-    // mxcli overwrites an enum case's @caption with its expression.
-    return [[], [finding('CAPTION08',
-      "mxcli wrote this split's own expression as its caption " +
-      `('${text}'); measured on 11.13.0 it discards both @caption ` +
-      "and @annotation on a split, so this is not the author's doing",
-      index + 1)], true];
-  }
-  if (text.includes('$') || COMPARISON_RE.search(text)) {
-    return [[finding('CAPTION05',
-      `caption restates the expression: '${text}' -- write the business question instead, with no $, <, >, != or =, ending in '?'`,
-      index + 1)], [], true];
-  }
-  if (!py.rstrip(text).endsWith('?')) {
-    return [[finding('CAPTION04',
-      `decision caption is not phrased as a question: '${text}' -- end it with '?', e.g. 'Is the invoice overdue?'`,
-      index + 1)], [], true];
-  }
-  return [[], [], true];
-}
-
-// A loop or while loop needs @annotation and must not carry @caption.
-function loopFindings(lines, index) {
-  const line = lines[index];
-  const kinds = annotationKinds(precedingAnnotations(lines, index));
-  const failures = [];
-  if (kinds.includes('caption')) {
-    failures.push(finding('CAPTION07',
-      'loop carries @caption, which is dropped (MDL042 on a loop, silently on a while) -- write @annotation \'<why it repeats>\' above it instead',
-      index + 1));
-  }
-  if (!kinds.includes('annotation')) {
-    failures.push(finding('CAPTION06',
-      `loop without @annotation -- put @annotation '<why it repeats>' on the line above: ${head(py.strip(line), 70)}`,
-      index + 1));
-  }
-  return failures;
-}
-
-// An action needs a @caption that is not the Mendix default.
-function actionFindings(lines, index) {
-  const line = lines[index];
-  const annotations = precedingAnnotations(lines, index);
-  if (!annotationKinds(annotations).includes('caption')) {
-    return [finding('CAPTION01',
-      `action without business-operation @caption -- put @caption '<what it does for the business>' on the line above: ${head(py.strip(line), 70)}`,
-      index + 1)];
-  }
-  const text = captionText(annotations);
-  if (text && DEFAULT_ACTION_CAPTION_RE.match(py.strip(text))) {
-    return [finding('CAPTION02',
-      `action caption restates the Mendix default: '${text}' -- say what it does for the business, e.g. 'Load the open invoices'`,
-      index + 1)];
-  }
-  return [];
-}
-
-function variableFindings(line, lineNumber) {
-  const failures = [];
-  for (const [regex, check, label] of VARIABLE_RULES) {
-    for (const hit of regex.findall(line)) {
-      const at = label.indexOf(' -- ');
-      const what = at < 0 ? label : label.slice(0, at), fix = at < 0 ? '' : label.slice(at + 4);
-      failures.push(finding(check, `${what}: ${hit}` + (fix ? ` -- ${fix}` : ''), lineNumber));
-    }
-  }
-  return failures;
-}
-
-// [failures, warnings] for all naming rules.
-function checkNaming(lines) {
-  const failures = [], warnings = [];
-  const mdl1 = isMdl1(lines);
-  lines.forEach((line, index) => {
-    const lineNumber = index + 1;
-    const stripped = py.strip(line).toLowerCase();
-    if (stripped.startsWith('end ') || stripped === 'end') return;
-    if (DECISION_RE.match(line) || (mdl1 && ELSIF_RE.match(line))) {
-      const [found, warned, hasCaption] = decisionFindings(lines, index, mdl1);
-      failures.push(...found);
-      warnings.push(...warned);
-      if (!hasCaption) return;  // skips the variable-name rules for this line
-    } else if (LOOP_RE.match(line)) {
-      failures.push(...loopFindings(lines, index));
-    } else if (ACTION_RE.match(line)) {
-      failures.push(...actionFindings(lines, index));
-    }
-    failures.push(...variableFindings(line, lineNumber));
-  });
-  return [failures, warnings];
-}
-
-// A microflow behind a popup's Save: it commits, then `close page`. Without `refresh` the
-// client is never told the object changed, so the grid under the popup still shows the old
-// rows until a reload -- in every app the harness built (new invoice, new customer). The tests
-// missed it: a session reloaded the page in its test (`reopen_app()`) to see the new row.
-const MICROFLOW_START_RE = rx(String.raw`^create\s+(?:or\s+(?:modify|replace)\s+)?microflow\s+([\w.]+)`, 'i');
-const COMMIT_STATEMENT_RE = rx(String.raw`^\s*(?:commit\s+\$\w+|change\s+\$\w+\b.*\bcommit\b)`, 'is');
-
-// REFRESH01: in a microflow that ends in `close page`, every commit carries `refresh`.
-function refreshFindings(lines) {
-  const failures = [];
-  let name = null, statements = [], closes = false;
-  const flush = () => {
-    if (!name || !closes) return;
-    for (const [lineNumber, statement] of statements) {
-      if (COMMIT_STATEMENT_RE.match(statement) && !py.re.search(String.raw`\brefresh\b`, statement, 'i')) {
-        const target = py.re.search(String.raw`\$\w+`, statement).group(0);
-        failures.push(finding('REFRESH01',
-          `${name} closes its page but commits ${target} without refresh -- the grid under the ` +
-          `popup keeps showing the old rows until a reload: write \`commit ${target} refresh;\` ` +
-          `(or \`change ${target} (...) commit refresh;\`)`,
-          lineNumber));
-      }
-    }
-  };
-  let current = '', start = null, inBody = false;
-  lines.forEach((line, index) => {
-    const match = MICROFLOW_START_RE.match(line);
-    if (match) {
-      flush();
-      name = match.group(1); statements = []; closes = false; current = ''; start = null; inBody = false;
-      return;
-    }
-    if (name === null || ANNOTATION_RE.match(line)) return;
-    if (!inBody) {
-      // the signature and its parameters end at `begin`
-      inBody = Boolean(py.re.match(String.raw`^\s*begin\s*$`, line, 'i'));
-      return;
-    }
-    if (py.re.match(String.raw`^end;\s*$`, line)) {
-      flush();
-      name = null;
-      return;
-    }
-    if (!py.strip(current)) start = index + 1;
-    current += ' ' + py.strip(line);
-    if (py.rstrip(line).endsWith(';')) {
-      const statement = py.strip(current);
-      if (py.re.match(String.raw`close\s+page\b`, statement, 'i')) closes = true;
-      statements.push([start, statement]);
-      current = '';
-    }
-  });
-  flush();
-  return failures;
-}
-
-function checkNamingAndRefresh(lines) {
-  const [failures, warnings] = checkNaming(lines);
-  // Performance (PERF02/03/05/06, perf_rules.cjs): warnings, listed before the caption warnings.
-  const perf = perfFindings(lines).map(([code, message, line]) => finding(code, message, line));
-  return [[...failures, ...refreshFindings(lines)], [...perf, ...warnings]];
-}
 
 const CHECKS = { naming: checkNamingAndRefresh };
 
@@ -355,8 +73,7 @@ function flowHashes(lines) {
   const hashes = new Map();
   for (const [name, start, end] of flowBlocks(lines)) {
     // Its folder does not count either: a move (FOLDER01) changes where a flow is, not what it does.
-    const text = lines.slice(start - 1, end).filter(l => !LAYOUT_ONLY.match(l)).join('\n')
-      .replace(/\bfolder\s*:?\s*'(?:[^']|'')*'\s*,?/gi, '');
+    const text = withoutFolder(lines.slice(start - 1, end).filter(l => !LAYOUT_ONLY.match(l)).join('\n'));
     hashes.set(name, crypto.createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16));
   }
   return hashes;
@@ -514,6 +231,100 @@ function parseArgs(argv) {
   return args;
 }
 
+// With --entities: the findings that need the domain model (and --pages, the pages) beside the
+// flows -- indexes (PERF07, PERF08), event and error handlers, list data sources (DS01).
+// Returns [failures, warnings]; the PERF warnings stay first, the index ones right after them.
+function modelFindings(lines, args, failures, warnings) {
+  const [entityText] = collectText([pathStr(args.entities)]);
+  const [pageText] = args.pages !== null ? collectText([pathStr(args.pages)]) : ['', []];
+  const documents = [...lines, ...py.splitlines(stripComments(pageText))];
+  let indexes;
+  if (py.strip(entityText) && !entityHeads(py.splitlines(entityText))) {
+    indexes = [finding('PERF07', 'not checked: no entity was recognised in the describe text ' +
+      '(a describe format index_rules.py does not read)', null)];
+  } else {
+    indexes = [...indexFindings(py.splitlines(entityText), documents), ...redundantFindings(py.splitlines(entityText), documents)]
+      .map(([code, message, line]) => finding(code, message, line));
+  }
+  const perf = warnings.filter(w => w.check.startsWith('PERF'));
+  warnings = [...perf, ...indexes, ...warnings.filter(w => !w.check.startsWith('PERF'))];
+  // Event handlers and error handlers: the loop and the silent skip fail, the rest warn.
+  for (const [code, message, line] of eventFindings(lines, entityText, pageText)) {
+    (code === 'EVENT01' || code === 'EVENT02' ? failures : warnings).push(finding(code, message, line));
+  }
+  // A list widget fed by a flow that only retrieves its rows: a database source pages them (DS01).
+  for (const [code, message, line] of dataSourceFindings(lines, pageText)) failures.push(finding(code, message, line));
+  return [failures, warnings];
+}
+
+// After the first DONE (the gate passes the hashes it kept then), a microflow that is new or
+// changed since the last DONE needs its captions; older ones keep them as warnings, a backlog.
+// The set of those flows' names; empty without --captions-baseline.
+function freshFlows(args, hashes) {
+  if (args.captions_baseline === null || !py.isfile(pathStr(args.captions_baseline))) return new Set();
+  let baseline;
+  try {
+    baseline = JSON.parse(fs.readFileSync(pathStr(args.captions_baseline)).toString('utf8'));
+  } catch {
+    baseline = {};
+  }
+  if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) baseline = {};   // a damaged file is no baseline, not a crash
+  // Another mxcli describes the same microflow in other words: every hash would differ and
+  // the whole caption backlog would block at once. The next DONE keeps a new baseline.
+  const format = Object.prototype.hasOwnProperty.call(baseline, '_format') ? baseline._format : '';
+  if (format !== args.format) baseline = Object.fromEntries(hashes);
+  return new Set([...hashes].filter(([name, digest]) =>
+    !(Object.prototype.hasOwnProperty.call(baseline, name) && baseline[name] === digest)).map(([name]) => name));
+}
+
+// --captions warn: a caption finding in a flow that is not fresh becomes a warning; one in a fresh
+// flow stays a failure and says why. Returns [failures, warnings, how many were demoted].
+function demoteCaptions(lines, failures, warnings, fresh) {
+  const blocks = flowBlocks(lines);
+  const flowAt = line => {
+    const found = blocks.find(([, start, end]) => start <= (line || 0) && (line || 0) <= end);
+    return found ? found[0] : '';
+  };
+  for (const failure of failures) {
+    if (CAPTION_RULES.has(failure.check) && fresh.has(flowAt(failure.line))) {
+      failure.message += ` -- ${flowAt(failure.line)} is new or changed since the last DONE, ` +
+        'so its captions are required now';
+    }
+  }
+  const demoted = failures.filter(f => CAPTION_RULES.has(f.check) && !fresh.has(flowAt(f.line)));
+  failures = failures.filter(f => !(CAPTION_RULES.has(f.check) && !fresh.has(flowAt(f.line))));
+  warnings.push(...demoted.map(f => finding(f.check, f.message, f.line)));
+  return [failures, warnings, demoted.length];
+}
+
+// --levels: a code the person raised or lowered in the rulebook moves to its level; off and info
+// drop out. Returns [failures, warnings].
+function applyLevels(levels, failures, warnings) {
+  const all = failures.map(f => [f, 'fail']).concat(warnings.map(w => [w, 'warn']));
+  failures = []; warnings = [];
+  for (const [f, kind] of all) {
+    const level = Object.prototype.hasOwnProperty.call(levels, f.check) ? levels[f.check] : null;
+    if (level === 'off' || level === 'info') continue;
+    (level === 'block' || (level === null && kind === 'fail') ? failures : warnings).push(f);
+  }
+  return [failures, warnings];
+}
+
+function printReport(report, captionWarnings) {
+  const { failures, warnings } = report;
+  const perf = warnings.filter(w => w.check.startsWith('PERF')).length;
+  const extra = (perf ? `, ${perf} performance warning(s)` : '') + (captionWarnings ? `, ${captionWarnings} caption warning(s)` : '');
+  py.print(`${report.verdict}  ${failures.length} failure(s) over ${report.lines} lines${extra}`);
+  for (const failure of failures) {
+    const location = failure.line ? `line ${failure.line}` : '-';
+    py.print(`  - [${failure.check}] ${location}: ${failure.message}`);
+  }
+  for (const warning of warnings) {
+    const location = warning.line ? `line ${warning.line}` : '-';
+    py.print(`  ! [${warning.check}] ${location}: ${warning.message}`);
+  }
+}
+
 function main() {
   // --levels: the codes the person raised or lowered in the rulebook (tests/rulebook/); every other
   // code keeps the behaviour below (--captions, the baseline), so an untouched rulebook changes nothing.
@@ -523,7 +334,13 @@ function main() {
 
   const [text, used] = collectText(sources);
   if (!py.strip(text)) {
-    process.stderr.write(`FAIL  no MDL found in ${py.pyRepr(sources)}\n`);
+    const message = `no MDL found in ${py.pyRepr(sources)}`;
+    process.stderr.write(`FAIL  ${message}\n`);
+    // --json promises a report on stdout; a caller that parses it gets the failure, not empty text.
+    if (args.json) {
+      py.print(py.jsonDumps({ verdict: 'FAIL', warnings: [], skills: args.skill, sources: [], lines: 0, failures: [message] },
+        { indent: 2 }));
+    }
     return 1;
   }
 
@@ -537,25 +354,7 @@ function main() {
   }
   // A Path is never false: `--entities ''` is Path('.'), and counts.
   if (args.entities !== null && args.skill.includes('naming')) {
-    const [entityText] = collectText([pathStr(args.entities)]);
-    const [pageText] = args.pages !== null ? collectText([pathStr(args.pages)]) : ['', []];
-    const documents = [...lines, ...py.splitlines(stripComments(pageText))];
-    let indexes;
-    if (py.strip(entityText) && !entityHeads(py.splitlines(entityText))) {
-      indexes = [finding('PERF07', 'not checked: no entity was recognised in the describe text ' +
-        '(a describe format index_rules.py does not read)', null)];
-    } else {
-      indexes = [...indexFindings(py.splitlines(entityText), documents), ...redundantFindings(py.splitlines(entityText), documents)]
-        .map(([code, message, line]) => finding(code, message, line));
-    }
-    const perf = warnings.filter(w => w.check.startsWith('PERF'));
-    warnings = [...perf, ...indexes, ...warnings.filter(w => !w.check.startsWith('PERF'))];
-    // Event handlers and error handlers: the loop and the silent skip fail, the rest warn.
-    for (const [code, message, line] of eventFindings(lines, entityText, pageText)) {
-      (code === 'EVENT01' || code === 'EVENT02' ? failures : warnings).push(finding(code, message, line));
-    }
-    // A list widget fed by a flow that only retrieves its rows: a database source pages them (DS01).
-    for (const [code, message, line] of dataSourceFindings(lines, pageText)) failures.push(finding(code, message, line));
+    [failures, warnings] = modelFindings(lines, args, failures, warnings);
   }
   const hashes = flowHashes(lines);
   // Documents were described and not one head was recognised: a describe format these rules do
@@ -570,53 +369,12 @@ function main() {
     record._format = args.format;
     fs.writeFileSync(pathStr(args.flow_hashes), py.jsonDumps(record, { indent: 0, sortKeys: true }));
   }
-  // After the first DONE (the gate passes the hashes it kept then), a microflow that is new or
-  // changed since the last DONE needs its captions; older ones keep them as warnings, a backlog.
-  let fresh = new Set();
-  if (args.captions_baseline !== null && py.isfile(pathStr(args.captions_baseline))) {
-    let baseline;
-    try {
-      baseline = JSON.parse(fs.readFileSync(pathStr(args.captions_baseline)).toString('utf8'));
-    } catch {
-      baseline = {};
-    }
-    if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) baseline = {};   // a damaged file is no baseline, not a crash
-    // Another mxcli describes the same microflow in other words: every hash would differ and
-    // the whole caption backlog would block at once. The next DONE keeps a new baseline.
-    const format = Object.prototype.hasOwnProperty.call(baseline, '_format') ? baseline._format : '';
-    if (format !== args.format) baseline = Object.fromEntries(hashes);
-    fresh = new Set([...hashes].filter(([name, digest]) =>
-      !(Object.prototype.hasOwnProperty.call(baseline, name) && baseline[name] === digest)).map(([name]) => name));
-  }
-  const blocks = flowBlocks(lines);
-  const flowAt = line => {
-    const found = blocks.find(([, start, end]) => start <= (line || 0) && (line || 0) <= end);
-    return found ? found[0] : '';
-  };
+  const fresh = freshFlows(args, hashes);
 
   let captionWarnings = 0;
-  if (args.captions === 'warn') {
-    for (const failure of failures) {
-      if (CAPTION_RULES.has(failure.check) && fresh.has(flowAt(failure.line))) {
-        failure.message += ` -- ${flowAt(failure.line)} is new or changed since the last DONE, ` +
-          'so its captions are required now';
-      }
-    }
-    const demoted = failures.filter(f => CAPTION_RULES.has(f.check) && !fresh.has(flowAt(f.line)));
-    failures = failures.filter(f => !(CAPTION_RULES.has(f.check) && !fresh.has(flowAt(f.line))));
-    warnings.push(...demoted.map(f => finding(f.check, f.message, f.line)));
-    captionWarnings = demoted.length;
-  }
+  if (args.captions === 'warn') [failures, warnings, captionWarnings] = demoteCaptions(lines, failures, warnings, fresh);
+  if (Object.keys(levels).length) [failures, warnings] = applyLevels(levels, failures, warnings);
 
-  if (Object.keys(levels).length) {
-    const all = failures.map(f => [f, 'fail']).concat(warnings.map(w => [w, 'warn']));
-    failures = []; warnings = [];
-    for (const [f, kind] of all) {
-      const level = Object.prototype.hasOwnProperty.call(levels, f.check) ? levels[f.check] : null;
-      if (level === 'off' || level === 'info') continue;
-      (level === 'block' || (level === null && kind === 'fail') ? failures : warnings).push(f);
-    }
-  }
   const report = {
     verdict: !failures.length ? 'PASS' : 'FAIL',
     warnings,
@@ -625,22 +383,8 @@ function main() {
     lines: lines.length,
     failures,
   };
-
-  if (args.json) {
-    py.print(py.jsonDumps(report, { indent: 2 }));
-  } else {
-    const perf = warnings.filter(w => w.check.startsWith('PERF')).length;
-    const extra = (perf ? `, ${perf} performance warning(s)` : '') + (captionWarnings ? `, ${captionWarnings} caption warning(s)` : '');
-    py.print(`${report.verdict}  ${failures.length} failure(s) over ${lines.length} lines${extra}`);
-    for (const failure of failures) {
-      const location = failure.line ? `line ${failure.line}` : '-';
-      py.print(`  - [${failure.check}] ${location}: ${failure.message}`);
-    }
-    for (const warning of warnings) {
-      const location = warning.line ? `line ${warning.line}` : '-';
-      py.print(`  ! [${warning.check}] ${location}: ${warning.message}`);
-    }
-  }
+  if (args.json) py.print(py.jsonDumps(report, { indent: 2 }));
+  else printReport(report, captionWarnings);
   return !failures.length ? 0 : 1;
 }
 
@@ -648,13 +392,10 @@ function main() {
 if (require.main === module) py.setOutputFilter(require('./mdl1_spelling.cjs').advice);
 if (require.main === module) process.exitCode = main();
 
-// The names check_mdl.py defines (and imports). Dicts come back as plain objects, tuples as arrays;
-// CAPTION_RULES (a set in Python) as a sorted array. Failure and Warning_ build the finding objects.
+// The rules of naming_rules.cjs, and this file's own. CAPTION_RULES (a set in Python) comes back as
+// a sorted array; finding builds the finding objects.
 module.exports = {
-  ANNOTATION_RE, CAPTION_RE, DECISION_RE, LOOP_RE, ACTION_RE, DEFAULT_ACTION_CAPTION_RE, PLACEHOLDER_VAR_RE,
-  THROWAWAY_VAR_RE, TYPE_ECHO_VAR_RE, COMPARISON_RE, VARIABLE_RULES, MICROFLOW_START_RE, COMMIT_STATEMENT_RE,
+  ...naming,
   FLOW_START, LAYOUT_ONLY, CHECKS, CAPTION_RULES: [...CAPTION_RULES].sort(),
-  finding, stripComments, precedingAnnotations, captionText, annotationKinds, decisionFindings, loopFindings,
-  actionFindings, variableFindings, checkNaming, refreshFindings, checkNamingAndRefresh, flowBlocks,
-  flowHashes, collectText, main,
+  flowBlocks, flowHashes, collectText, main,
 };

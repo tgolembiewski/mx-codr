@@ -89,42 +89,48 @@ fi
 # SCRIPT01: a document these scripts create that another script in mdlsource/ creates too (one-offs
 # elsewhere are not compared: once run, they are history).
 # Whichever runs last wins, so re-running one silently undoes the other -- no mx check sees it.
-if [ -f tools/mdl-checks/gate_helpers.cjs ]; then
-  duplicates="$("$NODE" tools/mdl-checks/gate_helpers.cjs duplicate-definitions "$@" 2>/dev/null)"
-  if [ -n "$duplicates" ]; then
-    echo "precheck: SCRIPT01 -- a document is created in more than one script (the real model is untouched):"
-    printf '%s\n' "$duplicates"
-    exit 1
+precheck_script01() {
+  if [ -f tools/mdl-checks/gate_helpers.cjs ]; then
+    duplicates="$("$NODE" tools/mdl-checks/gate_helpers.cjs duplicate-definitions "$@" 2>/dev/null)"
+    if [ -n "$duplicates" ]; then
+      echo "precheck: SCRIPT01 -- a document is created in more than one script (the real model is untouched):"
+      printf '%s\n' "$duplicates"
+      exit 1
+    fi
   fi
-fi
+}
 
 # CAPTION01-07: the flows these scripts create or modify carry their business captions now, not after
 # the gate names them (gate_scripts.cjs captionFindings): nine to twenty-three --only runs a B2B run
 # ended with "the full gate would refuse CAPTION01". CAPTION01 `off` in tests/rulebook/naming/ turns it off.
-if [ "$(mdl_rule_level CAPTION01 warn)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
-  uncaptioned="$("$NODE" tools/mdl-checks/gate_helpers.cjs captions "$@" 2>/dev/null)"
-  if [ -n "$uncaptioned" ]; then
-    echo "precheck: CAPTION01 -- activities without a business caption (the real model is untouched):"
-    printf '%s\n' "$uncaptioned"
-    echo "  Put @caption '<what it does for the business>' on the line above each action and decision (a question ending in ?),"
-    echo "  @annotation '<why it repeats>' above each loop -- the e.g. is a paste when it fits -- then exec again."
-    exit 1
+precheck_caption01() {
+  if [ "$(mdl_rule_level CAPTION01 warn)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
+    uncaptioned="$("$NODE" tools/mdl-checks/gate_helpers.cjs captions "$@" 2>/dev/null)"
+    if [ -n "$uncaptioned" ]; then
+      echo "precheck: CAPTION01 -- activities without a business caption (the real model is untouched):"
+      printf '%s\n' "$uncaptioned"
+      echo "  Put @caption '<what it does for the business>' on the line above each action and decision (a question ending in ?),"
+      echo "  @annotation '<why it repeats>' above each loop -- the e.g. is a paste when it fits -- then exec again."
+      exit 1
+    fi
   fi
-fi
+}
 
 # NAME02: the widgets of a page or snippet these scripts create are named <Page>_<What><Type> now,
 # not after a later change makes the whole page need them at once (gate_scripts.cjs widgetNameFindings).
 # NAME02 `off` in tests/rulebook/layout/NAME02.md turns it off.
-if [ "$(mdl_rule_level NAME02 warn)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
-  misnamed="$("$NODE" tools/mdl-checks/gate_helpers.cjs widget-names "$@" 2>/dev/null)"
-  if [ -n "$misnamed" ]; then
-    echo "precheck: NAME02 -- widget names that do not read <Page>_<What><Type> (the real model is untouched):"
-    printf '%s\n' "$misnamed" | head -12
-    [ "$(printf '%s\n' "$misnamed" | wc -l)" -gt 12 ] && echo "  ... and $(( $(printf '%s\n' "$misnamed" | wc -l) - 12 )) more"
-    echo "  Name each widget in the script before it runs: renamed later, every test that finds it changes too."
-    exit 1
+precheck_name02() {
+  if [ "$(mdl_rule_level NAME02 warn)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
+    misnamed="$("$NODE" tools/mdl-checks/gate_helpers.cjs widget-names "$@" 2>/dev/null)"
+    if [ -n "$misnamed" ]; then
+      echo "precheck: NAME02 -- widget names that do not read <Page>_<What><Type> (the real model is untouched):"
+      printf '%s\n' "$misnamed" | head -12
+      [ "$(printf '%s\n' "$misnamed" | wc -l)" -gt 12 ] && echo "  ... and $(( $(printf '%s\n' "$misnamed" | wc -l) - 12 )) more"
+      echo "  Name each widget in the script before it runs: renamed later, every test that finds it changes too."
+      exit 1
+    fi
   fi
-fi
+}
 
 # REQ01: requirements before the first feature. With MDL_REQUIREMENTS ask or assume (tests/harness.env),
 # the first pages and ACT_ microflows of an app (it has no page of its own yet) wait while
@@ -133,30 +139,32 @@ fi
 # app first, then wrote seven requirements for a nine-section request and missed the formats it asked
 # for, so no test asked for them (InvoiceB2BG1, 2026-10-12). The block carries the procedure, so the
 # requirements come right with no skill to find. REQ01 `off` in tests/rulebook/app/REQ01.md turns it off.
-if [ "${MDL_REQUIREMENTS:-ask}" != "off" ] && [ "$(mdl_rule_level REQ01 block)" = "block" ] \
-   && [ -f tools/mdl-checks/gate_helpers.cjs ] && ! ls docs/brain/plan/*.md >/dev/null 2>&1 \
-   && ! grep -q ' plan/' <<< "$("$MXCLI" brain staged -p "$MPR" 2>/dev/null)"; then
-  fresh="$("$NODE" tools/mdl-checks/gate_helpers.cjs new-features . "$MPR" "$@" 2>/dev/null)"
-  if [ -n "$fresh" ]; then
-    echo "precheck: REQ01 -- requirements first: these scripts build the app's first features and docs/brain/plan/ is empty (the real model is untouched):"
-    printf '%s\n' "$fresh"
-    if [ "${MDL_REQUIREMENTS:-ask}" = "assume" ]; then
-      echo "  Nobody will answer (MDL_REQUIREMENTS=assume): decide yourself, and record before building:"
-    else
-      echo "  Ask the person first and wait for the answers (skill requirements-interview), then record:"
+precheck_req01() {
+  if [ "${MDL_REQUIREMENTS:-ask}" != "off" ] && [ "$(mdl_rule_level REQ01 block)" = "block" ] \
+     && [ -f tools/mdl-checks/gate_helpers.cjs ] && ! ls docs/brain/plan/*.md >/dev/null 2>&1 \
+     && ! grep -q ' plan/' <<< "$("$MXCLI" brain staged -p "$MPR" 2>/dev/null)"; then
+    fresh="$("$NODE" tools/mdl-checks/gate_helpers.cjs new-features . "$MPR" "$@" 2>/dev/null)"
+    if [ -n "$fresh" ]; then
+      echo "precheck: REQ01 -- requirements first: these scripts build the app's first features and docs/brain/plan/ is empty (the real model is untouched):"
+      printf '%s\n' "$fresh"
+      if [ "${MDL_REQUIREMENTS:-ask}" = "assume" ]; then
+        echo "  Nobody will answer (MDL_REQUIREMENTS=assume): decide yourself, and record before building:"
+      else
+        echo "  Ask the person first and wait for the answers (skill requirements-interview), then record:"
+      fi
+      echo "  - one requirement per testable statement of the request, in its own words: every rule, field format,"
+      echo "    count, limit, role and screen it names is its own line (a request in numbered sections gives"
+      echo "    several per section; \"dates as DD/MM/YYYY\" is one). Slices by feature, one command per slice:"
+      echo "      ./mxcli brain capture \"<requirement>\" --slice 01-<feature> -a @<Module.Doc> -p $MPR && ./mxcli brain capture ..."
+      echo "  - what the request leaves open, and what you build differently from its words (a sign-in where it asks"
+      echo "    for a picker), as an assumption: ./mxcli brain capture \"Assumed: <decision>\" --open --slice <slice> -p $MPR"
+      echo "  - then ./mxcli brain promote <id> for each (assume mode promotes its own; ask mode waits for the person)."
+      echo "  Each requirement then needs a test that names it (# requirement: <id>, gate REQ02), one test file per"
+      echo "  slice so --only <slice> runs a short one. Then exec again."
+      exit 1
     fi
-    echo "  - one requirement per testable statement of the request, in its own words: every rule, field format,"
-    echo "    count, limit, role and screen it names is its own line (a request in numbered sections gives"
-    echo "    several per section; \"dates as DD/MM/YYYY\" is one). Slices by feature, one command per slice:"
-    echo "      ./mxcli brain capture \"<requirement>\" --slice 01-<feature> -a @<Module.Doc> -p $MPR && ./mxcli brain capture ..."
-    echo "  - what the request leaves open, and what you build differently from its words (a sign-in where it asks"
-    echo "    for a picker), as an assumption: ./mxcli brain capture \"Assumed: <decision>\" --open --slice <slice> -p $MPR"
-    echo "  - then ./mxcli brain promote <id> for each (assume mode promotes its own; ask mode waits for the person)."
-    echo "  Each requirement then needs a test that names it (# requirement: <id>, gate REQ02), one test file per"
-    echo "  slice so --only <slice> runs a short one. Then exec again."
-    exit 1
   fi
-fi
+}
 
 # REQ03: a later request's new page or ACT_ microflow waits for a requirement that anchors it, so
 # every request leaves its requirements in docs/brain/plan/ -- built or not -- and the next session's
@@ -164,38 +172,50 @@ fi
 # nothing said so, B2B 2026-10-15). Only once the app has pages and its plan has requirements.
 # Only after the app's first DONE (.mxcli/last-gate.txt): during the first build its new pages are
 # that request's, recorded by REQ01 -- REQ03 blocked twice inside the first part of b2b-f4 (2026-10-16).
-if [ "${MDL_REQUIREMENTS:-ask}" != "off" ] && [ "$(mdl_rule_level REQ03 block)" = "block" ] \
-   && [ -f tools/mdl-checks/gate_helpers.cjs ] && ls docs/brain/plan/*.md >/dev/null 2>&1 \
-   && grep -q '^full: .* DONE' .mxcli/last-gate.txt 2>/dev/null; then
-  unanchored="$("$NODE" tools/mdl-checks/gate_helpers.cjs unanchored-features . "$MPR" "$@" 2>/dev/null)"
-  if [ -n "$unanchored" ]; then
-    echo "precheck: REQ03 -- no requirement of this request names these new documents (the real model is untouched):"
-    printf '%s\n' "$unanchored"
-    echo "  Record this request's requirements first, one per testable statement of it, in a slice of its own,"
-    echo "  each anchored at the document that will build it:"
-    echo "    ./mxcli brain capture \"<requirement>\" --slice <NN>-<this request> -a @<Module.Doc> -p $MPR"
-    echo "  A part of the request you will not build now gets its requirement too, anchored at the document it"
-    echo "  will be: the next session's orient.sh lists it as open. A part that needs a key or an outside service is"
-    echo "  built with a stand-in, not deferred. Promote each (./mxcli brain promote <id>), then exec again."
-    exit 1
+precheck_req03() {
+  if [ "${MDL_REQUIREMENTS:-ask}" != "off" ] && [ "$(mdl_rule_level REQ03 block)" = "block" ] \
+     && [ -f tools/mdl-checks/gate_helpers.cjs ] && ls docs/brain/plan/*.md >/dev/null 2>&1 \
+     && grep -q '^full: .* DONE' .mxcli/last-gate.txt 2>/dev/null; then
+    unanchored="$("$NODE" tools/mdl-checks/gate_helpers.cjs unanchored-features . "$MPR" "$@" 2>/dev/null)"
+    if [ -n "$unanchored" ]; then
+      echo "precheck: REQ03 -- no requirement of this request names these new documents (the real model is untouched):"
+      printf '%s\n' "$unanchored"
+      echo "  Record this request's requirements first, one per testable statement of it, in a slice of its own,"
+      echo "  each anchored at the document that will build it:"
+      echo "    ./mxcli brain capture \"<requirement>\" --slice <NN>-<this request> -a @<Module.Doc> -p $MPR"
+      echo "  A part of the request you will not build now gets its requirement too, anchored at the document it"
+      echo "  will be: the next session's orient.sh lists it as open. A part that needs a key or an outside service is"
+      echo "  built with a stand-in, not deferred. Promote each (./mxcli brain promote <id>), then exec again."
+      exit 1
+    fi
   fi
-fi
+}
 
 # TEST01: test first. A page or ACT_ microflow new to the model, named by no `# covers:` line of
 # tests/verify-*.test.sh, waits for its test. Then the test is red until the exec (red-first comes
 # by itself) and the tests do not pile up at the end. TEST01 `off` in tests/rulebook/app/TEST01.md turns it off.
-if [ "$(mdl_rule_level TEST01 block)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
-  untested="$("$NODE" tools/mdl-checks/gate_helpers.cjs test-first . "$MPR" "$@" 2>/dev/null)"
-  if [ -n "$untested" ]; then
-    echo "precheck: TEST01 -- test first: these scripts create what no browser test names yet (the real model is untouched):"
-    printf '%s\n' "$untested"
-    echo "  Write tests/verify-<feature>.test.sh first: a \`# covers:\` line naming them and a scenario that"
-    echo "  opens them, does what the person would do and checks the result in the database (skill"
-    echo "  test-first-delivery). Run it with bash tests/gate.sh --only <feature> -- it fails, they are not in the"
-    echo "  app yet -- then run this exec again. One test may cover all the pages of one feature."
-    exit 1
+precheck_test01() {
+  if [ "$(mdl_rule_level TEST01 block)" != "off" ] && [ -f tools/mdl-checks/gate_helpers.cjs ]; then
+    untested="$("$NODE" tools/mdl-checks/gate_helpers.cjs test-first . "$MPR" "$@" 2>/dev/null)"
+    if [ -n "$untested" ]; then
+      echo "precheck: TEST01 -- test first: these scripts create what no browser test names yet (the real model is untouched):"
+      printf '%s\n' "$untested"
+      echo "  Write tests/verify-<feature>.test.sh first: a \`# covers:\` line naming them and a scenario that"
+      echo "  opens them, does what the person would do and checks the result in the database (skill"
+      echo "  test-first-delivery). Run it with bash tests/gate.sh --only <feature> -- it fails, they are not in the"
+      echo "  app yet -- then run this exec again. One test may cover all the pages of one feature."
+      exit 1
+    fi
   fi
-fi
+}
+
+# The script rules above, in this order: the first that finds something prints it and exits 1.
+precheck_script01 "$@"
+precheck_caption01 "$@"
+precheck_name02 "$@"
+precheck_req01 "$@"
+precheck_req03 "$@"
+precheck_test01 "$@"
 
 started="$(date +%s)"
 # The model often runs this by hand and the hook then runs it again before the exec: the second

@@ -1,5 +1,6 @@
-// gate_helpers duplicate-definitions (SCRIPT01), test-first (TEST01) and new-features (REQ01): what MDL
-// scripts create.
+// What gate_helpers.cjs's script subcommands read in MDL scripts: duplicate-definitions (SCRIPT01),
+// widget-names (NAME02), captions (CAPTION01-07), test-first (TEST01), new-features (REQ01),
+// unanchored-features (REQ03), near-icons and error-sources.
 'use strict';
 const fs = require('fs');
 const py = require('./py_compat.cjs');

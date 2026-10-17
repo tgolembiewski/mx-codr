@@ -94,33 +94,17 @@ check_coverage() {
 # Runs check_mdl.cjs --skill naming over the described microflows and nanoflows. Caption rules are
 # warnings unless the CAPTION cards are at `block`: 286 of them once landed on a session with no test green.
 check_naming() {
-  [ -f tools/mdl-checks/check_mdl.cjs ] || {
-    echo "naming: could not run -- tools/mdl-checks/check_mdl.cjs is missing" > "$WORK/naming.summary"
-    return 2; }
   local gate out code
-  modules_or_status naming; gate=$?
+  describe_step_begin naming check_mdl.cjs "$WORK/mdl" "MICROFLOWS NANOFLOWS" "no microflow or nanoflow to check"; gate=$?
   case "$gate" in
     0) ;;
-    3) return 0 ;;   # no user modules: a real pass, summary already written
+    3) return 0 ;;   # no user module, or nothing to check: a real pass, summary already written
     *) return "$gate" ;;
   esac
-  if ! describe_all naming "$WORK/mdl" "MICROFLOWS NANOFLOWS"; then
-    echo "naming: could not run -- $(head -1 "$WORK/naming.broken")" > "$WORK/naming.summary"
-    head -5 "$WORK/naming.broken" | sed 's/^/  - /' > "$WORK/naming.detail"
-    return 2
-  fi
-  if ! ls "$WORK"/mdl/*.mdl >/dev/null 2>&1; then
-    echo "naming: no microflow or nanoflow to check" > "$WORK/naming.summary"; return 0
-  fi
   rulebook_ok naming || return 2
-  # The six baseline caption cards (tests/rulebook/naming/CAPTION01..06) all at `block`: every caption
-  # finding blocks, not only on a microflow new or changed since the last DONE. One of them at `block`
-  # alone is raised by --levels below.
-  local captions=error total code_ levels_
-  levels_="$(mdl_rulebook levels naming 2>/dev/null)"
-  for code_ in CAPTION01 CAPTION02 CAPTION03 CAPTION04 CAPTION05 CAPTION06; do
-    case "$levels_" in *"\"$code_\":\"block\""*) ;; *) captions=warn; break ;; esac
-  done
+  local captions
+  captions="$(naming_caption_mode)"
+  local line
   local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args naming)
   # PERF07 reads the entities' indexes and the pages' data sources as well.
   rm -f "$WORK/naming.unread"
@@ -141,10 +125,28 @@ check_naming() {
     --flow-hashes "$CACHE_DIR/naming.flows.json" ${baseline[@]+"${baseline[@]}"} 2>&1)"; code=$?
   checker_verdict "$code" "$out"; gate=$?
   if [ "$gate" = "2" ]; then
-    echo "naming: could not run -- check_mdl.cjs exited $code" > "$WORK/naming.summary"
-    printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 > "$WORK/naming.detail"
-    return 2
+    checker_failed naming check_mdl.cjs "$code" "$out"; return 2
   fi
+  naming_record_findings
+}
+
+# naming_caption_mode -- what check_mdl.cjs gets as --captions: `error` when the six baseline caption
+# cards (tests/rulebook/naming/CAPTION01..06) are all at `block` -- every caption finding blocks, not
+# only on a microflow new or changed since the last DONE -- else `warn`. One of them at `block`
+# alone is raised by --levels.
+naming_caption_mode() {
+  local captions=error code_ levels_
+  levels_="$(mdl_rulebook levels naming 2>/dev/null)"
+  for code_ in CAPTION01 CAPTION02 CAPTION03 CAPTION04 CAPTION05 CAPTION06; do
+    case "$levels_" in *"\"$code_\":\"block\""*) ;; *) captions=warn; break ;; esac
+  done
+  echo "$captions"
+}
+
+# check_mdl.cjs ran and checked the model (its output in check_naming's out, its verdict in gate):
+# the summary, the first ten findings, and the warnings. Returns the verdict.
+naming_record_findings() {
+  local total
   echo "naming: $(printf '%s\n' "$out" | head -1)" > "$WORK/naming.summary"
   # A session read ten detail lines as ten findings when there were 286: say how many are left out.
   total="$(printf '%s\n' "$out" | grep -cE '^\s+- ')"
@@ -182,9 +184,7 @@ check_scope() {
   # 0 passes and 1 has findings, each under a PASS or WARN line; anything else (a traceback
   # exits 1 too) did not check the model, and counted as "findings", a pass while SCOPE01 warned.
   if { [ "$code" != "0" ] && [ "$code" != "1" ]; } || ! grep -qE '^(PASS|WARN|FAIL) ' <<< "${out%%$'\n'*}"; then
-    echo "scope: could not run -- check_scope.cjs exited $code" > "$WORK/scope.summary"
-    printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 > "$WORK/scope.detail"
-    return 2
+    checker_failed scope check_scope.cjs "$code" "$out"; return 2
   fi
   echo "scope: $(printf '%s\n' "$out" | head -1)" > "$WORK/scope.summary"
   [ "$code" = "0" ] && return 0

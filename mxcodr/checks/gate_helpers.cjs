@@ -42,9 +42,9 @@
 // Exit 0 unless noted: qualified-names exits 1 when stdin is not a JSON list.
 // Warnings are printed to stdout, ready to show under the gate's output.
 //
-// The Node port of gate_helpers.py (2026-10-05): the same output on the same input. JSON is read
-// the way Python's json module reads it (an integral float stays 1.0, NaN and Infinity parse), and
-// a value of the wrong type stops the subcommand with exit 1, as the Python's exception did.
+// The output is what gate_helpers.py printed on the same input, so JSON is read the way Python's
+// json module reads it (an integral float stays 1.0, NaN and Infinity parse), and a value of the
+// wrong type stops the subcommand with exit 1, as the Python's exception did.
 'use strict';
 const crypto = require('crypto');
 const fs = require('fs');

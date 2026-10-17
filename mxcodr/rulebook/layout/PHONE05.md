@@ -1,7 +1,7 @@
 ---
 step: layout
 level: block
-check: layout_rules/offline.cjs#loginWidthFindings
+check: layout_rules/phone.cjs#loginWidthFindings
 key: none
 ---
 

@@ -84,27 +84,36 @@ layout_sign_out_inputs() {
 # The layout step: check_layout.cjs over every page's `describe` -- navigation, accounts, the page top,
 # spacing, grids, names, text inputs, URLs (NAV, ACCOUNT, USER, BACK, SPACE, GRID, NAME, TEXT, URL ...).
 check_layout() {
-  [ -f tools/mdl-checks/check_layout.cjs ] || {
-    echo "layout: could not run -- tools/mdl-checks/check_layout.cjs is missing" > "$WORK/layout.summary"
-    return 2; }
   local gate out code
-  modules_or_status layout; gate=$?
+  describe_step_begin layout check_layout.cjs "$WORK/pages" "PAGES" "no page to check"; gate=$?
   case "$gate" in
     0) ;;
-    3) return 0 ;;   # no user modules: a real pass, summary already written
+    3) return 0 ;;   # no user module, or nothing to check: a real pass, summary already written
     *) return "$gate" ;;
   esac
-  if ! describe_all layout "$WORK/pages" "PAGES"; then
-    echo "layout: could not run -- $(head -1 "$WORK/layout.broken")" > "$WORK/layout.summary"
-    head -5 "$WORK/layout.broken" | sed 's/^/  - /' > "$WORK/layout.detail"
-    return 2
-  fi
-  if ! ls "$WORK"/pages/*.mdl >/dev/null 2>&1; then
-    echo "layout: no page to check" > "$WORK/layout.summary"; return 0
-  fi
   local -a nav_args=(--own-modules "$USER_MODULES")
   rm -f "$WORK/layout.unread"
   layout_sign_out_inputs || return 2
+  layout_page_inputs
+  layout_names_args
+  rulebook_ok layout || return 2
+  local line
+  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args layout)
+  mkdir -p "$CACHE_DIR" 2>/dev/null
+  out="$("$NODE" tools/mdl-checks/check_layout.cjs "$WORK/pages" "${nav_args[@]}" ${rb[@]+"${rb[@]}"} \
+    --expect-pages "$(cat "$WORK/layout.count" 2>/dev/null || echo 0)" 2>&1)"; code=$?
+  checker_verdict "$code" "$out"; gate=$?
+  if [ "$gate" = "2" ]; then
+    checker_failed layout check_layout.cjs "$code" "$out"; return 2
+  fi
+  layout_record_findings
+}
+
+# The rest of check_layout's input, added to its nav_args: the template module (MODULE01), the
+# project's layouts (NAV04), the built app's offline files (OFFLINE01-03), the layouts and menus of
+# the phone pages (PHONE01/02), the flows (BACK01, GRID02) and the entities (TEXT01/02, GRID03).
+# What cannot be read does not block; layout_unread names the rules that may have missed something.
+layout_page_inputs() {
   # MODULE01: the empty template's module, still in an app that has its own.
   if grep -q '"MyFirstModule"' <<< "$("$MXCLI" -p "$MPR" --json -c "SHOW MODULES" 2>/dev/null)"; then
     nav_args+=(--template-module)
@@ -135,6 +144,10 @@ check_layout() {
   # The entities say how long the text a textbox edits may be (TEXT01, TEXT02) and which filter a grid column wants (GRID03).
   describe_entities_into "$WORK/layout-entities" || layout_unread entities "TEXT01, TEXT02, GRID03 (its filter by type)"
   ls "$WORK"/layout-entities/*.mdl >/dev/null 2>&1 && nav_args+=(--entities "$WORK/layout-entities")
+}
+
+# Adds to check_layout's nav_args how the widget names are checked (NAME01/02), from the rulebook.
+layout_names_args() {
   # Widget names (NAME01/02): a page new since the install needs them (names-baseline.json, written by the
   # installer); a page the app already had keeps them as warnings. The precheck asks for them at each exec.
   # tests/rulebook/layout/NAME02.md at `block`: every page needs them; NAME01 and NAME02 `off`: not checked.
@@ -148,17 +161,12 @@ check_layout() {
     *) nav_args+=(--names warn --page-hashes "$CACHE_DIR/layout.pages.json")
        [ -f "$CACHE_DIR/names-baseline.json" ] && nav_args+=(--names-baseline "$CACHE_DIR/names-baseline.json") ;;
   esac
-  rulebook_ok layout || return 2
-  local -a rb=(); while IFS= read -r line; do rb+=("$line"); done < <(mdl_rule_args layout)
-  mkdir -p "$CACHE_DIR" 2>/dev/null
-  out="$("$NODE" tools/mdl-checks/check_layout.cjs "$WORK/pages" "${nav_args[@]}" ${rb[@]+"${rb[@]}"} \
-    --expect-pages "$(cat "$WORK/layout.count" 2>/dev/null || echo 0)" 2>&1)"; code=$?
-  checker_verdict "$code" "$out"; gate=$?
-  if [ "$gate" = "2" ]; then
-    echo "layout: could not run -- check_layout.cjs exited $code" > "$WORK/layout.summary"
-    printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 > "$WORK/layout.detail"
-    return 2
-  fi
+}
+
+# check_layout.cjs ran and checked the model (its output in check_layout's out, its verdict in gate):
+# the summary, the detail, every finding in .mxcli/layout.txt, and the warnings. Returns the verdict,
+# 1 when ALERT01 is at `block` and a page has one.
+layout_record_findings() {
   echo "layout: $(printf '%s\n' "$out" | head -1)" > "$WORK/layout.summary"
   printf '%s\n' "$out" | grep -E '^\s+[-!] ' | head -12 > "$WORK/layout.detail"
   # Every finding, where a session reads them all without running the checker: the detail shows

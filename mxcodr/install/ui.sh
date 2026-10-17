@@ -1,7 +1,7 @@
 # install/ui.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Terminal output: the banner, the progress bar and every ui_* line the install prints.
 
-# --- 2. Terminal output: colours, icons, progress bar ---
+# --- Terminal output: colours, icons, progress bar ---
 # Output only. Plain lines when not a TTY, ASCII icons without UTF-8.
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
   UI_TTY=1

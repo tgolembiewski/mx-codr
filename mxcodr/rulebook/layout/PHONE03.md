@@ -1,7 +1,7 @@
 ---
 step: layout
 level: block
-check: layout_rules/offline.cjs#phoneGridFindings
+check: layout_rules/phone.cjs#phoneGridFindings
 key: none
 ---
 

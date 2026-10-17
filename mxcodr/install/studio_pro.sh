@@ -1,7 +1,7 @@
 # install/studio_pro.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Finding Studio Pro installs and their mx (Windows).
 
-# --- 8. Finding Studio Pro installs (Windows) ---
+# --- Finding Studio Pro installs (Windows) ---
 # No CDN mxbuild runs on Windows; Studio Pro's mx is used, installed in Program Files or %LOCALAPPDATA%.
 studio_pro_roots() {
   local local_app="${LOCALAPPDATA:-}"
@@ -105,7 +105,32 @@ studio_pro_mx() {        # studio_pro_mx <version-prefix> -- echo the matching m
   return 1
 }
 
-# --- 8b. Choosing the Mendix version of a new app (macOS) ---
+# require_windows_studio_pro -- on Windows without any Studio Pro, stop: nothing here works without
+# it -- creating the app, mx check and the build all run the mx.exe / mxbuild.exe it installs (Mendix
+# publishes them separately for Linux only). Said first, before minutes of other installs, rather
+# than when the app is created. MDL_SKIP_STUDIO_PRO_CHECK skips it.
+require_windows_studio_pro() {
+  local wanted_mx mpr_file
+  [ "$IS_WINDOWS" = "1" ] && [ -z "$(studio_pro_versions)" ] && [ -z "${MDL_SKIP_STUDIO_PRO_CHECK:-}" ] || return 0
+  wanted_mx="${MX_VERSION:-}"
+  mpr_file="$(find "$APP" -maxdepth 1 -name '*.mpr' -print -quit 2>/dev/null)"
+  if [ -z "$wanted_mx" ] && [ -n "$mpr_file" ] && [ -n "${NODE:-}" ]; then
+    wanted_mx="$("$NODE" "$SRC/install/install_tool.cjs" mpr-version "$mpr_file" 2>/dev/null || true)"
+  fi
+  wanted_mx="${wanted_mx:-$DEFAULT_MX_VERSION}"
+  ui_fail "Mendix Studio Pro is not installed. Install it first, then run the installer again." \
+          "" \
+          "On Windows the harness cannot work without it: creating the app, mx check and" \
+          "building the app all use the mx.exe and mxbuild.exe that come with Studio Pro." \
+          "Docker does not replace it." \
+          "" \
+          "  1. Install Mendix Studio Pro $wanted_mx:" \
+          "     https://marketplace.mendix.com/link/studiopro/" \
+          "  2. Run this again:" \
+          "     bash $SRC/install.sh \"$APP\""
+}
+
+# --- Choosing the Mendix version of a new app (macOS) ---
 # mac_studio_pro_versions -- Studio Pro apps installed on this Mac that carry mx, oldest first.
 # The version is read from the app's name ("Mendix Studio Pro 11.15.0 Beta.app"): its Info.plist
 # says 1.0. An app without Contents/modeler/mx (10.24 betas ship none) cannot create or check an

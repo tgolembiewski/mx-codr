@@ -71,30 +71,40 @@ if [ -x "$APP/mxcli$EXE" ] && [ -f "$APP/tests/portable.sh" ]; then
   ( cd "$APP" && MXCLI="./mxcli$EXE" && . tests/portable.sh && mdl_syntax_digest ) >/dev/null 2>&1 || true
 fi
 
+# write_baseline <file> <writer> -- a baseline of the model as it is now, written once: never over an
+# existing <file>, and only with ./mxcli and tests/portable.sh there. In the project, with MPR set
+# (tests/portable.sh), <writer> <file> <own modules> writes it; best effort and silent.
+write_baseline() {
+  local baseline="$1" writer="$2"
+  [ -x "$APP/mxcli$EXE" ] && [ -f "$APP/tests/portable.sh" ] && [ ! -f "$APP/$baseline" ] || return 0
+  ( cd "$APP" && MXCLI="./mxcli$EXE" && . tests/portable.sh && mdl_find_mpr 2>/dev/null \
+    && modules="$(mdl_user_modules "$MPR")" && "$writer" "$baseline" "$modules" ) >/dev/null 2>&1 || true
+}
+
 # The paths baseline (check_paths.cjs): the model as it is now, so the paths it already has without a
 # test are warnings to clear and every path added from here on needs its test before DONE. Written
 # once, from a copy of the model (the catalog is written beside the .mpr); never overwritten, since
 # a later install would make everything built in between old. A new app gets an empty one.
-if [ -x "$APP/mxcli$EXE" ] && [ -f "$APP/tests/portable.sh" ] && [ ! -f "$APP/.mxcli/gate-cache/paths-baseline.json" ]; then
-  ( cd "$APP" && MXCLI="./mxcli$EXE" && . tests/portable.sh && mdl_find_mpr 2>/dev/null \
-    && modules="$(mdl_user_modules "$MPR")" && copy="$(mdl_tmpdir mdl-baseline)" \
+write_paths_baseline() {   # write_paths_baseline <file> <modules>
+  local file="$1" modules="$2" copy=""
+  copy="$(mdl_tmpdir mdl-baseline)" \
     && cp -R "$MPR" "$copy"/ && { [ ! -d mprcontents ] || cp -R mprcontents "$copy"/; } \
-    && { [ -z "$modules" ] && { mkdir -p .mxcli/gate-cache && echo '{}' > .mxcli/gate-cache/paths-baseline.json; } \
-         || "$NODE" tools/mdl-checks/check_paths.cjs . $modules --mpr "$copy/$MPR" \
-              --write-baseline .mxcli/gate-cache/paths-baseline.json; }
-    rm -rf "$copy" ) >/dev/null 2>&1 || true
-fi
+    && { [ -z "$modules" ] && { mkdir -p .mxcli/gate-cache && echo '{}' > "$file"; } \
+         || "$NODE" tools/mdl-checks/check_paths.cjs . $modules --mpr "$copy/$MPR" --write-baseline "$file"; }
+  rm -rf "$copy"
+}
+write_baseline .mxcli/gate-cache/paths-baseline.json write_paths_baseline
 
 # The widget-names baseline (NAME02): the pages and snippets the app has now. One that is not in it
 # needs <Page>_<What><Type> names before DONE; one that is keeps them as warnings, so a grown app is
 # not renamed wholesale. Written once, never overwritten; a new app gets an empty one.
-if [ -x "$APP/mxcli$EXE" ] && [ -f "$APP/tests/portable.sh" ] && [ ! -f "$APP/.mxcli/gate-cache/names-baseline.json" ]; then
-  ( cd "$APP" && MXCLI="./mxcli$EXE" && . tests/portable.sh && mdl_find_mpr 2>/dev/null \
-    && modules="$(mdl_user_modules "$MPR")" && mkdir -p .mxcli/gate-cache \
-    && { [ -z "$modules" ] && echo '{}' > .mxcli/gate-cache/names-baseline.json \
-         || "$NODE" tools/mdl-checks/gate_helpers.cjs names-baseline . "$MPR" .mxcli/gate-cache/names-baseline.json $modules; } \
-  ) >/dev/null 2>&1 || true
-fi
+write_names_baseline() {   # write_names_baseline <file> <modules>
+  local file="$1" modules="$2"
+  mkdir -p .mxcli/gate-cache \
+    && { [ -z "$modules" ] && echo '{}' > "$file" \
+         || "$NODE" tools/mdl-checks/gate_helpers.cjs names-baseline . "$MPR" "$file" $modules; }
+}
+write_baseline .mxcli/gate-cache/names-baseline.json write_names_baseline
 
 # --- 16. Step: record the install, then check the environment ---
 # INSTALL.json lets the gate detect stale or locally edited harness files.

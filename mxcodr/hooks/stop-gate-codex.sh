@@ -9,12 +9,7 @@ set -uo pipefail
 
 input="$(cat)"
 session_id="$(printf '%s' "$input" | "$NODE" "$HOOK_TOOL" get-default session_id 2>/dev/null)"
-[ -n "$session_id" ] || exit 0
-
-state_dir="${TMPDIR:-/tmp}/mendix-mdl-codex-hooks"
-safe_session="$(printf '%s' "$session_id" | tr -cd 'A-Za-z0-9._-')"
-[ -n "$safe_session" ] || exit 0
-marker="$state_dir/$safe_session.gate-required"
+marker="$(gate_marker codex "$session_id")" || exit 0
 [ -f "$marker" ] || exit 0
 
 # Ignore markers from another checkout.

@@ -16,6 +16,7 @@
 // caption, its data source; where nothing says what it shows (a KPI tile), the finding asks for it.
 'use strict';
 const crypto = require('crypto');
+const { withoutFolder } = require('../mxcli_client.cjs');
 
 const TYPE_WORD = {
   actionbutton: 'Button', linkbutton: 'Link', textbox: 'Input', textarea: 'Input', combobox: 'Picker',
@@ -121,7 +122,7 @@ function documentHashes(lines) {
   const out = {};
   // Without its folder: a move (FOLDER01) is not a change to the page.
   for (const doc of documentsOf(lines)) {
-    const text = doc.lines.join('\n').replace(/\bfolder\s*:?\s*'(?:[^']|'')*'\s*,?/gi, '');
+    const text = withoutFolder(doc.lines.join('\n'));
     out[doc.name] = crypto.createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16);
   }
   return out;

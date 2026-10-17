@@ -1,7 +1,7 @@
 ---
 step: layout
 level: block
-check: layout_rules/offline.cjs#stickyBarFindings
+check: layout_rules/phone.cjs#stickyBarFindings
 key: none
 ---
 

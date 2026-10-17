@@ -1,7 +1,7 @@
 ---
 step: naming
 level: warn
-check: check_mdl.cjs#loopFindings
+check: naming_rules.cjs#loopFindings
 key: none
 baseline: captions
 ---

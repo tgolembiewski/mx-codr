@@ -453,4 +453,4 @@ function main() {
 // `rulebook.cjs ... list | head` closes stdout early: not an error.
 process.stdout.on('error', e => { if (e.code === 'EPIPE') process.exit(0); throw e; });
 if (require.main === module) process.exitCode = main();
-module.exports = { migrate, envValues, RETIRED, parseCard, load, cardFiles, groupOf, levels, overrides, excepts, digest, changes, effective, levelArgs, levelOf, withoutLocal, localOf, merge, docs, RulebookError, LEVELS, STEPS };
+module.exports = { migrate, load, cardFiles, levels, overrides, excepts, digest, changes, effective, levelArgs, levelOf, withoutLocal, merge, docs };

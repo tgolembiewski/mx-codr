@@ -4,161 +4,16 @@
 //
 // Prints `<kind>\t<path or detail>` when the call is blocked (kind: env, harness, switch, token,
 // outside) and nothing when it may run; the hook turns the kind into its message. Exit 0 always.
-// A port of guard_harness.py that gives the same answer on the same call: the shell is split by
-// a copy of Python's shlex (below), and os.path is mirrored where the two runtimes differ.
+// The shell is split by Python's shlex (py_compat.cjs), and os.path is mirrored where the two
+// runtimes differ.
 'use strict';
 const fs = require('fs');
 const os = require('os');
+const { Shlex, shlexSplit, basename } = require('./py_compat.cjs');
 
 const WIN = process.platform === 'win32';
 
-// ---- Python's shlex.shlex, posix mode, as guard_harness.py configures it ----
-class Shlex {
-  constructor(text, punctuationChars) {
-    this.text = text;
-    this.at = 0;
-    this.commenters = '#';
-    this.wordchars = 'abcdfeghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' +
-      'ßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ';
-    this.whitespace = ' \t\r\n';
-    this.whitespaceSplit = false;
-    this.quotes = '\'"';
-    this.escape = '\\';
-    this.escapedquotes = '"';
-    this.state = ' ';
-    this.token = '';
-    this.punctuation = punctuationChars || '';
-    this.pushbackChars = [];
-    if (this.punctuation) {
-      this.wordchars += '~-./*?=';
-      this.wordchars = [...this.wordchars].filter(c => !this.punctuation.includes(c)).join('');
-    }
-  }
-  read() {
-    // One character, by code point like Python's str; '' at the end.
-    if (this.at >= this.text.length) return '';
-    const c = String.fromCodePoint(this.text.codePointAt(this.at));
-    this.at += c.length;
-    return c;
-  }
-  readline() {
-    const nl = this.text.indexOf('\n', this.at);
-    this.at = nl < 0 ? this.text.length : nl + 1;
-  }
-  has(set, c) { return set.includes(c); }
-  readToken() {
-    let quoted = false;
-    let escapedstate = ' ';
-    for (;;) {
-      const nextchar = this.punctuation && this.pushbackChars.length ? this.pushbackChars.pop() : this.read();
-      if (this.state === null) {
-        this.token = '';
-        break;
-      } else if (this.state === ' ') {
-        if (!nextchar) { this.state = null; break; }
-        else if (this.has(this.whitespace, nextchar)) {
-          if (this.token || quoted) break;
-          continue;
-        } else if (this.has(this.commenters, nextchar)) {
-          this.readline();
-        } else if (this.has(this.escape, nextchar)) {
-          escapedstate = 'a';
-          this.state = nextchar;
-        } else if (this.has(this.wordchars, nextchar)) {
-          this.token = nextchar; this.state = 'a';
-        } else if (this.has(this.punctuation, nextchar)) {
-          this.token = nextchar; this.state = 'c';
-        } else if (this.has(this.quotes, nextchar)) {
-          this.state = nextchar;
-        } else if (this.whitespaceSplit) {
-          this.token = nextchar; this.state = 'a';
-        } else {
-          this.token = nextchar;
-          if (this.token || quoted) break;
-          continue;
-        }
-      } else if (this.has(this.quotes, this.state)) {
-        quoted = true;
-        if (!nextchar) throw new Error('No closing quotation');
-        if (nextchar === this.state) {
-          this.state = 'a';
-        } else if (this.has(this.escape, nextchar) && this.has(this.escapedquotes, this.state)) {
-          escapedstate = this.state;
-          this.state = nextchar;
-        } else {
-          this.token += nextchar;
-        }
-      } else if (this.has(this.escape, this.state)) {
-        if (!nextchar) throw new Error('No escaped character');
-        if (this.has(this.quotes, escapedstate) && nextchar !== this.state && nextchar !== escapedstate) {
-          this.token += this.state;
-        }
-        this.token += nextchar;
-        this.state = escapedstate;
-      } else if (this.state === 'a' || this.state === 'c') {
-        if (!nextchar) { this.state = null; break; }
-        else if (this.has(this.whitespace, nextchar)) {
-          this.state = ' ';
-          if (this.token || quoted) break;
-          continue;
-        } else if (this.has(this.commenters, nextchar)) {
-          this.readline();
-          this.state = ' ';
-          if (this.token || quoted) break;
-          continue;
-        } else if (this.state === 'c') {
-          if (this.has(this.punctuation, nextchar)) {
-            this.token += nextchar;
-          } else {
-            if (!this.has(this.whitespace, nextchar)) this.pushbackChars.push(nextchar);
-            this.state = ' ';
-            break;
-          }
-        } else if (this.has(this.quotes, nextchar)) {
-          this.state = nextchar;
-        } else if (this.has(this.escape, nextchar)) {
-          escapedstate = 'a';
-          this.state = nextchar;
-        } else if (this.has(this.wordchars, nextchar) || this.has(this.quotes, nextchar) ||
-                   (this.whitespaceSplit && !this.has(this.punctuation, nextchar))) {
-          this.token += nextchar;
-        } else {
-          // Only reached with punctuation chars set: whitespace_split is on everywhere here.
-          this.pushbackChars.push(nextchar);
-          this.state = ' ';
-          if (this.token || quoted) break;
-          continue;
-        }
-      }
-    }
-    let result = this.token;
-    this.token = '';
-    if (!quoted && result === '') result = null;
-    return result;
-  }
-  all() {
-    const out = [];
-    for (let tok = this.readToken(); tok !== null; tok = this.readToken()) out.push(tok);
-    return out;
-  }
-}
-
-function shlexSplit(text) {
-  const lex = new Shlex(text, '');
-  lex.whitespaceSplit = true;
-  lex.commenters = '';
-  return lex.all();
-}
-
 // ---- os.path, as Python has it on this platform ----
-function basename(p) {
-  if (WIN) {
-    p = p.replace(/^[A-Za-z]:/, '');
-    return p.split(/[\\/]/).pop();
-  }
-  return p.slice(p.lastIndexOf('/') + 1);
-}
-
 function normpath(p) {
   // posixpath.normpath; ntpath's on Windows, whose backslashes the caller turns back into slashes.
   if (WIN) p = p.replace(/\//g, '\\').replace(/\\/g, '/');
@@ -193,62 +48,72 @@ function strip(s, chars) {
 const pyStrip = s => s.replace(/^\s+|\s+$/g, '');
 const rstripSlash = s => s.replace(/\/+$/, '');
 
-// ---- the rule, line for line as guard_harness.py has it ----
-function main() {
-let data;
-try {
-  data = JSON.parse(fs.readFileSync(0, 'utf8'));
-} catch {
-  process.exit(0);
-}
-if (!data || typeof data !== 'object' || Array.isArray(data)) process.exit(0);
-const tool = String(data.tool_name || '').toLowerCase();
-const args = (data.tool_input && typeof data.tool_input === 'object') ? data.tool_input : {};
-const root = process.cwd().replace(/\\/g, '/').replace(/\/+$/, '');
+// ---- what is guarded ----
 const ENV = 'tests/harness.env';
 const DIRS = ['tools/mdl-checks/', 'tests/gate/', 'tests/lib/', '.claude/lint-rules/', '.pi/extensions/',
   '.opencode/plugin/', '.mxcli/applied/'];
 // The rulebook (tests/rulebook/): the person's levels and exceptions, guarded like harness.env --
 // also with MDL_HARNESS_EDITS=allow, since a card changed by a session is a verdict changed.
 const RULEBOOK = 'tests/rulebook/';
-const FILES = new Set(['.claude/settings.local.json', '.codex/hooks.json', '.cursor/hooks.json', 'tests/gate.sh',
+const HARNESS_FILES = ['.claude/settings.local.json', '.codex/hooks.json', '.cursor/hooks.json', 'tests/gate.sh',
   'tests/lib.sh', 'tests/precheck.sh', 'tests/portable.sh', 'tests/orient.sh', 'tests/rules.sh', '.claude/lint-config.yaml',
   'tests/diagnose.sh', 'tests/peek.sh', 'tests/run-app.sh', 'tests/run-docker.sh',
   'tests/scenario-helpers.js', 'tests/marketplace-login.sh', '.mxcli/marketplace-login-needed',
   // Which paths are old enough to be warnings: the installer's record, not the session's.
-  '.mxcli/gate-cache/paths-baseline.json']);
-try {
-  const recorded = JSON.parse(fs.readFileSync('tools/mdl-checks/INSTALL.json', 'utf8')).files || {};
-  for (const f of Object.keys(recorded)) {
-    if (f.startsWith('tests/') && !f.startsWith('tests/verify-')) FILES.add(f);
-  }
-} catch { /* not installed */ }
-let allowEdits = false;
-try {
-  allowEdits = /^\s*MDL_HARNESS_EDITS\s*=\s*["']?allow/m.test(fs.readFileSync(ENV, 'utf8').replace(/\r\n?/g, "\n"));
-} catch { /* no harness.env */ }
+  '.mxcli/gate-cache/paths-baseline.json'];
+// The gate's switches a session must not set for one run. A rule's level is in its card
+// (tests/rulebook/, guarded above), not here.
+const SWITCHES = ['MDL_ALLOW_GREEN_FIRST', 'MDL_VISUAL_REVIEW', 'MDL_PRECHECK', 'MDL_GATE_CACHE',
+  'MDL_HARNESS_EDITS', 'MDL_MARKETPLACE_LOGIN', 'MDL_DB_RESET', 'MDL_REQUIREMENTS'];
+const SEGMENTS = /&&|\|\||[;|\n]/;
+const HOME = os.homedir().replace(/\\/g, '/').replace(/\/+$/, '');
+const READ_ROOTS = ['/System', '/Applications', '/Library', '/usr', '/opt', HOME + '/.mxcli/mxbuild', HOME + '/.mxcli/runtime'];
+const SEARCH_VERBS = ['find', 'rg', 'ag', 'fd', 'fdfind', 'mdfind', 'locate'];
+const READ_VERBS = ['cat', 'sed', 'head', 'tail', 'less', 'more', 'strings', 'awk', 'bat'];
 
-function rel(path) {
+// The guarded files of the project in the working directory: the fixed list plus every tests/ file
+// the installer recorded (the app's own tests, tests/verify-*, are the session's).
+function harnessFiles() {
+  const files = new Set(HARNESS_FILES);
+  try {
+    const recorded = JSON.parse(fs.readFileSync('tools/mdl-checks/INSTALL.json', 'utf8')).files || {};
+    for (const f of Object.keys(recorded)) {
+      if (f.startsWith('tests/') && !f.startsWith('tests/verify-')) files.add(f);
+    }
+  } catch { /* not installed */ }
+  return files;
+}
+
+// MDL_HARNESS_EDITS=allow in tests/harness.env: the person lets the session change the harness.
+function editsAllowed() {
+  try {
+    return /^\s*MDL_HARNESS_EDITS\s*=\s*["']?allow/m.test(fs.readFileSync(ENV, 'utf8').replace(/\r\n?/g, "\n"));
+  } catch { /* no harness.env */ }
+  return false;
+}
+
+// ---- the rule ----
+// ctx: { root, files, allowEdits } of the project the call runs in.
+
+function rel(ctx, path) {
   path = strip(pyStrip(path), '"\'').replace(/\\/g, '/');
-  if (path.toLowerCase().startsWith(root.toLowerCase() + '/')) path = path.slice(root.length + 1);
+  if (path.toLowerCase().startsWith(ctx.root.toLowerCase() + '/')) path = path.slice(ctx.root.length + 1);
   while (path.startsWith('./')) path = path.slice(2);
   return path;
 }
 
-function kind(path) {
-  const p = rel(path);
+function kind(ctx, path) {
+  const p = rel(ctx, path);
   const low = p.toLowerCase();
   if (low === ENV || low.endsWith('/' + ENV)) return 'env';
   if (p.startsWith(RULEBOOK) || p.includes('/' + RULEBOOK)) return 'rulebook';
-  if (allowEdits) return null;
-  for (const f of FILES) if (p === f || p.endsWith('/' + f)) return 'harness';
+  if (ctx.allowEdits) return null;
+  for (const f of ctx.files) if (p === f || p.endsWith('/' + f)) return 'harness';
   for (const d of DIRS) if (p.startsWith(d) || p.includes('/' + d)) return 'harness';
   return null;
 }
 
-const SEGMENTS = /&&|\|\||[;|\n]/;
-
-function shellTargets(command) {
+function shellTargets(ctx, command) {
   const targets = [];
   let here = '';
   const placed = (path) => {
@@ -269,7 +134,7 @@ function shellTargets(command) {
     const verb = basename(words[0]);
     const operands = words.slice(1).filter(w => !w.startsWith('-'));
     if (verb === 'cd' && operands.length === 1) {
-      here = rel(placed(operands[0]));
+      here = rel(ctx, placed(operands[0]));
     } else if (['tee', 'rm', 'truncate', 'shred', 'unlink'].includes(verb)) {
       targets.push(...operands.map(placed));
     } else if ((verb === 'sed' || verb === 'perl') && words.slice(1).some(w => w.startsWith('-i') || w === '--in-place')) {
@@ -296,22 +161,17 @@ function shellTargets(command) {
   return targets;
 }
 
-const HOME = os.homedir().replace(/\\/g, '/').replace(/\/+$/, '');
-const READ_ROOTS = ['/System', '/Applications', '/Library', '/usr', '/opt', HOME + '/.mxcli/mxbuild', HOME + '/.mxcli/runtime'];
-const SEARCH_VERBS = ['find', 'rg', 'ag', 'fd', 'fdfind', 'mdfind', 'locate'];
-const READ_VERBS = ['cat', 'sed', 'head', 'tail', 'less', 'more', 'strings', 'awk', 'bat'];
-
 function expand(path) {
   path = strip(pyStrip(path), '"\'').replace(/\\/g, '/');
   if (path === '~' || path.startsWith('~/')) path = HOME + path.slice(1);
   return path.split('$HOME').join(HOME).split('${HOME}').join(HOME);
 }
 
-function outside(path) {
+function outside(ctx, path) {
   const p = expand(path);
   if (p.startsWith('/dev/')) return false;
   if (p.startsWith('/') || /^[A-Za-z]:\//.test(p)) {
-    return !(p.toLowerCase() === root.toLowerCase() || p.toLowerCase().startsWith(root.toLowerCase() + '/'));
+    return !(p.toLowerCase() === ctx.root.toLowerCase() || p.toLowerCase().startsWith(ctx.root.toLowerCase() + '/'));
   }
   return p === '..' || p.startsWith('../');
 }
@@ -350,7 +210,7 @@ function commandWords(command) {
   }
 }
 
-function outsideTarget(command) {
+function outsideTarget(ctx, command) {
   for (const words of commandWords(command)) {
     if (!words.length) continue;
     const verb = basename(words[0]);
@@ -366,12 +226,12 @@ function outsideTarget(command) {
         roots.push(w);
       }
       if (verb !== 'find') roots = roots.slice(1);
-      for (const r of roots) if (outside(r)) return r;
+      for (const r of roots) if (outside(ctx, r)) return r;
     } else if (['grep', 'egrep', 'fgrep'].includes(verb) && rest.some(w =>
         w === '--recursive' || w === '--dereference-recursive' ||
         (w.startsWith('-') && !w.startsWith('--') && (w.slice(1).includes('r') || w.slice(1).includes('R'))))) {
       const operands = rest.filter(w => !w.startsWith('-'));
-      for (const r of operands.slice(1)) if (outside(r)) return r;
+      for (const r of operands.slice(1)) if (outside(ctx, r)) return r;
     } else if (READ_VERBS.includes(verb)) {
       let skip = false;
       for (const w of rest) {
@@ -408,38 +268,50 @@ function tokenRead(command) {
   return null;
 }
 
-// The gate's switches a session must not set for one run. A rule's level is in its card
-// (tests/rulebook/, guarded above), not here.
-const SWITCHES = ['MDL_ALLOW_GREEN_FIRST', 'MDL_VISUAL_REVIEW', 'MDL_PRECHECK', 'MDL_GATE_CACHE',
-  'MDL_HARNESS_EDITS', 'MDL_MARKETPLACE_LOGIN', 'MDL_DB_RESET', 'MDL_REQUIREMENTS'];
-let hit = null;
-if (tool === 'bash') {
-  const command = String(args.command || '');
-  for (const target of shellTargets(command)) {
-    const k = kind(target);
-    if (k) { hit = [k, rel(target)]; break; }
+// [kind, detail] for a shell command that is blocked, or null.
+function bashHit(ctx, command) {
+  for (const target of shellTargets(ctx, command)) {
+    const k = kind(ctx, target);
+    if (k) return [k, rel(ctx, target)];
   }
-  if (!hit && /tests[/\\](gate|precheck)\.sh/.test(command) &&
+  if (/tests[/\\](gate|precheck)\.sh/.test(command) &&
       new RegExp('(^|[\\s;&|(])(export\\s+)?(' + SWITCHES.join('|') + ')=').test(command)) {
-    hit = ['switch', ''];
+    return ['switch', ''];
   }
   // Rewriting the paths baseline would turn every untested path into an old one, a warning.
-  if (!hit && /--write-baseline\b/.test(command)) hit = ['harness', '.mxcli/gate-cache/paths-baseline.json'];
-  if (!hit) {
-    const secret = tokenRead(command);
-    if (secret) hit = ['token', secret];
-  }
-  if (!hit) {
-    const away = outsideTarget(command);
-    if (away) hit = ['outside', away];
-  }
-} else if (['edit', 'write', 'multiedit', 'notebookedit', 'patch', 'apply_patch'].includes(tool)) {
-  const path = String(args.file_path || args.filePath || args.notebook_path || args.path || '');
-  const k = path ? kind(path) : null;
-  if (k) hit = [k, rel(path)];
+  if (/--write-baseline\b/.test(command)) return ['harness', '.mxcli/gate-cache/paths-baseline.json'];
+  const secret = tokenRead(command);
+  if (secret) return ['token', secret];
+  const away = outsideTarget(ctx, command);
+  if (away) return ['outside', away];
+  return null;
 }
-if (hit) process.stdout.write(hit[0] + '\t' + hit[1] + '\n');
+
+function main() {
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(0, 'utf8'));
+  } catch {
+    process.exit(0);
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) process.exit(0);
+  const tool = String(data.tool_name || '').toLowerCase();
+  const args = (data.tool_input && typeof data.tool_input === 'object') ? data.tool_input : {};
+  // Read from the working directory, the project the call runs in.
+  const ctx = {
+    root: process.cwd().replace(/\\/g, '/').replace(/\/+$/, ''),
+    files: harnessFiles(),
+    allowEdits: editsAllowed(),
+  };
+  let hit = null;
+  if (tool === 'bash') {
+    hit = bashHit(ctx, String(args.command || ''));
+  } else if (['edit', 'write', 'multiedit', 'notebookedit', 'patch', 'apply_patch'].includes(tool)) {
+    const path = String(args.file_path || args.filePath || args.notebook_path || args.path || '');
+    const k = path ? kind(ctx, path) : null;
+    if (k) hit = [k, rel(ctx, path)];
+  }
+  if (hit) process.stdout.write(hit[0] + '\t' + hit[1] + '\n');
 }
 
 if (require.main === module) main();
-module.exports = { Shlex, shlexSplit, normpath, basename };

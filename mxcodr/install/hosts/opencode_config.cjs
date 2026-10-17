@@ -1,16 +1,10 @@
 // Add the rules and the syntax digest to the instructions in opencode.json.
 'use strict';
 const fs = require('fs');
-const { dumps, load } = require('./json_file.cjs');
+const { dumps, loadOrExit } = require('./json_file.cjs');
 
 const path = process.argv[2];
-let config;
-try {
-  config = load(path) || {};
-} catch (error) {
-  process.stderr.write(`invalid existing ${path}: ${error.message}\n`);
-  process.exit(1);
-}
+const config = loadOrExit(path, error => `invalid existing ${path}: ${error.message}\n`);
 
 if (!('$schema' in config)) config.$schema = 'https://opencode.ai/config.json';
 if (!('instructions' in config)) config.instructions = [];

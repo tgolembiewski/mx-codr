@@ -1,7 +1,7 @@
 # install/step_hosts.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Step 14: register the hooks and plugins for Claude Code, Codex, Cursor, OpenCode and Pi. Runs as it is read.
 
-# --- 14. Step: register hooks for Claude Code, Codex, Cursor and OpenCode ---
+# --- 14. Step: register hooks for Claude Code, Codex, Cursor, OpenCode and Pi ---
 # Merged into .claude/settings.local.json, which mxcli init leaves alone.
 ui_begin "registering Claude hooks"
 mkdir -p "$APP/tools/mdl-checks/hooks"

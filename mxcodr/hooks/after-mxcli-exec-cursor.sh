@@ -12,13 +12,9 @@ case "$input" in *verify-*.test.sh*)
 esac
 case "$input" in *"mxcli exec"*|*"mxcli.exe exec"*) ;; *) printf '{}\n'; exit 0 ;; esac
 
-# NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message).
+# NODE and HOOK_TOOL (hook_tool.cjs, the small jobs: read a field, wrap a message); payload_field
+# and gate_marker.
 . "$(dirname "${BASH_SOURCE[0]}")/hook-env.sh"
-
-# A top-level value of the event payload, or "" when absent or unparsable.
-payload_field() {
-  printf '%s' "$input" | "$NODE" "$HOOK_TOOL" get "$1" 2>/dev/null
-}
 
 # Resolve before cd: BASH_SOURCE may be relative.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,12 +33,8 @@ cd "$repo_root" 2>/dev/null || true
 
 # Marker per conversation, recording the project, so the stop hook knows the gate is owed.
 conversation="$(payload_field conversation_id)"
-if [ -n "$conversation" ]; then
-  state_dir="${TMPDIR:-/tmp}/mendix-mdl-cursor-hooks"
-  safe="$(printf '%s' "$conversation" | tr -cd 'A-Za-z0-9._-')"
-  if [ -n "$safe" ] && mkdir -p "$state_dir" 2>/dev/null; then
-    printf '%s\n' "$repo_root" > "$state_dir/$safe.gate-required"
-  fi
+if marker="$(gate_marker cursor "$conversation")" && mkdir -p "${marker%/*}" 2>/dev/null; then
+  printf '%s\n' "$repo_root" > "$marker"
 fi
 
 [ -f "$script_dir/after-mxcli-exec.sh" ] || emit ""

@@ -1,7 +1,7 @@
 ---
 step: naming
 level: block
-check: check_mdl.cjs#variableFindings
+check: naming_rules.cjs#variableFindings
 key: none
 ---
 

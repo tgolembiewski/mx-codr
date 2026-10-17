@@ -6,7 +6,7 @@
 //
 // Part of check_layout.cjs; see its header for inputs and the full rule table.
 'use strict';
-const { layoutKinds } = require('./offline.cjs');
+const { layoutKinds } = require('./phone.cjs');
 const { isBackButton, CURRENT_USER_SNIPPET } = require('./page_top.cjs');
 const { documentKey } = require('./names.cjs');
 const { PAGE_LAYOUT_RE, WIDGET_LINE_RE, BACK_WRAPPERS, pageBlocks, indentOf } = require('./pages.cjs');

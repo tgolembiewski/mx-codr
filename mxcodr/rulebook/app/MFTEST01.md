@@ -1,7 +1,7 @@
 ---
 step: tests
 level: block
-check: bash:tests/gate/tests.sh#run_microflow_tests
+check: bash:tests/gate/mftest.sh#run_microflow_tests
 key: none
 ---
 

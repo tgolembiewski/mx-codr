@@ -1,7 +1,7 @@
 # install/prereqs.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Prerequisite helpers: package managers, installing or only reporting a missing tool, yes/no questions.
 
-# --- 3. Prerequisite helpers: detect a tool, then install it or report it ---
+# --- Prerequisite helpers: detect a tool, then install it or report it ---
 # The JDK is only reported (may need a reboot or licence click); Docker is installed when missing.
 DEPS_INSTALLED=0
 DEPS_MISSING=()          # human lines, printed in the summary rather than mid-step
@@ -25,7 +25,7 @@ dep_run() {              # dep_run "<shell command>" -- honours the dry run
     ui_note "would run: $1"
     return 0
   fi
-  # DEPS_LOG is set in section 11.
+  # DEPS_LOG is set by step_prereqs.sh.
   eval "$1" >>"$DEPS_LOG" 2>&1
 }
 
@@ -60,14 +60,18 @@ dep_need() {
   dep_apply "$1" "$2" "$command"
 }
 
-# docker_ready -- true when the daemon answers; time-boxed because `docker info` hangs while Docker starts.
-docker_ready() {
-  have docker || return 1
-  if have timeout; then
-    timeout "${DOCKER_PROBE_TIMEOUT:-8}" docker info >/dev/null 2>&1
-  else
-    docker info >/dev/null 2>&1
-  fi
+# Report-only: a reboot or licence click stands between the install command and a working tool.
+dep_report_only() {      # dep_report_only <label> <detect> <winget> <brew> <apt>
+  eval "$2" >/dev/null 2>&1 && return 0
+  local command=""
+  case "$(pkg_manager)" in
+    winget) command="winget install -e --id $3" ;;
+    brew)   command="brew install $4" ;;
+    apt)    command="${SUDO}apt-get install -y $5" ;;
+    dnf)    command="${SUDO}dnf install -y $5" ;;
+  esac
+  DEPS_MISSING+=("$1 -- ${command:-install it by hand}  (not installed for you)")
+  return 1
 }
 
 # ask "<prompt>" <y|n> -- MDL_ASSUME_YES answers yes (the app-creation guard does not use ask).
@@ -84,29 +88,4 @@ ask() {
   printf '%s' "$question"
   read -r reply
   case "${reply:-$default}" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
-}
-
-docker_install_command() {
-  case "$(pkg_manager)" in
-    winget) echo "winget install -e --accept-package-agreements --accept-source-agreements --id Docker.DockerDesktop" ;;
-    brew)   echo "brew install --cask docker" ;;
-    apt)    echo "${SUDO}apt-get update -qq && ${SUDO}apt-get install -y docker.io" ;;
-    dnf)    echo "${SUDO}dnf install -y docker" ;;
-  esac
-}
-
-# docker_start_command -- start Docker detached: Docker Desktop in the foreground never returns.
-docker_start_command() {
-  if [ "$IS_WINDOWS" = "1" ]; then
-    # Docker Desktop installs per machine (Program Files) or, lately, per user (LOCALAPPDATA).
-    local program_files="${PROGRAMFILES:-C:\\Program Files}" local_app="${LOCALAPPDATA:-}" exe
-    exe="${program_files//\\//}/Docker/Docker/Docker Desktop.exe"
-    [ -n "$local_app" ] && [ -f "${local_app//\\//}/Programs/DockerDesktop/Docker Desktop.exe" ] \
-      && exe="${local_app//\\//}/Programs/DockerDesktop/Docker Desktop.exe"
-    echo "cmd //c start \"\" \"$exe\""
-  elif [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
-    echo "open -a Docker"
-  else
-    echo "${SUDO}systemctl start docker"
-  fi
 }

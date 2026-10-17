@@ -62,7 +62,7 @@ function currentUserFindings(lines, snippets, navigation, layouts, phoneLayouts 
     if (m && m.group('name').endsWith('.' + CURRENT_USER_SNIPPET)) defined.push(m.group('name'));
   }
   const types = layoutTypes(layouts);
-  const small = require('./offline.cjs').layoutKinds(phoneLayouts);
+  const small = require('./phone.cjs').layoutKinds(phoneLayouts);
   const loginPages = loginPagesOf(navigation);
   const missing = [], unaligned = [], failures = [];
   const isUser = w => w[0] === 'snippetcall' && w[1].includes(CURRENT_USER_SNIPPET);

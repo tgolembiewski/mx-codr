@@ -1,7 +1,7 @@
 ---
 step: paths
 level: block
-check: check_paths.cjs#requirementFindings
+check: requirement_rules.cjs#requirementFindings
 key: document
 ---
 

@@ -1,7 +1,7 @@
 ---
 step: layout
 level: warn
-check: layout_rules/offline.cjs#tabsFindings
+check: layout_rules/phone.cjs#tabsFindings
 key: none
 ---
 

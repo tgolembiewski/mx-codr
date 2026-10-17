@@ -1,7 +1,43 @@
 # install/docker.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Docker: the walkthrough when the daemon is missing or not running.
 
-# --- 5. Docker: install, start, wait for the daemon ---
+# --- Docker: install, start, wait for the daemon ---
+# docker_ready -- true when the daemon answers; time-boxed because `docker info` hangs while Docker starts.
+docker_ready() {
+  have docker || return 1
+  if have timeout; then
+    timeout "${DOCKER_PROBE_TIMEOUT:-8}" docker info >/dev/null 2>&1
+  else
+    docker info >/dev/null 2>&1
+  fi
+}
+
+# docker_install_command -- this machine's command to install Docker, or nothing.
+docker_install_command() {
+  case "$(pkg_manager)" in
+    winget) echo "winget install -e --accept-package-agreements --accept-source-agreements --id Docker.DockerDesktop" ;;
+    brew)   echo "brew install --cask docker" ;;
+    apt)    echo "${SUDO}apt-get update -qq && ${SUDO}apt-get install -y docker.io" ;;
+    dnf)    echo "${SUDO}dnf install -y docker" ;;
+  esac
+}
+
+# docker_start_command -- start Docker detached: Docker Desktop in the foreground never returns.
+docker_start_command() {
+  if [ "$IS_WINDOWS" = "1" ]; then
+    # Docker Desktop installs per machine (Program Files) or, lately, per user (LOCALAPPDATA).
+    local program_files="${PROGRAMFILES:-C:\\Program Files}" local_app="${LOCALAPPDATA:-}" exe
+    exe="${program_files//\\//}/Docker/Docker/Docker Desktop.exe"
+    [ -n "$local_app" ] && [ -f "${local_app//\\//}/Programs/DockerDesktop/Docker Desktop.exe" ] \
+      && exe="${local_app//\\//}/Programs/DockerDesktop/Docker Desktop.exe"
+    echo "cmd //c start \"\" \"$exe\""
+  elif [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+    echo "open -a Docker"
+  else
+    echo "${SUDO}systemctl start docker"
+  fi
+}
+
 # docker_walkthrough -- install and start Docker, wait for it, say what is left to do by hand.
 docker_walkthrough() {
   local command
@@ -160,16 +196,21 @@ setup_docker_mode() {
     docker_start_and_wait || true
   fi
   mkdir -p "$APP/tests"
+  # The person's own switches survive, as in write_harness_env; the local mode's keys do not.
+  local previous=""
+  [ -f "$APP/tests/harness.env" ] && previous="$(cat "$APP/tests/harness.env" 2>/dev/null)"
   {
-    printf '# Written by install.sh -- how this project is built and run.\n'
-    printf '# Read by tests/portable.sh as DATA -- KEY=value, one layer of quotes, no\n'
-    printf '# shell. Only the keys it lists are honoured, and this file wins over the\n'
-    printf '# environment for them.\n'
+    harness_env_header
     printf 'MDL_RUN_MODE=docker\n'
     printf '\n# The app and its database run in Docker. tests/run-docker.sh builds and\n'
     printf '# starts them (mxcli docker run); the gate runs it again after a model change.\n'
     printf 'MDL_BOOT_COMMAND="bash tests/run-docker.sh"\n'
-  } > "$APP/tests/harness.env"
+  } > "$APP/tests/harness.env.new"
+  if [ -n "$previous" ]; then
+    keep_person_switches "$previous" "$APP/tests/harness.env.new" \
+      "MDL_NO_DOCKER MDL_MXBUILD_PATH MDL_DB_HOST MDL_DB_NAME MDL_DB_USER MDL_DB_PASSWORD MDL_PSQL JAVA_HOME"
+  fi
+  mv "$APP/tests/harness.env.new" "$APP/tests/harness.env"
   chmod 600 "$APP/tests/harness.env" 2>/dev/null || true
   ignore_credential_files
 }

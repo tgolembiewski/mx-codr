@@ -1,7 +1,7 @@
 ---
 step: layout
 level: block
-check: layout_rules/offline.cjs#phoneMenuFindings
+check: layout_rules/phone.cjs#phoneMenuFindings
 key: none
 ---
 

@@ -1,7 +1,7 @@
 # install/postgres.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # PostgreSQL logins and tests/harness.env (how this machine boots the app).
 
-# --- 4. PostgreSQL logins and tests/harness.env ---
+# --- PostgreSQL logins and tests/harness.env ---
 # `mxcli run --local` supports only PostgreSQL, with or without Docker.
 psql_path() {
   if have psql; then command -v psql; return 0; fi
@@ -16,16 +16,27 @@ psql_path() {
   return 1
 }
 
-# Tries the mendix role and the postgres superuser. -w: fail instead of prompting for a password.
+# pg_host -- the database host without its port (MDL_DB_HOST is host:port for mxcli).
+pg_host() {
+  local host="${MDL_DB_HOST:-127.0.0.1}"
+  printf '%s\n' "${host%%:*}"
+}
+
+# pg_can_login <psql> <host> <user> <password> -- true when that login answers. -w: fail instead of
+# prompting for a password.
+pg_can_login() {
+  PGPASSWORD="$4" "$1" -w -h "$2" -U "$3" -d postgres -tAc 'SELECT 1' >/dev/null 2>&1
+}
+
+# Tries the mendix role and the postgres superuser.
 postgres_login() {       # echoes "<user>:<password>" for a login that answers
-  local psql candidate password host="${MDL_DB_HOST:-127.0.0.1}"
-  host="${host%%:*}"
+  local psql candidate password host
+  host="$(pg_host)"
   psql="$(psql_path)" || return 1
   for candidate in "${MDL_DB_USER:-mendix}:${MDL_DB_PASSWORD:-mendix}" \
                    "postgres:${PGPASSWORD:-postgres}" "postgres:" "${USER:-}:"; do
     password="${candidate#*:}"
-    PGPASSWORD="$password" "$psql" -w -h "$host" -U "${candidate%%:*}" \
-      -d postgres -tAc 'SELECT 1' >/dev/null 2>&1 || continue
+    pg_can_login "$psql" "$host" "${candidate%%:*}" "$password" || continue
     printf '%s\n' "$candidate"
     return 0
   done
@@ -36,8 +47,8 @@ postgres_answers() { postgres_login >/dev/null 2>&1; }
 
 # postgres_ask_superuser -- ask once for a superuser password (never stored) to create the app role.
 postgres_ask_superuser() {
-  local psql user password host="${MDL_DB_HOST:-127.0.0.1}"
-  host="${host%%:*}"
+  local psql user password host
+  host="$(pg_host)"
   psql="$(psql_path)" || return 1
   [ -t 0 ] || return 1
   [ "$UI_TTY" = 1 ] || return 1
@@ -56,8 +67,7 @@ postgres_ask_superuser() {
   read -r -s password
   printf '\n\n'
 
-  if ! PGPASSWORD="$password" "$psql" -w -h "$host" -U "$user" \
-         -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
+  if ! pg_can_login "$psql" "$host" "$user" "$password"; then
     ui_note "that $user login was refused -- nothing was changed"
     return 1
   fi
@@ -69,8 +79,7 @@ postgres_ask_superuser() {
   PGPASSWORD="$password" "$psql" -w -h "$host" -U "$user" -d postgres \
     -c "ALTER ROLE \"$wanted\" LOGIN PASSWORD '$wanted_pass' CREATEDB" >/dev/null 2>&1 || true
 
-  if PGPASSWORD="$wanted_pass" "$psql" -w -h "$host" -U "$wanted" \
-       -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
+  if pg_can_login "$psql" "$host" "$wanted" "$wanted_pass"; then
     ui_note "PostgreSQL role $wanted created"
     return 0
   fi
@@ -80,8 +89,8 @@ postgres_ask_superuser() {
 
 # ensure_postgres_role -- create the app role if the login can; print "<user>:<password>" to use.
 ensure_postgres_role() {
-  local login user password psql host="${MDL_DB_HOST:-127.0.0.1}"
-  host="${host%%:*}"
+  local login user password psql host
+  host="$(pg_host)"
   login="$(postgres_login)" || return 1
   user="${login%%:*}"; password="${login#*:}"
   psql="$(psql_path)" || return 1
@@ -93,8 +102,7 @@ ensure_postgres_role() {
        -c "CREATE ROLE \"$wanted\" LOGIN PASSWORD '$wanted_pass' CREATEDB" >/dev/null 2>&1; then
     printf '%s:%s\n' "$wanted" "$wanted_pass"; return 0
   fi
-  if PGPASSWORD="$wanted_pass" "$psql" -w -h "$host" -U "$wanted" \
-       -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
+  if pg_can_login "$psql" "$host" "$wanted" "$wanted_pass"; then
     printf '%s:%s\n' "$wanted" "$wanted_pass"; return 0
   fi
   printf '%s\n' "$login"
@@ -116,6 +124,37 @@ ignore_credential_files() {
   return 0
 }
 
+# harness_env_header [<last words>] -- the comment tests/harness.env starts with; <last words> end its
+# fourth line. Shared with setup_docker_mode (docker.sh).
+harness_env_header() {
+  printf '# Written by install.sh -- how this project is built and run.\n'
+  printf '# Read by tests/portable.sh as DATA -- KEY=value, one layer of quotes, no\n'
+  printf '# shell. Only the keys it lists are honoured, and this file wins over the\n'
+  printf '# environment for them.%s\n' "${1:+ $1}"
+}
+
+# keep_person_switches <old harness.env text> <new file> [<keys to drop>] -- append to the new file
+# every KEY=value line of the old one whose key the new file does not set, under a comment; none when
+# there is none. The keys to drop are another run mode's own (docker mode drops the local ones).
+keep_person_switches() {
+  local previous="$1" written="$2" drop=" ${3:-} " line key kept=""
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*|'export '*) continue ;; esac
+    key="${line%%=*}"
+    [ "$key" != "$line" ] || continue
+    case "$key" in *[!A-Za-z0-9_]*) continue ;; esac
+    case "$drop" in *" $key "*) continue ;; esac
+    grep -q "^${key}=" "$written" && continue
+    # A rule's level and exceptions live in its card now (step_harness moves them there).
+    case "$key" in MDL_VISUAL|MDL_RUNTIME_ERRORS|MDL_SCOPE|MDL_CAPTIONS|MDL_WIDGET_NAMES|MDL_PATHS| \
+      MDL_REQUIRE_PRODUCTION|MDL_TEST_FIRST|MDL_UNTESTED|MDL_KEEP_UNUSED) continue ;; esac
+    kept="${kept}${line}"$'\n'
+  done <<< "$previous"
+  if [ -n "$kept" ]; then
+    printf '\n# Kept from the previous tests/harness.env: the person'"'"'s own switches.\n%s' "$kept" >> "$written"
+  fi
+}
+
 # Rewrites tests/harness.env; sets MDL_DB_USER, MDL_DB_PASSWORD and no_docker_mode.
 write_harness_env() {    # write_harness_env <mendix-install-dir>
   local mxbuild="$1" db_name psql login jdk jdk_home=""
@@ -135,10 +174,7 @@ write_harness_env() {    # write_harness_env <mendix-install-dir>
   local previous=""
   [ -f "$APP/tests/harness.env" ] && previous="$(cat "$APP/tests/harness.env" 2>/dev/null)"
   {
-    printf '# Written by install.sh -- how this project is built and run.\n'
-    printf '# Read by tests/portable.sh as DATA -- KEY=value, one layer of quotes, no\n'
-    printf '# shell. Only the keys it lists are honoured, and this file wins over the\n'
-    printf '# environment for them. It holds a database password: keep it out of git.\n'
+    harness_env_header "It holds a database password: keep it out of git."
     printf 'MDL_RUN_MODE=local\n'
     printf 'MDL_NO_DOCKER=1\n'
     [ -n "$mxbuild" ] && printf 'MDL_MXBUILD_PATH="%s"\n' "$mxbuild"
@@ -166,19 +202,7 @@ write_harness_env() {    # write_harness_env <mendix-install-dir>
     fi
   } > "$APP/tests/harness.env.new"
   if [ -n "$previous" ]; then
-    local line key kept=""
-    while IFS= read -r line; do
-      case "$line" in ''|'#'*|'export '*) continue ;; esac
-      key="${line%%=*}"
-      [ "$key" != "$line" ] || continue
-      case "$key" in *[!A-Za-z0-9_]*) continue ;; esac
-      grep -q "^${key}=" "$APP/tests/harness.env.new" && continue
-      # A rule's level and exceptions live in its card now (step_harness moves them there).
-      case "$key" in MDL_VISUAL|MDL_RUNTIME_ERRORS|MDL_SCOPE|MDL_CAPTIONS|MDL_WIDGET_NAMES|MDL_PATHS| \
-        MDL_REQUIRE_PRODUCTION|MDL_TEST_FIRST|MDL_UNTESTED|MDL_KEEP_UNUSED) continue ;; esac
-      kept="${kept}${line}"$'\n'
-    done <<< "$previous"
-    [ -n "$kept" ] && printf '\n# Kept from the previous tests/harness.env: the person'"'"'s own switches.\n%s' "$kept" >> "$APP/tests/harness.env.new"
+    keep_person_switches "$previous" "$APP/tests/harness.env.new"
   fi
   mv "$APP/tests/harness.env.new" "$APP/tests/harness.env"
   chmod 600 "$APP/tests/harness.env" 2>/dev/null || true

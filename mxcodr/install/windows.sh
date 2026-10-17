@@ -1,7 +1,7 @@
 # install/windows.sh -- part of install.sh, which sources the parts in order; never run it on its own.
 # Windows repairs: the junctions and aliases a Studio Pro install needs for mxcli to find it.
 
-# --- 6. Windows repairs: path conversion, and junctions for Studio Pro and the JDK ---
+# --- Windows repairs: path conversion, and junctions for Studio Pro and the JDK ---
 # No-ops unless IS_WINDOWS=1. Junctions, not symlinks: they need no admin rights or Developer Mode.
 
 win_path() {             # win_path <msys-path> -- echo the Windows form

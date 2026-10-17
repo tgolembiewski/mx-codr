@@ -3,10 +3,11 @@
 # Sourced by gate.sh, lib.sh, orient.sh, diagnose.sh, precheck.sh, theme.sh, run-app.sh,
 # run-docker.sh and marketplace-login.sh; not run on its own.
 # Provides: $MXCLI, $NODE, $MDL_SHELL_HELPERS, mdl_find_node, $PY and mdl_find_python (older
-# project tests only), mdl_load_harness_env, mdl_json_object,
+# project tests only), the rulebook's mdl_rulebook_dir, mdl_rulebook, mdl_rule_level, mdl_rule_mode
+# and mdl_rule_args, mdl_load_harness_env, mdl_json_object,
 #   mdl_json_string, mdl_json_number, mdl_ere_quote, mdl_runtime_running, mdl_check_local_database,
 #   mdl_check_mxcli_freshness, mdl_check_install_freshness, mdl_syntax_digest, mdl_studio_pro_open,
-#   mdl_studio_pro_warning, mdl_tmpdir, mdl_tmpfile, mdl_find_mpr, mdl_user_modules.
+#   mdl_studio_pro_warning, mdl_tmpdir, mdl_tmpfile, mdl_copy_model, mdl_find_mpr, mdl_user_modules.
 # Sourcing it also loads tests/harness.env as data (never sourced) and repairs JAVA_HOME.
 # Inputs: MXCLI, PY, PORTABLE_APP_DIR, APP_DIR, LOCALAPPDATA. Nothing else is exported.
 

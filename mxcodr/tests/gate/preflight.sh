@@ -1,4 +1,5 @@
-# tests/gate/preflight.sh -- checks run right before the tests: sessions, a stale model, the environment.
+# tests/gate/preflight.sh -- checks run before the tests: a film recording in the background (before
+# anything else), then sessions, a stale model, the environment.
 # Sourced by tests/gate.sh; defines functions only.
 
 # film.sh --all records in the background, in the browser the tests use: a gate run now would
