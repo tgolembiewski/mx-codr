@@ -38,6 +38,8 @@ skill, data checks by OQL in `verify-with-oql`, and logic tests in `test-microfl
    (exit 0) or the build failed (exit 1); entity and association changes make it restart the runtime
    itself. No `sleep` after it, and none after `./mxcli run restart -p App.mpr` either: `./mxcli run wait
    -p App.mpr` after it is enough.
+   Since mxcli 0.29 `docker check` checks the project as stored: a CE0463 "stale widget definition" is fixed
+   with `./mxcli fix widgets -p App.mpr` and then checked again; never use `--update-widgets` to decide it builds.
 3. Then feature by feature: write its tests and make them pass. A failing test is either the app or the
    test being wrong; find out which before changing anything.
 4. Right after the first whole green run, the finishing steps above. Microflow tests, notes and tidying
