@@ -141,7 +141,7 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
 
 <main>
 <header class="top">
-  <div class="eyebrow">mx-codr · harness v2, skills only · bundle 2026.11.01.12 · mxcli v0.28.0</div>
+  <div class="eyebrow">mx-codr · harness v2, skills only · bundle 2026.11.01.14 · mxcli v0.29.0</div>
   <h1>Everything the mx-codr harness does</h1>
   <p class="lede">An AI agent builds the Mendix app with mxcli. The harness gives it one short rule file it reads on every turn, seven skills it reads when a part of the app calls for one, and a starter kit for its Playwright tests. Nothing runs while the agent builds: no gate, no hooks, no verdict.</p>
 </header>
@@ -156,7 +156,7 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
   </div>
   <ul class="items">
     <li>The source is <code>mxcodr/</code> in this repository: <code>install.sh</code>, the installer <code>overlay/install.mjs</code>, the rule file and the kit in <code>overlay/templates/</code>, the skills in <code>overlay/skills/</code>.</li>
-    <li>The agent proves its own work with tests it keeps in <code>tests/</code>; whether a run built what was asked is measured from outside, by a benchmark runner kept in the development repository.</li>
+    <li>The agent proves its own work with tests it keeps in <code>tests/</code>; whether a run built what was asked is measured from outside, by <code>harness-eval/</code>.</li>
     <li>v1 (the gate <code>tests/gate.sh</code>, hooks, checkers and the rulebook) was removed on 2026-11-01 and is kept in the tags <code>v1-best-hb1</code> and <code>v1-last</code>.</li>
   </ul>
 </section>
@@ -219,7 +219,7 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
   <p>The app folder holds one <code>.mpr</code> already (<code>mxcli new</code> makes it). Node 20 or later; on Windows, Git Bash.</p>
   <div class="table-wrap"><table><thead><tr><th>--agent</th><th>agent</th><th>always-on rule</th><th>our skills</th></tr></thead><tbody><tr><td><code>claude (default)</code></td><td>Claude Code</td><td><code>.claude/rules/mxcodr.md</code></td><td><code>.claude/skills/&lt;name&gt;/</code></td></tr><tr><td><code>cursor</code></td><td>Cursor</td><td><code>.cursor/rules/mxcodr.mdc (alwaysApply: true)</code></td><td><code>.cursor/skills/&lt;name&gt;/</code></td></tr><tr><td><code>codex, pi</code></td><td>Codex, Pi</td><td><code>AGENTS.md, between &lt;!-- mxcodr:start --&gt; and &lt;!-- mxcodr:end --&gt;</code></td><td><code>.agents/skills/&lt;name&gt;/</code></td></tr><tr><td><code>opencode</code></td><td>opencode</td><td><code>the same AGENTS.md block</code></td><td><code>.opencode/skills/&lt;name&gt;/</code></td></tr></tbody></table></div>
   <ol class="items">
-    <li><strong>mxcli 0.28.0</strong>: the recorded one, PATH, or the app's <code>./mxcli</code>, else a download into <code>.mxcodr/bin/</code>; <code>./mxcli</code> is made that binary when it is a shim, a dead link or a binary that does not run here.</li>
+    <li><strong>mxcli 0.29.0</strong>: the recorded one, PATH, or the app's <code>./mxcli</code>, else a download into <code>.mxcodr/bin/</code>; <code>./mxcli</code> is made that binary when it is a shim, a dead link or a binary that does not run here.</li>
     <li><strong>Database</strong>: <code>--db</code>, else the last install's, else postgres when port 5432 answers, else hsqldb.</li>
     <li><strong>The app's look</strong>: <code>--theme</code> one of <code>atlas</code>, <code>navy</code>, <code>teal</code>, <code>amber</code>, <code>plum</code>, <code>forest</code>, else the last install's (its frame refreshed), else asked once on a terminal (Enter = atlas, Mendix's own look). No terminal or <code>--yes</code>: nothing applied, the app keeps <code>mxcli new</code>'s look. Only <code>theme/</code> files change; <code>node .mxcodr/theme.mjs &lt;name&gt;</code> changes it later.</li>
     <li><strong>Caches</strong>: <code>mxcli setup mxbuild</code>, <code>mxcli run --local --setup</code>, then <code>mxcli init --sync-skills .</code>.</li>
@@ -233,12 +233,12 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
   <h2><span class="num">6</span>Changing the harness</h2>
   <ul class="items">
     <li>Edit <code>mxcodr/overlay/</code>, raise <code>BUNDLE</code> in <code>overlay/lib/mx.mjs</code>.</li>
-    <li><code>node --test &#x27;mxcodr/test/*.test.mjs&#x27;</code>: rule format, skills free of gate words, install placement per agent, the test kit, the themes, and survival of <code>mxcli init</code> (with mxcli 0.28.0 on PATH).</li>
-    <li>Measure by installing into an app and running your agent on a prompt; time, tokens and turns are what the benchmark kit records.</li>
+    <li><code>node --test &#x27;mxcodr/test/*.test.mjs&#x27;</code>: rule format, skills free of gate words, install placement per agent, the test kit, the themes, and survival of <code>mxcli init</code> (with mxcli 0.29.0 on PATH).</li>
+    <li>Measure with <code>harness-eval/bin/run.sh &lt;prompt&gt; &lt;label&gt;</code>; the score is a line in <code>harness-eval/results/results.jsonl</code>.</li>
   </ul>
 </section>
 
-<footer>Generated from the files of bundle 2026.11.01.12. The interactive v1 pages of the same names remain in the mx-codr repository until it is updated.</footer>
+<footer>Generated from the files of bundle 2026.11.01.14. The interactive v1 pages of the same names remain in the mx-codr repository until it is updated.</footer>
 </main>
 </div>
 </body>

@@ -1,7 +1,7 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.12** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.28.0** (`PIN`). v2 replaced v1's gate with skills
-and a rule file (decision of 2026-10-31).
+Bundle **2026.11.01.14** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+`docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Since 2026.11.01.12 (v1 features back): the installer offers six looks again (`--theme <name>`, or asked
   once on a terminal; `node .mxcodr/theme.mjs` changes it later; no terminal or `--yes` leaves the look
@@ -88,7 +88,7 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   that are the kit's, written now or kept from before, `theme`, requests), `theme.mjs` and `themes/` (to
   change the look later) and `bin/mxcli` when mxcli had to be downloaded.
 
-All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.28.0 rewrites
+All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.29.0 rewrites
 `settings.json`, `.cursorrules`, `opencode.json` and the inside of its own markers, none of which we touch).
 `mxcli init` regenerates an `AGENTS.md` without its markers whole, so when the file is absent or has none the
 installer writes mxcli's empty markers first and our block after them; `--sync-skills` then fills the section.
@@ -100,7 +100,7 @@ installer writes mxcli's empty markers first and our block after them; `--sync-s
 
 The app folder must already hold one `.mpr` (`mxcli new` makes one). On Windows, run it from Git Bash.
 
-1. **mxcli**: a found mxcli 0.28.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
+1. **mxcli**: a found mxcli 0.29.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
    `.mxcodr/bin/`. `./mxcli` becomes that binary when it is an earlier bundle's shim, a link to nowhere, or a
    binary that does not run here (`mxcli new` on macOS can leave a Linux one); someone else's wrapper stays.
 2. **Database**: `--db`, else the last install's, else postgres when port 5432 answers, else hsqldb.
@@ -146,8 +146,7 @@ Run it in the app folder. Under `mxcli run --local --watch` the new look shows a
     node --test 'mxcodr/test/*.test.mjs'   # rule format, skills-clean, install placement, test kit, themes, init survival (mxcli on PATH)
 
 A change: edit `overlay/`, raise `BUNDLE` in `overlay/lib/mx.mjs` (`YYYY.MM.DD.N`), run the tests, then
-install into an app with `install.sh` and build a test app with your agent. (The benchmark runner is kept in the
-development repository and is not published here.)
+install into an app with `install.sh` and measure with `harness-eval/bin/run.sh`.
 
-v1 (the gate `tests/gate.sh`, hooks, checkers and rulebook) is no longer in the tree. It is kept in the tag
-`v1-last` (bundle 2026.10.25.13): `git worktree add ../mxcodr-v1 v1-last`.
+v1 (the gate, hooks, checkers and rulebook) was removed on 2026-11-01. It is in the tags `v1-best-hb1`
+(bundle 2026.10.25.13, best b2b-full result) and `v1-last`: `git worktree add ../mxcodr-v1 v1-best-hb1`.

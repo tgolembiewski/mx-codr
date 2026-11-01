@@ -232,12 +232,15 @@ decision.
 ## Check it
 
 ```bash
-./mxcli lint -p app.mpr | grep -E 'MOD001|ARCH001|CONV008'
+./mxcli lint -p app.mpr | grep -E 'ARCH001|CONV008'
+./mxcli -p app.mpr -c "refresh catalog; select QualifiedName, Folder from catalog.pages where Folder = '' or Folder in ('Pages','Microflows','Nanoflows','Snippets','Entities')"
+./mxcli -p app.mpr -c "select QualifiedName, Folder from catalog.microflows where Folder = '' or Folder in ('Pages','Microflows','Nanoflows','Snippets','Entities')"
 ./mxcli graph-report -p app.mpr
 ```
 
-`MOD001` — a page, microflow, nanoflow or snippet at module root, or in a folder
-named after a document type. `ARCH001` — a page reading another module's entities.
+The two queries list a page or microflow at module root or in a folder named after a document
+type (ignore marketplace modules; repeat for `catalog.snippets`
+and `catalog.nanoflows`). `ARCH001` — a page reading another module's entities.
 `CONV008` — a module role mapped to more than one user role. `graph-report` shows
 cycles and cross-module coupling that no single rule catches.
 
