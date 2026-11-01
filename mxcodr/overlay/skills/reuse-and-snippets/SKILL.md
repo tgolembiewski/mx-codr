@@ -73,10 +73,6 @@ flow, each with different arguments, is reuse of the most literal kind, while on
 call from one flow is a hop. Extract for a real second call site, or to name a step
 that is genuinely hard to read inline.
 
-Lint rule **REU001** counts *distinct callers*, so it reports the ten-calls-from-one-
-flow case as a single caller. That is a known false positive at `info` level; read it
-as "look at this", not "inline this".
-
 ## Pages
 
 Share a page only when it is genuinely the same job.
@@ -161,15 +157,17 @@ attempting the pattern.
 
 ## Check it
 
-Both reuse rules read the model, so they are lint rules:
+The reuse rule has no lint code; count users from the catalog (after `refresh catalog full`):
 
 ```bash
-./mxcli lint -p app.mpr | grep -E 'REU001|CONV005'
+./mxcli -p app.mpr -c "refresh catalog full; select TargetName, count(distinct SourceName) as users from catalog.refs where TargetName in (select QualifiedName from catalog.snippets) group by TargetName"
+./mxcli -p app.mpr -c "select TargetName, count(*) as refs, count(distinct SourceName) as flows from catalog.refs where RefKind = 'call' and TargetName like '%SUB_%' group by TargetName"
+./mxcli lint -p app.mpr | grep CONV005
 ```
 
-`REU001` — a snippet used by fewer than two pages, or a `SUB_` with fewer than two
-distinct callers. `CONV005` — a snippet not named `SNIPPET_…`. Both need a FULL
-catalog for the reference counts; `mxcli lint` builds it on its own.
+A snippet with `users` below 2, or a `SUB_` with one ref and no second caller in sight, is a
+candidate to inline. A snippet listed in neither result is unused. `CONV005` — a snippet not
+named `SNIPPET_…`.
 
 ## Validation checklist
 

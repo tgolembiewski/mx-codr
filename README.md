@@ -7,7 +7,7 @@ works in the app reads one short always-on rule file, finds seven skills next to
 starter Playwright test kit. **Nothing runs behind the agent's back**: no gate, no hooks, no refusals, no
 edits to your agent's settings.
 
-The bundle is **2026.11.01.13**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
+The bundle is **2026.11.01.14**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
 
 ## What you get
 
