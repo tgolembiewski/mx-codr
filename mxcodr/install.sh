@@ -1,106 +1,28 @@
 #!/usr/bin/env bash
-# install.sh -- install the mx-codr harness (skills, lint rules, checkers, hooks, tests/gate.sh)
-# into a Mendix project, creating the app when there is none. Safe to re-run.
-#
-# Usage: bash install.sh [project-dir] [--no-app] [--no-deps] [-h|--help]
-#   Run it from the project folder, one level above the bundle:  cd <app> && bash mxcodr/install.sh
-#   (not from inside mxcodr/ -- that still works, but the target is then guessed, not named).
-#   --no-app     never create a Mendix app; stop when there is no .mpr
-#   --no-deps    only report missing prerequisites; by default they are installed
-#                (winget/brew/apt/dnf). --with-deps is still accepted and changes nothing.
-#   No dir: the current directory, or the project the bundle sits in when run from inside it.
-# Env: MX_VERSION, APP_NAME (new app); MDL_ASSUME_YES=1; MDL_DEPS_DRY_RUN=1 (print installs only);
-#   MDL_NO_UPDATE_CHECK=1; MXCLI_TAG (default: the tag in MXCLI_TESTED), MXCLI_SHA256; MDL_DB_HOST, MDL_DB_USER, MDL_DB_PASSWORD,
-#   PGPASSWORD; DOCKER_WAIT, DOCKER_PROBE_TIMEOUT (seconds); NO_COLOR.
-# Exit: 0 installed; 1 ui_fail (bad argument, no project, no Node, app creation failed);
-#   other non-zero = unexpected command failure. Missing prerequisites do not fail the install.
-#
-# How it is laid out: this file holds the constants and finds Node, then sources install/*.sh
-# in the order below -- the first ten define functions, the rest run the install step by step.
-#   install/ui.sh            terminal output (ui_*)
-#   install/prereqs.sh       prerequisite helpers (package managers, install or report)
-#   install/postgres.sh      PostgreSQL logins and tests/harness.env
-#   install/docker.sh        Docker walkthrough
-#   install/windows.sh       Windows repairs (junctions)
-#   install/mxcli.sh         mxcli: download and update
-#   install/studio_pro.sh    finding Studio Pro (Windows)
-#   install/toolchain.sh     Playwright browser, JDK, MxBuild, no-Docker mode
-#   install/theme.sh         the app's theme (also tests/theme.sh)
-#   install/compaction.sh    when the coding agents compact their context (the person's choice)
-#   install/target.sh        10. arguments and the target project
-#   install/step_prereqs.sh  11. prerequisites
-#   install/step_app.sh      12. create the Mendix app
-#   install/step_skills.sh   13. skills, lint rules, checkers, rule
-#   install/step_hosts.sh    14. hooks for Claude, Codex, Cursor, OpenCode, Pi
-#   install/step_harness.sh  15-16. the test harness, record the install, check the environment
-#   install/summary.sh       17. summary
-
-set -Eeuo pipefail
-
-# No silent exits. A command that fails outside an if / || / && ends the install (set -e); the
-# ERR trap notes where, and the EXIT trap says so. ERR fires only on such a failure, so a
-# deliberate stop (ui_fail) keeps its own message alone.
-# A missing shasum on Windows once ended the install with no word at all.
-MDL_STOPPED_AT=""
-# Set by step_app.sh while a scratch project exists; never taken from the caller's environment,
-# since the EXIT trap evals it.
-MDL_EXIT_EXTRA=""
-trap 'MDL_STOPPED_AT="${BASH_SOURCE[0]##*/mxcodr/}:${LINENO}: ${BASH_COMMAND}"' ERR
-mdl_install_exit() {
-  local code=$?
-  [ -n "${MDL_EXIT_EXTRA:-}" ] && eval "$MDL_EXIT_EXTRA"
-  if [ "$code" -ne 0 ] && [ -n "$MDL_STOPPED_AT" ]; then
-    printf '\r\033[K\n  x The installer stopped unexpectedly (exit %s) at %s\n' "$code" "$MDL_STOPPED_AT" >&2
-    printf '    Nothing after this step was done. Please report this line.\n\n' >&2
-  fi
-}
-trap mdl_install_exit EXIT
-
-# --- Constants ---
-DEFAULT_MX_VERSION="11.12.1"               # Mendix version for a new app when MX_VERSION is unset and no Studio Pro is found
-PLAYWRIGHT_CLI_PACKAGE="@playwright/cli@0.1.15"   # pinned to the devcontainer's version
-DEFAULT_DOCKER_WAIT=180                    # seconds to wait for the Docker daemon (DOCKER_WAIT)
-UI_BAR_WIDTH=24                            # progress bar width, in characters
-UI_SUB_EXPECTED=6                          # sub-steps expected inside one step, for the bar
-
-# --- 1. Platform and Node ---
-case "$(uname -s 2>/dev/null || echo unknown)" in
-  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1; EXE=".exe" ;;
-  *)                    IS_WINDOWS=0; EXE="" ;;
-esac
-
-# Prints a node that runs. The hooks that need it carry a copy; keep them the same.
-mdl_find_node() {
-  if command -v node >/dev/null 2>&1; then
-    printf 'node\n'
-    return 0
-  fi
-  # The Node.js installer (also via winget) puts node on PATH only for shells started after it.
-  local local_app="${LOCALAPPDATA:-}" candidate
-  local_app="${local_app//\\//}"
-  for candidate in "/c/Program Files/nodejs/node.exe" "$local_app/Programs/nodejs/node.exe"; do
-    [ -x "$candidate" ] || continue
-    printf '%s\n' "$candidate"
-    return 0
-  done
-  return 1
-}
-
-# The harness runs on Node: its hooks, checks and the installer's own jobs (install/install_tool.cjs).
-# Not fatal here: unless --no-deps, the prerequisites step installs Node and probes again.
-NODE="$(mdl_find_node || true)"
-
-# The bundle this script belongs to: every part and file below is read from here.
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-version="$(cat "$SRC/VERSION")"
-
-# --- The rest, in install/ next to this file, in this order ---
-for _install_part in ui prereqs postgres docker windows mxcli studio_pro toolchain theme compaction \
-                     target step_prereqs step_app step_skills step_hosts step_harness summary; do
-  if [ ! -f "$SRC/install/$_install_part.sh" ]; then
-    echo "install/$_install_part.sh is missing -- download the whole mxcodr/ bundle again" >&2
-    exit 1
-  fi
-  # shellcheck source=/dev/null
-  . "$SRC/install/$_install_part.sh"
+# mx-codr installer (harness v2, skills only; macOS, Linux, Git Bash): check Node >= 20, then hand over to
+# the Node installer, which runs from this bundle and writes into the app only the rule file, our skills
+# and .mxcodr/ (installed.json, and bin/ when it downloads mxcli).
+#   bash install.sh <app folder> [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme <name>] [--yes] [--boot] [--request <file>]
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+usage='usage: bash install.sh <app folder> [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme <name>] [--yes] [--boot] [--request <file>]'
+app="${1:?$usage}"; shift
+[ -d "$app" ] || { echo "mxcodr: no folder $app" >&2; exit 2; }
+if ! command -v node >/dev/null 2>&1; then
+  echo "mxcodr: Node.js 20 or later is needed: https://nodejs.org (macOS: brew install node)" >&2; exit 2
+fi
+major="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$major" -lt 20 ]; then
+  echo "mxcodr: Node $(node -v) is too old; install Node 20 or later (https://nodejs.org)" >&2; exit 2
+fi
+# --request <file>: saved word for word in docs/requests/NN.md; made absolute before the cd
+args=()
+while [ $# -gt 0 ]; do
+  if [ "$1" = "--request" ] && [ $# -gt 1 ]; then
+    [ -f "$2" ] || { echo "mxcodr: no request file $2" >&2; exit 2; }
+    args+=("--request" "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"); shift 2
+  else args+=("$1"); shift; fi
 done
+app="$(cd "$app" && pwd)"
+cd "$app"
+exec node "$here/overlay/install.mjs" "$app" ${args[@]+"${args[@]}"}

@@ -1,0 +1,11 @@
+{
+  "name": "tests",
+  "private": true,
+  "description": "The app's Playwright suite. Run npm install here; the version is pinned (1.64.1 has --shuffle).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}
