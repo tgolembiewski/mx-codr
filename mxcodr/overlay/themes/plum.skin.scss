@@ -1,0 +1,38 @@
+// ---------------------------------------------------------------------------
+// mx-codr frame for the plum theme: a top bar of its own colour, a lighter active item on
+// the side rail, and outline buttons in the brand colour. Appended to the scaffold by the
+// installer (and .mxcodr/theme.mjs) before `mxcli theme apply`.
+//
+// Only Atlas's own variables are set -- the ones Atlas Core paints these parts with
+// (layouts/_layout-atlas.scss, helpers/_navigation-tree.scss, helpers/_button.scss). No
+// Atlas property is restyled (one exception at the end: the combo box's inner focus ring), so an
+// Atlas update keeps working. This comes after the
+// theme's own block, at the same scope, so it wins without !important.
+:root {
+  --navtopbar-bg: #4a2f5c;
+  --navsidebar-bg-active: #56366a;
+  --navsidebar-bg-hover: #56366a;
+  --navsidebar-border-radius: var(--mxt-radius-lg);
+}
+// Form controls as tall as Atlas's buttons. The signal base sets 32px, while the data grid's
+// filter buttons (operator, calendar) stay at Atlas's 38px: the filter row was uneven, and the
+// drop-down filter's 8px padding left 16px for a 20px line, so "Select" was cut off at the
+// bottom (InvoiceChaseCodr, plum, 2026-10-05). Every input, drop-down and filter reads this.
+:root {
+  --mxt-control-height: 38px;
+}
+// Buttons a page author set to the Default style (Mendix renders them `mx-button btn-default`)
+// take the brand colour. The variables are scoped to them, so the grid's column selector
+// (`btn-default` only) and the date picker's button (`mx-button` only) keep the neutral look.
+.mx-button.btn-default {
+  --btn-default-color: var(--mxt-brand);
+  --btn-default-border-color: var(--mxt-brand);
+}
+
+// The combo box shows focus on its whole box (widget-combobox-input-container-active); the focus
+// ring every input gets drew a second frame around the text inside it, both in the brand colour
+// (OfflineLab, amber, 2026-10-11; every theme: the ring is the same). Only the inner input drops it.
+.widget-combobox .widget-combobox-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}

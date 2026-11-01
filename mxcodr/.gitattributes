@@ -1,7 +1,0 @@
-# The harness is bash and Node on every host, including Windows under Git Bash.
-# A CRLF line ending in a shell script is not a line ending, it is an argument:
-# `bash tests/gate.sh` then fails on every line with `$'\r': command not found`.
-*.sh    text eol=lf
-*.cjs   text eol=lf
-*.js    text eol=lf
-*.mdl   text eol=lf
