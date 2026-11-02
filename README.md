@@ -7,7 +7,7 @@ works in the app reads one short always-on rule file, finds eight skills next to
 starter Playwright test kit. **Nothing runs behind the agent's back**: no gate, no hooks, no refusals, no
 edits to your agent's settings.
 
-The bundle is **2026.11.01.20**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
+The bundle is **2026.11.01.23**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
 
 ## What you get
 
@@ -28,10 +28,16 @@ The bundle is **2026.11.01.20**, pinned to [mxcli](https://github.com/mendixlabs
 
 ## Install
 
-You need Node 20 or later, and a Mendix app folder with one `.mpr` (`mxcli new MyApp` makes one).
+You need Node 20 or later. Copy the `mxcodr/` folder into the folder of your app (an empty folder is fine)
+and run it from there:
 
     git clone https://github.com/tgolembiewski/mx-codr.git
-    bash mx-codr/mxcodr/install.sh /path/to/MyApp --db hsqldb --agent claude
+    mkdir -p MyApp && cp -R mx-codr/mxcodr MyApp/
+    cd MyApp && ./mxcodr/install.sh --db hsqldb --agent claude
+
+With no `.mpr` in the folder the installer creates the app with `mxcli new` (Mendix `MX_VERSION`, default 11.12.1;
+name `APP_NAME`, default the folder name), keeping your own files; `--no-app` stops instead. The folder can also
+be named: `bash mx-codr/mxcodr/install.sh /path/to/MyApp ...`.
 
 On Windows, run it from Git Bash. Then start a **new** agent session in the app folder: an agent reads its
 rules and skills when the session starts.
