@@ -75,8 +75,8 @@ and the same `Layout:` in the scripts that create them, or a re-run moves them b
 
 **A heading on a page.** The page `Title:` feeds only the browser tab: a page with no heading widget
 opens unlabelled. Either an `H1`-`H3` `dynamictext` in each page, or one header snippet every page calls
-(see `reuse-and-snippets`), one way per app. A header (or signed-in bar) the request puts on every page
-includes pop-ups: they call the same snippet.
+(see `reuse-and-snippets`), one way per app. A header the request puts on every page includes pop-ups;
+the signed-in bar and sign-out never do: a pop-up opens over a page that already shows them.
 
 **A page a person navigates to has a URL** (`Url: 'orders'`), so it can be bookmarked, shared and
 reloaded; a page with an object parameter carries it, `Url: 'order/{Order/Id}'`. Pop-ups, the login
@@ -279,8 +279,8 @@ in, Back shares the top row with who is signed in: [reference/signed-in-user.md]
   a role holds `Administration.Administrator`. When the app has sign-in, administrators start on a
   page of the app's own module. How, with the MDL: [reference/menu.md](reference/menu.md); read it
   before writing or changing the menu.
-- **Who is signed in**, top right of every page (the login page aside; pop-ups too when the request says
-  every page), clicking through to My account: the entity, data-source microflow, snippet and top row
+- **Who is signed in**, top right of every page (the login page and pop-ups aside, even when the request
+  says every page), clicking through to My account: the entity, data-source microflow, snippet and top row
   are in [reference/signed-in-user.md](reference/signed-in-user.md); read it before the first page.
 
 ## The app starts every time
