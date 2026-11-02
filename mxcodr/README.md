@@ -1,8 +1,32 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.20** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.01.23** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.01.23: a new app lands in a folder an earlier `mxcli new`/`init` left files in (no `.mpr`, but
+  `.ai-context/`, `.claude/skills/`, `.classpath`... as when a person deleted the app by hand and the hidden
+  files stayed): those leftovers get the new app's copies instead of being "the folder's own" (rule in
+  `isScaffoldLeftover`: only what mxcli writes and nobody edits; `.claude/rules/`, a `CLAUDE.md`/`AGENTS.md`
+  with text of the person's own and a `.gitignore` with lines of their own are kept). A leftover `mprcontents/`
+  is moved aside to `mprcontents.old/`. Notes that list paths show at most five, then `and N more (list in
+  .mxcodr/install.log)`; the full lists go to `.mxcodr/install.log`. The move into the folder is
+  all-or-nothing: planned first, the `.mpr` last, every move undone on a failure, and Ctrl-C waits for the
+  moves, so a failed or interrupted run never leaves scaffold files without an app.
+- Since 2026.11.01.22: the installer's output looks like v1's (`overlay/lib/ui.mjs`, a port of v1's
+  `install/ui.sh`): the mx-codr wordmark and version, the `▪ target` line, one progress bar over the steps
+  (percent, the running step, its phase from `mxcli new`, the elapsed time once a step passes 5 s), a green `✔`
+  line per step, yellow `!` notes, a red `✘` failure on stderr with the fix below it, and v1's summary (`What
+  landed`, `Now`, `Next`, `Good to know`) with v2's content. The slow tools (mxcli download, `mxcli new`, MxBuild,
+  the runtime cache, `mxcli init --sync-skills`, `--boot`) run without blocking, so the bar keeps moving. Off a
+  terminal, with `NO_COLOR` or `TERM=dumb`: plain `· step` / `✔ step` lines, no escape codes, no bar; without a
+  UTF-8 locale (cmd.exe) ASCII icons, as v1. The theme question now comes before the slow steps, as v1 asked
+  its questions first. The `mxcodr install:` prefix is gone; failures still exit 2.
+- Since 2026.11.01.21: the installer runs with no arguments and creates the app when there is none, as v1 did:
+  `cd <folder> && bash mxcodr/install.sh` installs into the current folder (or the one holding `mxcodr/` when run
+  from inside it); with no `.mpr` there it runs `mxcli new` in a temporary folder and moves the app in, keeping
+  every file already there (`MX_VERSION`, default 11.12.1 on every platform; `APP_NAME`, default the folder name
+  in letters and digits). On Windows a Studio Pro of that version must be installed, else it stops and lists the
+  installed ones. `--no-app` stops instead; `-h`/`--help` prints the usage. Git Bash paths reach Node as Windows paths.
 - Since 2026.11.01.20: the read-whole sentence now covers only the project skills in `.claude/skills/`; of mxcli's
   own skills in `.ai-context/skills/` the agent reads only the section it needs (so9 read them whole too, about
   30k tokens of early context carried through ~150 calls; tokens went 53M -> 78M).
@@ -44,7 +68,8 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
     overlay/install.mjs            the installer
     overlay/lib/                   mx.mjs (PIN, BUNDLE), rules.mjs (rule file text and its format check),
                                    skills.mjs (which skills are installed), requests.mjs, cache.mjs,
-                                   theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs)
+                                   theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs),
+                                   ui.mjs (what the installer prints: v1's banner, bar, marks, summary)
     overlay/themes/                catalog.json, per theme <name>.css (tokens) and <name>.skin.scss (frame),
                                    logos/<name>/, the preview page and its screenshots
     overlay/templates/mxcodr.md    the always-on rule file, 25 lines
@@ -103,7 +128,8 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   the app's own). v1's `tests/film.sh` is removed on upgrade.
 - **`.mxcodr/`** holds `installed.json` (bundle, mxcli path and version, db, agents, skills, the kit files
   that are the kit's, written now or kept from before, `theme`, requests), `theme.mjs` and `themes/` (to
-  change the look later) and `bin/mxcli` when mxcli had to be downloaded.
+  change the look later), `bin/mxcli` when mxcli had to be downloaded, and `install.log` (the paths a new app
+  replaced or kept, when it found any).
 
 All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.29.0 rewrites
 `settings.json`, `.cursorrules`, `opencode.json` and the inside of its own markers, none of which we touch).
@@ -113,17 +139,29 @@ installer writes mxcli's empty markers first and our block after them; `--sync-s
 
 ## What the installer does
 
-    bash mxcodr/install.sh <app folder> [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme <name>] [--yes] [--boot] [--request <file>]
+    cd <folder> && bash mxcodr/install.sh [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
 
-The app folder must already hold one `.mpr` (`mxcli new` makes one). On Windows, run it from Git Bash.
+No app is needed: copy `mxcodr/` into an empty folder (or the folder of an app) and run it there. The folder is
+the current one, or the one holding `mxcodr/` when run from inside it; it can also be named first
+(`bash mxcodr/install.sh <app folder> ...`). Defaults: `--agent claude` (or the last install's), the database as
+in step 2, no theme question without a terminal or with `--yes`. On Windows, run it from Git Bash.
 
+0. **A new app** when the folder has no `.mpr` (more than one is an error): `mxcli new <name> --version <v>` in a
+   temporary folder, then moved in (all-or-nothing, the `.mpr` last); a file already there is kept and the
+   scaffold's copy dropped, so `mxcodr/` is never touched, except leftovers of an earlier mxcli scaffold, which
+   get the new copies (full lists in `.mxcodr/install.log`). `<v>` is `MX_VERSION`, else 11.12.1 on every platform. `<name>` is `APP_NAME`,
+   else the folder name in letters and digits (`App` in front when it starts with a digit). On Windows the
+   version's Studio Pro must be installed (`C:\Program Files\Mendix\<v>*\modeler\mx.exe` or the same under
+   `%LOCALAPPDATA%\Programs\Mendix`); none: it stops and lists what is installed, and never installs one.
+   There `mxcli new` skips its first build, and a per-user Studio Pro (which mxcli cannot see) creates the app with
+   its own `mx.exe create-project`, then `mxcli init`. `--no-app` stops here instead, writing nothing.
 1. **mxcli**: a found mxcli 0.29.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
    `.mxcodr/bin/`. `./mxcli` becomes that binary when it is an earlier bundle's shim, a link to nowhere, or a
    binary that does not run here (`mxcli new` on macOS can leave a Linux one); someone else's wrapper stays.
 2. **Database**: `--db`, else the last install's, else postgres when port 5432 answers, else hsqldb.
 3. **The app's look** (`overlay/lib/theme.mjs`): `--theme <number|name>`, else the last install's (its
-   frame refreshed, the app's logo kept), else asked once when stdin is a terminal (the list in colour,
-   the preview page opened, Enter = atlas). No terminal or `--yes`: nothing is applied and `installed.json`
+   frame refreshed, the app's logo kept), else asked once when stdin is a terminal, before the slow steps
+   start (the list in colour, the preview page opened, Enter = atlas). No terminal or `--yes`: nothing is applied and `installed.json`
    records `"theme": "as-is"`, so unattended eval runs keep `mxcli new`'s look. Whatever is recorded is
    not asked again on a later install; `--theme` or `node .mxcodr/theme.mjs` chooses then. Only files under
    `theme/` change, never the model; a failing mxcli is said, never fatal. See *Change the look later*.

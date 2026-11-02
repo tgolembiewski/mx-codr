@@ -360,7 +360,7 @@ test('film: a reinstall writes tests/film.mjs again over an edited copy, also wh
 
 test('film: the installer always writes the recorder, and v1\'s tests/film.sh goes on upgrade while tests/film.mjs stays', () => {
   const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
-  assert.match(src, /say\(`film recorder -> \$\{copyFilm\(app\)\}/);
+  assert.match(src, /ui\.done\('film recorder', `.*\$\{copyFilm\(app\)\}/);
   const d = stubApp();
   put(d, 'tests/film.sh', '#!/usr/bin/env bash\n');
   copyFilm(d);
