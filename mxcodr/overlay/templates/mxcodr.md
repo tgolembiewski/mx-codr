@@ -10,7 +10,7 @@ Write them as plain `@playwright/test` specs on top of `tests/mx.ts` (sign-in an
 of each test (the trial runtime allows six sessions). Prove a refusal by attempting the forbidden action
 as that role (a call, a URL, an API request) and asserting that the server refuses it, plus the allowed
 side as the permitted role; never add a button, widen access or lower security so a test can see a message.
-Run tests in the foreground and never end your turn while a test run is still going. **You are done only
+Write and run the tests yourself in the foreground, never through a background agent, and never end your turn while a test run or an agent is still going. **You are done only
 when** you have printed a table `requirement -> test that asserts it` covering every requirement of the
 request (write the missing tests first), then run the whole suite once as `npx playwright test --shuffle`
 in `tests/` and shown it green with `sessions left: 0`. Never edit `tests/mx.ts` or `tests/mx.teardown.ts`
