@@ -1,8 +1,11 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.19** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.01.20** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.01.20: the read-whole sentence now covers only the project skills in `.claude/skills/`; of mxcli's
+  own skills in `.ai-context/skills/` the agent reads only the section it needs (so9 read them whole too, about
+  30k tokens of early context carried through ~150 calls; tokens went 53M -> 78M).
 - Since 2026.11.01.19: the always-on rule says to read each skill whole, one file per read, never through `head`,
   `cut` or a combined `cat` (so8 cut `naming-and-captions` at 30 lines and decision captions fell from 96% to 43%);
   `naming-and-captions` states the decision-caption rule in its first lines.
