@@ -7,7 +7,7 @@ works in the app reads one short always-on rule file, finds eight skills next to
 starter Playwright test kit. **Nothing runs behind the agent's back**: no gate, no hooks, no refusals, no
 edits to your agent's settings.
 
-The bundle is **2026.11.01.23**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
+The bundle is **2026.11.01.24**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
 
 ## What you get
 
@@ -50,7 +50,7 @@ rules and skills when the session starts.
 | opencode | `opencode` | block in `AGENTS.md` | `.opencode/skills/` |
 | Pi | `pi` | block in `AGENTS.md` | `.agents/skills/` |
 
-Give several agents with commas: `--agent claude,codex`.
+Without `--agent` the installer asks on a terminal which agent(s) will work in the app (numbers or names, several at once: `1,5`). Give several agents with commas: `--agent claude,codex`. On a re-install `--agent` adds to the agents installed before; `--remove-agent <name>` removes one.
 
 Options: `--db hsqldb|postgres`, `--theme <name>`, `--yes`, `--boot`, `--request <file>`.
 

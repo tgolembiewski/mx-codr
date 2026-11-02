@@ -1,8 +1,9 @@
 // The mx-codr installer (harness v2, skills only). install.sh runs it from the bundle:
-//   node overlay/install.mjs <app folder> [--db hsqldb|postgres] [--agent claude,cursor,codex,opencode,pi] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
+//   node overlay/install.mjs <app folder> [--db hsqldb|postgres] [--agent claude,cursor,codex,opencode,pi] [--remove-agent <name>] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
 // A folder with no .mpr first gets a new Mendix app (mxcli new; MX_VERSION, APP_NAME), unless --no-app.
 // It installs nothing that runs while the agent builds: the pinned mxcli, MxBuild and the runtime cached,
-// the database chosen, mxcli's own skills refreshed, one always-on rule file per agent, our skills beside
+// the database chosen, mxcli's own skills refreshed, one always-on rule file per agent (asked on a terminal,
+// --agent adds one to the last install's, --remove-agent takes one out), our skills beside
 // mxcli's, a starter test kit in tests/ (only the files that are absent), tests/film.mjs (always), the app's look when one is chosen (theme/ only),
 // .mxcodr/theme.mjs to change it later, and .mxcodr/installed.json (+ .mxcodr/bin/mxcli when it had to download mxcli). Run it again to
 // repair or upgrade; an earlier bundle's gate (./mxgate, .mxgate/) and v1's hooks and checkers are removed.
@@ -20,6 +21,7 @@ import { readTemplate, ruleText, mdcText, agentsBlockDir, checkRule, SKILLS_DIR,
 import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS } from './lib/skills.mjs';
 import { decideTheme, activeFrameTheme, applyTheme, askTheme, installThemeTool } from './lib/theme.mjs';
 import { makeUi } from './lib/ui.mjs';
+import { decideAgents, askAgents, agentsNote, agentNames, agentStartLines, AGENT_INFO } from './lib/agents.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ui = makeUi();
@@ -30,7 +32,7 @@ export const FOOTPRINT = '.mxcodr';
 
 async function main() {
   const argv = process.argv.slice(2);
-  const app = argv[0] && !argv[0].startsWith('--') ? path.resolve(argv.shift()) : die('usage: node install.mjs <app folder> [--db hsqldb|postgres] [--agent claude] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]');
+  const app = argv[0] && !argv[0].startsWith('--') ? path.resolve(argv.shift()) : die('usage: node install.mjs <app folder> [--db hsqldb|postgres] [--agent claude] [--remove-agent <name>] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]');
   const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const env = { ...process.env, MXCLI_QUIET: '1' };
   const run = (cmd, args, o = {}) => spawnSync(cmd, args, { encoding: 'utf8', cwd: app, env, timeout: o.timeout || 600000, stdio: 'pipe' });
@@ -54,20 +56,28 @@ async function main() {
   const prev = readJson(path.join(foot, 'installed.json'), null) || readJson(path.join(app, '.mxgate', 'installed.json'), {});
   migrateBin(app, prev);
 
-  // the choices first, as v1 asked its questions before the bar: database and agents (both kept from the last
-  // install unless given), then the app's look: --theme, else the last install's (its frame refreshed), else
+  // the choices first, as v1 asked its questions before the bar: database (kept from the last install unless
+  // given), agents, then the app's look: --theme, else the last install's (its frame refreshed), else
   // asked once on a terminal; with no terminal or --yes nothing is applied (the look mxcli new gave it stays)
   const db = opt('--db') || prev.db || (await reachable(5432) ? 'postgres' : 'hsqldb');
   if (!['hsqldb', 'postgres'].includes(db)) die(`unknown --db ${db}`, 'use --db hsqldb or --db postgres');
-  const agents = parseAgents(opt('--agent') || prev.agents?.join(',') || 'claude');
+  // the agents: --agent adds to the last install's, --remove-agent takes one out; on a terminal with neither (and
+  // no --yes) the person picks them (lib/agents.mjs); else the last install's, or Claude Code, and a note
+  const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  let picked;
+  try { picked = decideAgents({ flag: argv.includes('--agent') ? opt('--agent') ?? '' : undefined, remove: argv.includes('--remove-agent') ? opt('--remove-agent') ?? '' : undefined, prev, tty, yes: argv.includes('--yes') }); } catch (e) { die(e.message, e.fix); }
   let choice;
-  try { choice = decideTheme({ flag: argv.includes('--theme') ? opt('--theme') ?? '' : undefined, prev, tty: Boolean(process.stdin.isTTY && process.stdout.isTTY), yes: argv.includes('--yes'), active: activeFrameTheme(app) }); } catch (e) { die(e.message, 'node overlay/lib/theme.mjs list shows the themes'); }
-  if (choice.how === 'ask') {
+  try { choice = decideTheme({ flag: argv.includes('--theme') ? opt('--theme') ?? '' : undefined, prev, tty, yes: argv.includes('--yes'), active: activeFrameTheme(app) }); } catch (e) { die(e.message, 'node overlay/lib/theme.mjs list shows the themes'); }
+  if (picked.how === 'ask' || choice.how === 'ask') {
     const readline = await import('node:readline/promises');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    choice = { name: await askTheme({ rl, write: t => process.stdout.write(t), plain: Boolean(process.env.NO_COLOR) }), how: 'flag' };
+    const write = t => process.stdout.write(t);
+    // the agents first: the theme question opens a preview in the browser
+    if (picked.how === 'ask') picked = await askAgents({ rl, write, prev });
+    if (choice.how === 'ask') choice = { name: await askTheme({ rl, write, plain: Boolean(process.env.NO_COLOR) }), how: 'flag' };
     rl.close();
   }
+  const { agents } = picked;
 
   // the bar's steps, counted up front (v1: a plan one short pushed the bar past 100%)
   ui.plan(13 + (newApp ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
@@ -100,7 +110,9 @@ async function main() {
   ui.begin('choosing the database');
   ui.done('database', db === 'postgres' ? `postgres (${dbName})` : 'hsqldb');
   ui.begin('choosing the agents');
-  ui.done('agents', agents.join(', '));
+  ui.done('agents', `${agentNames(agents)}${picked.added.length ? ` (added ${agentNames(picked.added)})` : ''}`);
+  if (picked.how === 'kept' || picked.how === 'default') warn(agentsNote(agents));
+  if (picked.removed.length) ui.note(`removing ${agentNames(picked.removed)}: its rule and our skills go (you deselected it)`);
 
   // 2b. the app's look (theme/ files only)
   ui.begin('applying the theme');
@@ -176,12 +188,14 @@ async function main() {
     if (w.status !== 0) die(`the app is not ready: ${lastLine(w)}`, 'see .mxcli/run.log');
     ui.done('smoke boot', `the app boots (${(st.stdout || '').trim().split('\n').pop()}); stopped again`);
   }
-  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents });
+  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked });
 }
 
 // ---- the summary: what landed, what to do now (v1's summary.sh, with v2's content) --------------------
 
-function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, kit, theme, db, dbName, request, warnings, agents }) {
+// out: the ui to print with (the tests pass their own)
+export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, kit, theme, db, dbName, request, warnings, agents, picked = { added: [], removed: [] } }, out = ui) {
+  const ui = out;
   const { c, i } = ui;
   const note = s => `${c.grey}${s}${c.reset}`;
   ui.clear();
@@ -191,6 +205,8 @@ function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, 
   ui.head(i.box, 'What landed');
   if (newApp) ui.row('app', 1, `${newApp.name}.mpr  ${note(`(created empty, Mendix ${newApp.version})`)}`);
   ui.row('mxcli', 1, `${mxcli}  ${note(`(${PIN}${downloaded ? ', downloaded' : ''}; ./mxcli is this one)`)}`);
+  ui.row('agents', agents.length, `${agentNames(agents)}${picked.added.length ? `  ${note(`(${agentNames(picked.added)} added now)`)}` : ''}`);
+  if (picked.removed.length) ui.row('removed', picked.removed.length, `${agentNames(picked.removed)}  ${note('(deselected: its rule and our skills were taken out)')}`);
   ui.row('rule', ruleTargets.length, `${ruleTargets.join('  ')}  ${note('(every session)')}`);
   ui.row('skills', INSTALLED_SKILLS.length, `${skillDirs.join('  ')}  ${note("(beside mxcli's own)")}`);
   if (kit.written.length) ui.row('test kit', kit.written.length, `tests/  ${note('(written only when absent; yours from now on)')}`);
@@ -204,11 +220,11 @@ function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, 
   for (const w of warnings) ui.line(`\n  ${c.yellow}${i.warn}${c.reset} ${w}`);
 
   // the one thing to do now, first: the agent works in the app folder
-  const others = agents.slice(1);
   ui.head(i.play, 'Now');
-  ui.line(`     ${c.bold}Open your agent in the project folder and ask it for a feature:${c.reset}`);
+  ui.line(`     ${c.bold}Start ${agents.length > 1 ? 'one of your agents' : 'your agent'} in the app folder and ask it for a feature:${c.reset}`);
   ui.line(`       cd "${app}"`);
-  ui.line(`       ${agents[0].padEnd(11)} ${others.length ? note(`(or ${others.join(', ')})`) : ''}`.trimEnd());
+  for (const [cmd, name, where] of agentStartLines(agents)) ui.line(`       ${cmd.padEnd(13)} ${name.padEnd(12)} ${note(where)}`);
+  ui.line(`     ${c.bold}A session already open here must be restarted:${c.reset} skills are read when a session starts.`);
 
   const nextRows = [
     ['cd tests && npx playwright test', 'the suite the agent keeps (--shuffle before done)'],
@@ -222,14 +238,14 @@ function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, 
   for (const [cmd, what] of nextRows) ui.line(`     ${cmd.padEnd(width)} ${note(what)}`);
 
   ui.head(i.dot, 'Good to know');
-  ui.line(`     ${c.bold}Start a NEW agent session before building anything here.${c.reset}`);
-  ui.line("     An agent's skill list is fixed when its session starts, so the skills this installer");
+  ui.line("     Why the restart: an agent's skill list is fixed when its session starts, so the skills this installer");
   ui.line('     just wrote are invisible to the session that ran it. Measured: a session that installed');
   ui.line('     and then built without restarting read twelve SKILL.md files by hand -- 216k characters,');
   ui.line('     36 commands, 6.5 minutes -- before its first real command. After a restart: 8 commands.');
   ui.line('     The agent reads the rule file by itself; nothing runs while it builds: no hooks, no gate.');
   if (agents.includes('cursor')) ui.line(`     Cursor reads ${c.bold}.cursor/rules/mxcodr.mdc${c.reset} (alwaysApply); restart an open session to pick it up.`);
   if (agents.some(a => ['codex', 'opencode', 'pi'].includes(a))) ui.line(`     Codex, opencode and Pi read our block in ${c.bold}AGENTS.md${c.reset}, after mxcli's section.`);
+  ui.line(`     Another agent: ${c.bold}bash mxcodr/install.sh --agent <name>${c.reset} adds it (${Object.keys(AGENT_INFO).join(', ')}); --remove-agent <name> takes one out.`);
   ui.line(`     Run ${c.bold}bash mxcodr/install.sh${c.reset} again to repair or upgrade; your tests/ files stay.`);
   ui.line('');
 }

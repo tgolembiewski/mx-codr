@@ -1,8 +1,17 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.23** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.01.24** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.01.24: the installer asks which coding agent(s) will work in the app (a numbered list,
+  Claude Code, Cursor, Codex, opencode, Pi; several as `1,5`; Enter keeps the last install's, else Claude Code),
+  on a terminal with no `--agent`, before the theme question (`overlay/lib/agents.mjs`). A Pi session had run
+  without the harness: the install had silently defaulted to Claude Code, so Pi found no `AGENTS.md` block and
+  no `.agents/skills/`. `--agent` now ADDS to the last install's agents (an earlier agent's rule and skills stay);
+  an agent is removed only when deselected on the question or named with `--remove-agent`, and the summary says
+  so. With `--yes` or no terminal the last install's agents (else Claude Code) stay and a `!` note names them and
+  how to add another (`./mxcodr/install.sh --agent pi`). The summary's `Now` has one line per agent: the command
+  that starts it, where its rule and skills are, and that a session open before the install must be restarted.
 - Since 2026.11.01.23: a new app lands in a folder an earlier `mxcli new`/`init` left files in (no `.mpr`, but
   `.ai-context/`, `.claude/skills/`, `.classpath`... as when a person deleted the app by hand and the hidden
   files stayed): those leftovers get the new app's copies instead of being "the folder's own" (rule in

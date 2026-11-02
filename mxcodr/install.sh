@@ -3,12 +3,12 @@
 # the Node installer, which runs from this bundle and writes into the app only the rule file, our skills
 # and .mxcodr/ (installed.json, and bin/ when it downloads mxcli). With no .mpr in the folder it first
 # creates the Mendix app there (mxcli new; MX_VERSION, APP_NAME), unless --no-app.
-#   cd <folder> && bash mxcodr/install.sh [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
+#   cd <folder> && bash mxcodr/install.sh [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--remove-agent <name>] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
 # The folder may also be named first: bash install.sh <app folder> [options]. Without one it is the current
 # folder, or the folder the bundle sits in when run from inside mxcodr/.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-usage='usage: bash install.sh [<app folder>] [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]'
+usage='usage: bash install.sh [<app folder>] [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--remove-agent <name>] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]'
 for a in "$@"; do
   case "$a" in
     -h|--help)
@@ -16,8 +16,11 @@ for a in "$@"; do
       printf '  <app folder>  default: the current folder, or the folder holding mxcodr/ when run from inside it\n'
       printf '  no .mpr there: a Mendix app is created (MX_VERSION, default 11.12.1; APP_NAME, default the\n'
       printf '                folder name in letters and digits); --no-app stops instead. Existing files stay.\n'
-      printf '  --agent       default claude (or the last install'"'"'s); --db default postgres when port 5432\n'
-      printf '                answers, else hsqldb; --yes or no terminal: no theme question\n'
+      printf '  --agent       adds these agents to the last install'"'"'s (none before: just these); without it a\n'
+      printf '                terminal asks which agents (default the last install'"'"'s, else claude)\n'
+      printf '  --remove-agent takes an agent'"'"'s rule and our skills out again\n'
+      printf '  --db          default postgres when port 5432 answers, else hsqldb\n'
+      printf '  --yes         or no terminal: no questions (agents: the last install'"'"'s, else claude; theme: none)\n'
       exit 0 ;;
   esac
 done
