@@ -9,6 +9,9 @@ A microflow is read in Studio Pro as a diagram, by people who did not write it: 
 names and the captions on the boxes. This skill makes the flow, and the page, readable from the canvas
 without opening a shape.
 
+**Every decision's `@caption` is the question it answers (`Waiting for approval?`), never the condition,
+and every activity gets a caption too.** The detail is in *Decision captions* below.
+
 ## Caption every activity as you write it
 
 **Every retrieve, create, change, commit, delete, call, show page and `set` gets an `@caption` on the
