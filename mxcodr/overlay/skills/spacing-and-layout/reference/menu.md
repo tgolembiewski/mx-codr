@@ -22,17 +22,38 @@ create or modify navigation Responsive
   home page Sales.Order_List for "Employee"
   home page Sales.Cust_MyOrders for "CustomerPortal"
   {
-    menu item 'Orders' ( OnClick: show page Sales.Order_List, Icon: Atlas_Core.Atlas_Filled."shopping-cart" )
     menu item 'My orders' ( OnClick: show page Sales.Cust_MyOrders, Icon: Atlas_Core.Atlas_Filled.document )
-    menu item 'Users' ( OnClick: show page Administration.Account_Overview, Icon: Atlas_Core.Atlas_Filled."user-neutral-shield" )
+    menu 'Sales' ( Icon: Atlas_Core.Atlas_Filled."shopping-cart" ) {
+      menu item 'Orders' ( OnClick: show page Sales.Order_List, Icon: Atlas_Core.Atlas_Filled."shopping-cart" )
+      menu item 'Customers' ( OnClick: show page Sales.Customer_List, Icon: Atlas_Core.Atlas_Filled."user-neutral-group" )
+    }
+    menu 'Administration' ( Icon: Atlas_Core.Atlas_Filled.cog ) {
+      menu item 'Users' ( OnClick: show page Administration.Account_Overview, Icon: Atlas_Core.Atlas_Filled."user-neutral-shield" )
+      menu item 'Settings' ( OnClick: show page Sales.Setting_List, Icon: Atlas_Core.Atlas_Filled.wrench )
+    }
     menu item 'My account' ( OnClick: call microflow Administration.ManageMyAccount, Icon: Atlas_Core.Atlas_Filled.user )
     menu item 'Log out' ( OnClick: sign out, Icon: Atlas_Core.Atlas_Filled.logout )
   }
 ;
 ```
 
-An employee sees Orders, My account and Log out; a customer sees My orders, My account and Log out;
-an administrator also sees Users.
+An employee sees Sales (Orders, Customers), My account and Log out; a customer sees My orders, My
+account and Log out, and no Sales or Administration at all: Mendix drops a group whose pages a role
+cannot open, and shows only the entries it can open of a partly open group (measured on 11.12).
+
+## Group the entries
+
+A long flat menu is hard to scan. Group the entries under a few top-level sub-menus
+(`menu 'Caption' ( Icon: … ) { menu item … }`):
+
+- **Administration** holds what administrators and back-office staff set up: the admin panel, Users,
+  reference data (rates, tax codes, categories), jobs and imports.
+- The day-to-day work goes in groups named after the business area (**Sales**, **Warehouse**,
+  **Finance**) when the menu would otherwise have more than about seven entries.
+- Top level keeps each role's home page, My account and Log out, so they are one click away.
+- No group of one entry: put that entry at the top level. No group inside a group.
+- Groups open collapsed and work as an accordion, and the open page is not highlighted, so name a
+  group so the entry is obvious inside it.
 
 - `create or modify navigation` replaces the whole menu: `DESCRIBE NAVIGATION Responsive` first and
   keep the items already there.
