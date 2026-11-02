@@ -273,9 +273,9 @@ in, Back shares the top row with who is signed in: [reference/signed-in-user.md]
 ## When users sign in: menu and signed-in user
 
 - **The menu** is the navigation profile's own, on the app's one layout: one menu for every role
-  (Mendix hides what a role cannot open), an icon per item, different icons for what one role sees,
-  every role's home page in it, Users for administrators, My account for everyone, Log out last. Never
-  a row of buttons built into a layout. Every role that signs in includes `Administration.User`, and
+  (Mendix hides what a role cannot open), grouped under sub-menus (Administration, business areas), an
+  icon per item, different icons for what one role sees, every role's home page in it, Users for
+  administrators, My account for everyone, Log out last. Never a row of buttons built into a layout. Every role that signs in includes `Administration.User`, and
   a role holds `Administration.Administrator`. When the app has sign-in, administrators start on a
   page of the app's own module. How, with the MDL: [reference/menu.md](reference/menu.md); read it
   before writing or changing the menu.
