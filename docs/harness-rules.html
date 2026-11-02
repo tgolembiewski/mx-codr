@@ -141,7 +141,7 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
 
 <main>
 <header class="top">
-  <div class="eyebrow">mx-codr · harness v2, skills only · bundle 2026.11.01.23 · mxcli v0.29.0</div>
+  <div class="eyebrow">mx-codr · harness v2, skills only · bundle 2026.11.01.24 · mxcli v0.29.0</div>
   <h1>Everything the mx-codr harness does</h1>
   <p class="lede">An AI agent builds the Mendix app with mxcli. The harness gives it one short rule file it reads on every turn, eight skills it reads when a part of the app calls for one, and a starter kit for its Playwright tests. Nothing runs while the agent builds: no gate, no hooks, no verdict.</p>
 </header>
@@ -216,12 +216,13 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
 
 <section id="install">
   <h2><span class="num">5</span>The installer</h2>
-  <pre class="cmd">cd &lt;folder&gt; &amp;&amp; bash mxcodr/install.sh [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--theme &lt;name&gt;] [--yes] [--boot] [--request &lt;file&gt;] [--no-app]</pre>
+  <pre class="cmd">cd &lt;folder&gt; &amp;&amp; bash mxcodr/install.sh [--db hsqldb|postgres] [--agent claude[,cursor,codex,opencode,pi]] [--remove-agent &lt;name&gt;] [--theme &lt;name&gt;] [--yes] [--boot] [--request &lt;file&gt;] [--no-app]</pre>
   <p>The folder is the current one (or the one holding <code>mxcodr/</code> when run from inside it), or named first: <code>bash mxcodr/install.sh &lt;app folder&gt; ...</code>. With no <code>.mpr</code> there the installer first creates the app with <code>mxcli new</code> in a temporary folder and moves it in, keeping every file already there (<code>MX_VERSION</code>, default 11.12.1; <code>APP_NAME</code>, default the folder name in letters and digits; on Windows a Studio Pro of that version must be installed); <code>--no-app</code> stops instead. Node 20 or later; on Windows, Git Bash.</p>
   <div class="table-wrap"><table><thead><tr><th>--agent</th><th>agent</th><th>always-on rule</th><th>our skills</th></tr></thead><tbody><tr><td><code>claude (default)</code></td><td>Claude Code</td><td><code>.claude/rules/mxcodr.md</code></td><td><code>.claude/skills/&lt;name&gt;/</code></td></tr><tr><td><code>cursor</code></td><td>Cursor</td><td><code>.cursor/rules/mxcodr.mdc (alwaysApply: true)</code></td><td><code>.cursor/skills/&lt;name&gt;/</code></td></tr><tr><td><code>codex, pi</code></td><td>Codex, Pi</td><td><code>AGENTS.md, between &lt;!-- mxcodr:start --&gt; and &lt;!-- mxcodr:end --&gt;</code></td><td><code>.agents/skills/&lt;name&gt;/</code></td></tr><tr><td><code>opencode</code></td><td>opencode</td><td><code>the same AGENTS.md block</code></td><td><code>.opencode/skills/&lt;name&gt;/</code></td></tr></tbody></table></div>
   <ol class="items">
     <li><strong>mxcli 0.29.0</strong>: the recorded one, PATH, or the app's <code>./mxcli</code>, else a download into <code>.mxcodr/bin/</code>; <code>./mxcli</code> is made that binary when it is a shim, a dead link or a binary that does not run here.</li>
     <li><strong>Database</strong>: <code>--db</code>, else the last install's, else postgres when port 5432 answers, else hsqldb.</li>
+    <li><strong>Agents</strong>: on a terminal without <code>--agent</code> (and without <code>--yes</code>) the installer asks which coding agent(s) will work in the app: 1 Claude Code, 2 Cursor, 3 Codex, 4 opencode, 5 Pi, several as <code>1,5</code>, Enter = the last install's, else Claude Code. <code>--agent</code> adds to the last install's agents; an agent's rule and skills go only when it is deselected or named with <code>--remove-agent</code>. No terminal or <code>--yes</code>: the last install's (else Claude Code) and a note naming them and how to add another. The summary has one start line per agent.</li>
     <li><strong>The app's look</strong>: <code>--theme</code> one of <code>atlas</code>, <code>navy</code>, <code>teal</code>, <code>amber</code>, <code>plum</code>, <code>forest</code>, else the last install's (its frame refreshed), else asked once on a terminal (Enter = atlas, Mendix's own look). No terminal or <code>--yes</code>: nothing applied, the app keeps <code>mxcli new</code>'s look. Only <code>theme/</code> files change; <code>node .mxcodr/theme.mjs &lt;name&gt;</code> changes it later.</li>
     <li><strong>Caches</strong>: <code>mxcli setup mxbuild</code>, <code>mxcli run --local --setup</code>, then <code>mxcli init --sync-skills .</code>.</li>
     <li><strong>Upgrade cleanup</strong>: the v2 gate (<code>./mxgate</code>, <code>.mxgate/</code>) and v1's files (<code>tools/mdl-checks/</code>, <code>tests/gate.sh</code>, its rule files, plugins and only our hook and permission entries) go; the app's tests, <code>docs/requests/</code> and <code>docs/brain/</code> stay.</li>
@@ -239,7 +240,7 @@ pre.cmd { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; ov
   </ul>
 </section>
 
-<footer>Generated from the files of bundle 2026.11.01.23. The interactive v1 pages of the same names remain in the mx-codr repository until it is updated.</footer>
+<footer>Generated from the files of bundle 2026.11.01.24. The interactive v1 pages of the same names remain in the mx-codr repository until it is updated.</footer>
 </main>
 </div>
 </body>
