@@ -1,8 +1,11 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.18** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.01.19** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.01.19: the always-on rule says to read each skill whole, one file per read, never through `head`,
+  `cut` or a combined `cat` (so8 cut `naming-and-captions` at 30 lines and decision captions fell from 96% to 43%);
+  `naming-and-captions` states the decision-caption rule in its first lines.
 - Since 2026.11.01.18: the menu is grouped under sub-menus (Administration, business areas; home pages,
   My account and Log out on top), measured: Mendix drops a group a role cannot open (`spacing-and-layout`).
 - Since 2026.11.01.17: pop-ups never carry the signed-in bar or sign-out, even when the request says every
