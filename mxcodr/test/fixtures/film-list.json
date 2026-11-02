@@ -1,0 +1,143 @@
+{
+ "config": {
+  "rootDir": "/app/tests"
+ },
+ "suites": [
+  {
+   "title": "orders.spec.ts",
+   "file": "orders.spec.ts",
+   "line": 0,
+   "column": 0,
+   "specs": [
+    {
+     "title": "order creation: lines, +1 on a repeated product, live totals, numbering, first history entry",
+     "file": "orders.spec.ts",
+     "line": 11,
+     "column": 5,
+     "id": "de3f15501f825e0a6f88-a67946cf2ca3570f78e6",
+     "tests": [
+      {
+       "status": "skipped",
+       "results": []
+      }
+     ]
+    },
+    {
+     "title": "credit rule: an order above the available credit is refused with the calculated amount",
+     "file": "orders.spec.ts",
+     "line": 33,
+     "column": 5,
+     "id": "de3f15501f825e0a6f88-9d5d7836a8d7cf731c86",
+     "tests": [
+      {
+       "status": "skipped",
+       "results": []
+      }
+     ]
+    },
+    {
+     "title": "quantity check: zero is refused, above stock warns",
+     "file": "orders.spec.ts",
+     "line": 48,
+     "column": 5,
+     "id": "de3f15501f825e0a6f88-93a984e28ef3d6d70107",
+     "tests": [
+      {
+       "status": "skipped",
+       "results": []
+      }
+     ]
+    },
+    {
+     "title": "approval: above 50,000 gross needs a manager; Confirm disabled until approved; employee cannot approve",
+     "file": "orders.spec.ts",
+     "line": 57,
+     "column": 5,
+     "id": "de3f15501f825e0a6f88-1af18f6677d744fec948",
+     "tests": [
+      {
+       "status": "skipped",
+       "results": []
+      }
+     ]
+    }
+   ],
+   "suites": []
+  },
+  {
+   "title": "roles.spec.ts",
+   "file": "roles.spec.ts",
+   "line": 0,
+   "column": 0,
+   "specs": [],
+   "suites": [
+    {
+     "title": "role admin",
+     "file": "roles.spec.ts",
+     "line": 13,
+     "column": 8,
+     "specs": [
+      {
+       "title": "home page, signed-in bar and menu",
+       "file": "roles.spec.ts",
+       "line": 16,
+       "column": 9,
+       "id": "7a25b8aaa0fcc60dba5a-16cd61d9e3801b1e4bd7",
+       "tests": [
+        {
+         "status": "skipped",
+         "results": []
+        }
+       ]
+      }
+     ],
+     "suites": []
+    },
+    {
+     "title": "role manager",
+     "file": "roles.spec.ts",
+     "line": 13,
+     "column": 8,
+     "specs": [
+      {
+       "title": "home page, signed-in bar and menu",
+       "file": "roles.spec.ts",
+       "line": 16,
+       "column": 9,
+       "id": "7a25b8aaa0fcc60dba5a-d0e1fb9bea68f8111a21",
+       "tests": [
+        {
+         "status": "skipped",
+         "results": []
+        }
+       ]
+      }
+     ],
+     "suites": []
+    }
+   ]
+  },
+  {
+   "title": "startup.spec.ts",
+   "file": "startup.spec.ts",
+   "line": 0,
+   "column": 0,
+   "specs": [
+    {
+     "title": "after-startup seed is idempotent: a restart adds and changes nothing",
+     "file": "startup.spec.ts",
+     "line": 7,
+     "column": 5,
+     "id": "9d5cd95b3f2ad7194fa4-16a4875ae1179db83915",
+     "tests": [
+      {
+       "status": "skipped",
+       "results": []
+      }
+     ]
+    }
+   ],
+   "suites": []
+  }
+ ]
+}

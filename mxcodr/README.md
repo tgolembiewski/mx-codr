@@ -1,8 +1,10 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.15** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.01.16** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.01.16: `film-tests` is back as the eighth skill, with `tests/film.mjs` on the v2 kit, written on
+  every install (see *Film a test*).
 - Since 2026.11.01.12 (v1 features back): the installer offers six looks again (`--theme <name>`, or asked
   once on a terminal; `node .mxcodr/theme.mjs` changes it later; no terminal or `--yes` leaves the look
   as `mxcli new` made it). `spacing-and-layout` spells out the stacked-lists-in-tabs rule (the heading
@@ -38,6 +40,7 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
     overlay/templates/mxcodr.md    the always-on rule file, 25 lines
     overlay/templates/keep-tests.md its first 7 lines, byte for byte the sk2 rule
     overlay/templates/tests/       the starter test kit
+    overlay/templates/film.mjs     the film recorder, installed as tests/film.mjs
     overlay/skills/                our skills
     test/                          the bundle's own tests (node --test)
 
@@ -68,6 +71,7 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   - `module-structure`: which module, the starting folders, `<Module>Ext` for Marketplace changes
   - `reuse-and-snippets`: reuse a microflow, share a page, extract a snippet
   - `files-and-images`: uploads, images, documents, a generated PDF
+  - `film-tests`: lists the tests and films the one the person picks (or all), only when asked
 
   `requirements-interview` is in the bundle but **not installed**; to switch it on, move it from
   `OPTIONAL_SKILLS` to `INSTALLED_SKILLS`.
@@ -84,6 +88,9 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   and config, which import from it, are not written either; the installer says so (move `tests/mx.ts` aside and
   install again to get the kit). A kept `tests/package.json` that pins another `@playwright/test` gets the pin
   hint (`npm install -D -E @playwright/test@1.64.1` in `tests/`).
+- **The film recorder** (`overlay/templates/film.mjs`): `tests/film.mjs`, written on **every** install and
+  reinstall (unlike the kit it is the bundle's, so an edit there is replaced; it is written also when the kit is
+  the app's own). v1's `tests/film.sh` is removed on upgrade.
 - **`.mxcodr/`** holds `installed.json` (bundle, mxcli path and version, db, agents, skills, the kit files
   that are the kit's, written now or kept from before, `theme`, requests), `theme.mjs` and `themes/` (to
   change the look later) and `bin/mxcli` when mxcli had to be downloaded.
@@ -118,13 +125,39 @@ The app folder must already hold one `.mpr` (`mxcli new` makes one). On Windows,
    `.codex/hooks.json` and `.cursor/hooks.json`. The app's tests, `docs/requests/` and `docs/brain/` are
    never touched.
 6. **Rule file and skills** per agent, as in the table; every skill of ours is first removed from every skills
-   folder (the retired `test-first-delivery` and `film-tests` included). Then the starter test kit, then
+   folder (the retired `test-first-delivery` included). Then the starter test kit and `tests/film.mjs`, then
    `mxcli init --sync-skills .`, so mxcli's own skills and its sections of `CLAUDE.md`/`AGENTS.md` match the
    pinned binary (after our files: it fills the mxcli markers step 6 may have written). Then
    `.mxcodr/theme.mjs` and `.mxcodr/themes/`.
 7. **`--request <file>`**: the request saved word for word as `docs/requests/NN.md`.
 8. **`--boot`**: `mxcli run --local --detach` (Mendix's default ports when free, else three free ones from
    18080), `mxcli run wait --ready`, `mxcli run stop`.
+
+## Film a test
+
+A person who wants to *see* a test asks the agent in plain words: "film the order approval test", "show me
+how the customer test works", "record all the tests". The `film-tests` skill has the agent list the tests
+(`node tests/film.mjs --list`), ask which one unless the request names it, and film it. The agent never
+films on its own.
+
+The film is the test as it is, slowed: a title card names the test for three seconds, an animated pointer
+travels to each element before it is clicked or filled, each action waits 1000 ms, and the test's title
+stays in a small label at the bottom. Typed values never show as captions (Playwright's action callouts are
+off). By hand, in the app folder, with the app running:
+
+    node tests/film.mjs --list                # every test, numbered, with file:line
+    node tests/film.mjs 7                     # test 7; or words of its title, or orders.spec.ts:57
+    node tests/film.mjs --pace 1500 7         # slower (ms per action; 0 = the test's own speed)
+    node tests/film.mjs --all                 # every test with a browser, in the background (--status, --stop)
+
+The video lands in `.mxcli/films/<title>.mp4` (ffmpeg converts it; without ffmpeg there is only the `.webm`,
+which opens in Chrome or Firefox, not QuickTime). `.mxcli/` is in mxcli's `.gitignore`. A failing test keeps
+its film, which shows where it stopped.
+
+Normal runs are unaffected: `tests/playwright.config.ts` has no video or slow-down. While it films,
+`film.mjs` writes a temporary `.film.config.ts` beside the app's config (spreading it and adding only
+`use.video` with `show.actions` and `show.test`) and one wrapper per spec in `.film/` (a `beforeEach` that
+shows the title card, then the spec imported unchanged), and removes both afterwards.
 
 ## Change the look later
 
@@ -143,7 +176,7 @@ Run it in the app folder. Under `mxcli run --local --watch` the new look shows a
 
 ## Develop
 
-    node --test 'mxcodr/test/*.test.mjs'   # rule format, skills-clean, install placement, test kit, themes, init survival (mxcli on PATH)
+    node --test 'mxcodr/test/*.test.mjs'   # rule format, skills-clean, install placement, test kit, film recorder, themes, init survival (mxcli on PATH)
 
 A change: edit `overlay/`, raise `BUNDLE` in `overlay/lib/mx.mjs` (`YYYY.MM.DD.N`), run the tests, then
 install into an app with `install.sh` and measure with `harness-eval/bin/run.sh`.

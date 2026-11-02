@@ -3,11 +3,11 @@
 **Your AI agent builds the Mendix app. mx-codr gives it the rules, skills and tests to build it well.**
 
 mx-codr v2 is a small installer. You run it once in a Mendix app. From then on the coding agent that
-works in the app reads one short always-on rule file, finds seven skills next to mxcli's own, and gets a
+works in the app reads one short always-on rule file, finds eight skills next to mxcli's own, and gets a
 starter Playwright test kit. **Nothing runs behind the agent's back**: no gate, no hooks, no refusals, no
 edits to your agent's settings.
 
-The bundle is **2026.11.01.15**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
+The bundle is **2026.11.01.16**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.29.0.
 
 ## What you get
 
@@ -15,11 +15,15 @@ The bundle is **2026.11.01.15**, pinned to [mxcli](https://github.com/mendixlabs
   runtime caches, and writes everything below for the agents you choose.
 - **One always-on rule file** (about 25 lines): keep tests, prove a refusal as the wrong role, run the whole
   suite once at the end, show a table "requirement -> test that asserts it".
-- **Seven skills**: `durable-tests`, `app-security`, `spacing-and-layout`, `naming-and-captions`,
-  `module-structure`, `reuse-and-snippets`, `files-and-images`.
+- **Eight skills**: `durable-tests`, `app-security`, `spacing-and-layout`, `naming-and-captions`,
+  `module-structure`, `reuse-and-snippets`, `files-and-images`, `film-tests`.
 - **A starter test kit** in `tests/` (`mx.ts`, `mx.teardown.ts`, `playwright.config.ts`, `package.json`):
   sign-in and sign-out that never leak a session, grid and form helpers, OQL checks, and a teardown that
   prints `sessions left: N`. Files are written only when absent and are yours from then on.
+- **Films of tests**: ask the agent "film the order approval test", or run `node tests/film.mjs --list` and
+  `node tests/film.mjs <number>` yourself. The run is slowed, with a title card and a pointer, and lands in
+  `.mxcli/films/` (`.webm`, plus `.mp4` when ffmpeg is installed). Normal test runs are not affected; see
+  *Film a test* in `mxcodr/README.md`.
 - **Six looks for the app** (themes): atlas (Mendix's own), navy, teal, amber, plum, forest.
 
 ## Install

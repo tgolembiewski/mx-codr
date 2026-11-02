@@ -8,10 +8,12 @@ export const INSTALLED_SKILLS = [
   'module-structure',
   'reuse-and-snippets',
   'files-and-images',
+  'film-tests',
 ];
 // requirements-interview: kept trimmed in the bundle, not installed while run so1 is compared with sk2
 // (sk2 had no such skill; owner decision 2026-10-31).
 export const OPTIONAL_SKILLS = ['requirements-interview'];
 
 // Skills an earlier bundle installed that this one removes from every skills folder.
-export const RETIRED_SKILLS = ['test-first-delivery', 'film-tests'];
+// film-tests was retired with v1's film.sh and came back in 2026.11.01.16 on the v2 kit (tests/film.mjs).
+export const RETIRED_SKILLS = ['test-first-delivery'];
