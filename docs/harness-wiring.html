@@ -60,14 +60,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 </head>
 <body>
 <div class="wrap">
-  <p class="label">mx-codr · harness v2, skills only · bundle 2026.11.01.15 · mxcli v0.29.0</p>
+  <p class="label">mx-codr · harness v2, skills only · bundle 2026.11.01.16 · mxcli v0.29.0</p>
   <h1>How the harness is wired</h1>
   <p class="lede">Read left to right: a person installs once, the files land in the app, the agent reads <b>one rule file on every turn</b> and a skill when a part of the app calls for one, and keeps its checks as tests. <b>Nothing is wired into the agent's tools</b>: no hook fires, no command is wrapped, no verdict is printed into its context.</p>
 
   <div class="lanes" role="list">
     <div class="node" role="listitem" style="--c:var(--src-you)"><p class="t">1 · The person</p><p class="s">mxcli new &lt;App&gt;<br>bash mxcodr/install.sh &lt;app&gt;</p><p>Once per app; again to upgrade or repair.</p></div>
     <div class="node" role="listitem" style="--c:var(--src-script)"><p class="t">2 · The installer</p><p class="s">overlay/install.mjs</p><p>Pins mxcli 0.29.0, applies the chosen look (theme/ only), caches MxBuild and the runtime, removes earlier bundles' files, writes ours, then syncs mxcli's skills.</p></div>
-    <div class="node" role="listitem" style="--c:var(--src-host)"><p class="t">3 · Files in the app</p><p class="s">rule file · skills · tests/mx.ts … · .mxcodr/</p><p>Plain files the agent's own host loads; no settings, no hooks.</p></div>
+    <div class="node" role="listitem" style="--c:var(--src-host)"><p class="t">3 · Files in the app</p><p class="s">rule file · skills · tests/mx.ts … · tests/film.mjs · .mxcodr/</p><p>Plain files the agent's own host loads; no settings, no hooks.</p></div>
     <div class="node" role="listitem" style="--c:var(--src-agent)"><p class="t">4 · The agent</p><p class="s">./mxcli exec · ./mxcli run · npx playwright test</p><p>Builds with mxcli, boots the app, runs its suite, shows it passing.</p></div>
     <div class="node" role="listitem" style="--c:var(--src-tool)"><p class="t">5 · Measured outside</p><p class="s">harness-eval/bin/run.sh · score.py · check_&lt;prompt&gt;.py</p><p>An independent check the agent never sees, after the run.</p></div>
   </div>
@@ -86,7 +86,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   <h2>What survives mxcli init</h2>
   <p><code>./mxcli init --all-tools</code> and <code>./mxcli init --sync-skills</code> (mxcli 0.29.0), proven by <code>mxcodr/test/init-survival.test.mjs</code>:</p>
-  <div class="table-wrap"><table><thead><tr><th>path</th><th>after init</th><th>why</th></tr></thead><tbody><tr><td><code>.claude/rules/mxcodr.md</code></td><td><span class="yes">kept</span></td><td>mxcli never writes in <code>.claude/rules/</code></td></tr><tr><td><code>.cursor/rules/mxcodr.mdc</code></td><td><span class="yes">kept</span></td><td>mxcli writes <code>.cursorrules</code>, not this folder</td></tr><tr><td><code>&lt;!-- mxcodr:start --&gt;</code> block in <code>AGENTS.md</code></td><td><span class="yes">kept</span></td><td>mxcli rewrites only the inside of its own markers; when the file has none, the installer writes them first</td></tr><tr><td>our skills in each skills folder</td><td><span class="yes">kept</span></td><td>mxcli ships no skill of these names; <code>--sync-skills</code> refreshes only its own</td></tr><tr><td><code>tests/</code> (the kit and the agent's specs)</td><td><span class="yes">kept</span></td><td>mxcli does not touch <code>tests/</code></td></tr><tr><td><code>.mxcodr/</code></td><td><span class="yes">kept</span></td><td>ours alone</td></tr><tr><td><code>settings.json</code>, <code>.cursorrules</code>, <code>opencode.json</code></td><td><span class="no">rewritten</span></td><td>mxcli's files; v2 writes nothing into them</td></tr></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>path</th><th>after init</th><th>why</th></tr></thead><tbody><tr><td><code>.claude/rules/mxcodr.md</code></td><td><span class="yes">kept</span></td><td>mxcli never writes in <code>.claude/rules/</code></td></tr><tr><td><code>.cursor/rules/mxcodr.mdc</code></td><td><span class="yes">kept</span></td><td>mxcli writes <code>.cursorrules</code>, not this folder</td></tr><tr><td><code>&lt;!-- mxcodr:start --&gt;</code> block in <code>AGENTS.md</code></td><td><span class="yes">kept</span></td><td>mxcli rewrites only the inside of its own markers; when the file has none, the installer writes them first</td></tr><tr><td>our skills in each skills folder</td><td><span class="yes">kept</span></td><td>mxcli ships no skill of these names; <code>--sync-skills</code> refreshes only its own</td></tr><tr><td><code>tests/</code> (the kit and the agent's specs)</td><td><span class="yes">kept</span></td><td>mxcli does not touch <code>tests/</code></td></tr><tr><td><code>tests/film.mjs</code> (the film recorder)</td><td><span class="yes">kept</span></td><td>in <code>tests/</code>; our installer writes it again on every install</td></tr><tr><td><code>.mxcodr/</code></td><td><span class="yes">kept</span></td><td>ours alone</td></tr><tr><td><code>settings.json</code>, <code>.cursorrules</code>, <code>opencode.json</code></td><td><span class="no">rewritten</span></td><td>mxcli's files; v2 writes nothing into them</td></tr></tbody></table></div>
 
   <h2>How a run is measured</h2>
   <ul>
@@ -95,7 +95,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     <li>The run's transcript and logs stay in <code>harness-eval/results/runs/</code>; a written report goes to <code>docs/sessions/&lt;date&gt;-&lt;name&gt;/</code>.</li>
   </ul>
 
-  <footer>Generated from the files of bundle 2026.11.01.15. v1 (gate, hooks, checkers) is in the tags <code>v1-best-hb1</code> and <code>v1-last</code>.</footer>
+  <footer>Generated from the files of bundle 2026.11.01.16. v1 (gate, hooks, checkers) is in the tags <code>v1-best-hb1</code> and <code>v1-last</code>.</footer>
 </div>
 </body>
 </html>

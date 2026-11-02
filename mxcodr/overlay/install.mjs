@@ -2,7 +2,7 @@
 //   node overlay/install.mjs <app folder> [--db hsqldb|postgres] [--agent claude,cursor,codex,opencode,pi] [--theme <name>] [--yes] [--boot] [--request <file>]
 // It installs nothing that runs while the agent builds: the pinned mxcli, MxBuild and the runtime cached,
 // the database chosen, mxcli's own skills refreshed, one always-on rule file per agent, our skills beside
-// mxcli's, a starter test kit in tests/ (only the files that are absent), the app's look when one is chosen (theme/ only),
+// mxcli's, a starter test kit in tests/ (only the files that are absent), tests/film.mjs (always), the app's look when one is chosen (theme/ only),
 // .mxcodr/theme.mjs to change it later, and .mxcodr/installed.json (+ .mxcodr/bin/mxcli when it had to download mxcli). Run it again to
 // repair or upgrade; an earlier bundle's gate (./mxgate, .mxgate/) and v1's hooks and checkers are removed.
 import fs from 'node:fs';
@@ -76,6 +76,7 @@ async function main() {
   for (const line of copySkills(app, agents)) say(line);
   const kit = copyTestKit(app, Array.isArray(prev.testKit) ? prev.testKit : []);
   for (const line of kit.lines) say(line);
+  say(`film recorder -> ${copyFilm(app)} (written on every install; the film-tests skill says how to use it)`);
   say(`theme tool -> ${installThemeTool(app)}`);
   // mxcli's own skills and its section of CLAUDE.md/AGENTS.md, after writeRules: an AGENTS.md that had no mxcli
   // section has its markers now, and this fills them (it leaves our block, outside them, as it is)
@@ -251,13 +252,27 @@ function playwrightPin(f) {
   try { const p = JSON.parse(fs.readFileSync(f, 'utf8')); return p.devDependencies?.['@playwright/test'] || p.dependencies?.['@playwright/test'] || null; } catch { return null; }
 }
 
+// ---- 5c. the film recorder ---------------------------------------------------------------------------
+
+// tests/film.mjs records a test's run as a video when a person asks (the film-tests skill). Unlike the kit it is
+// the bundle's, not the app's: written on every install and reinstall, whatever the kit's files are, so a later
+// bundle's fix reaches every app. It only adds a temporary config while it films; the app's config is never edited.
+export const FILM = 'tests/film.mjs';
+export function copyFilm(app, src = path.join(here, 'templates', 'film.mjs')) {
+  const f = path.join(app, FILM);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.rmSync(f, { force: true }); // a link or a read-only copy is replaced, not written through
+  fs.copyFileSync(src, f);
+  return FILM;
+}
+
 // ---- 6. upgrade: the earlier bundles' files out -----------------------------------------------------
 
 // Paths an earlier bundle wrote that this one has no use for (v2 gate, then v1). The app's own tests/*.spec.ts,
 // docs/requests/ and docs/brain/ are never touched.
 const OLD_PATHS = [
   'mxgate', '.mxgate', '.claude/rules/mxgate.md', '.claude/rules/mdl-skills.md', '.cursor/rules/mdl-skills.mdc',
-  'tools/mdl-checks', 'tests/gate.sh', 'tests/gate', 'tests/rulebook', 'tests/checks',
+  'tools/mdl-checks', 'tests/gate.sh', 'tests/gate', 'tests/rulebook', 'tests/checks', 'tests/film.sh',
   '.opencode/plugin/mendix-mdl-harness.js', '.pi/extensions/mendix-mdl-harness.js',
 ];
 // A hook or permission is ours when it names one of these.

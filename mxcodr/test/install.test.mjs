@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fenceText, unfence, withMxcliSection, MXCLI_BEGIN, MXCLI_END, writeRules, copySkills, copyTestKit, TEST_KIT, PLAYWRIGHT, upgradeCleanup, migrateBin, stripOurs, ensureLocalMxcli, replaceShim, parseAgents } from '../overlay/install.mjs';
+import { fenceText, unfence, withMxcliSection, MXCLI_BEGIN, MXCLI_END, writeRules, copySkills, copyTestKit, copyFilm, FILM, TEST_KIT, PLAYWRIGHT, upgradeCleanup, migrateBin, stripOurs, ensureLocalMxcli, replaceShim, parseAgents } from '../overlay/install.mjs';
 import { parseRule, bodyLines, checkRule, START, END } from '../overlay/lib/rules.mjs';
 import { INSTALLED_SKILLS } from '../overlay/lib/skills.mjs';
 import { readRequests, saveRequest, sha1 } from '../overlay/lib/requests.mjs';
@@ -30,9 +30,9 @@ function stubApp() {
 }
 const install = (d, agents) => { const before = new Set(walk(d)); writeRules(d, agents); copySkills(d, agents); return walk(d).filter(f => !before.has(f)); };
 const skillFiles = dir => INSTALLED_SKILLS.flatMap(s => walk(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'overlay', 'skills', s)).map(f => `${dir}/${s}/${f}`));
-const GATE = /\bgates?\b|mxgate|\.mxgate|tests\/(orient|peek|lib|gate|film)|scenario\(|# covers|rulebook|\bDONE\b/;
+const GATE = /\bgates?\b|mxgate|\.mxgate|tests\/(orient|peek|lib|gate|film\.sh)|scenario\(|# covers|rulebook|\bDONE\b/;
 
-test('Claude Code: .claude/rules/mxcodr.md and the seven skills in .claude/skills/, nothing else; AGENTS.md untouched', () => {
+test('Claude Code: .claude/rules/mxcodr.md and the eight skills in .claude/skills/, nothing else; AGENTS.md untouched', () => {
   const d = stubApp();
   const written = install(d, ['claude']);
   assert.deepEqual(written, ['.claude/rules/mxcodr.md', ...skillFiles('.claude/skills')].sort());
@@ -328,4 +328,42 @@ test('test kit: a kept tests/package.json with another or no Playwright pin gets
   const f = stubApp();
   copyTestKit(f);
   assert.doesNotMatch(copyTestKit(f, TEST_KIT).lines.join('\n'), /pin/, 'the kit\'s own package.json needs no hint');
+});
+
+// film-tests is back (2026.11.01.16): the recorder is the bundle's, written on every install and reinstall.
+const filmSource = () => fs.readFileSync(new URL('../overlay/templates/film.mjs', import.meta.url), 'utf8');
+
+test('film: a fresh install writes tests/film.mjs and the film-tests skill into every chosen agent\'s skills folder', () => {
+  const d = stubApp();
+  install(d, ['claude', 'cursor', 'codex', 'opencode']);
+  for (const dir of ['.claude/skills', '.cursor/skills', '.agents/skills', '.opencode/skills'])
+    assert.equal(get(d, `${dir}/film-tests/SKILL.md`), fs.readFileSync(new URL('../overlay/skills/film-tests/SKILL.md', import.meta.url), 'utf8'), dir);
+  assert.equal(FILM, 'tests/film.mjs');
+  assert.equal(copyFilm(d), 'tests/film.mjs');
+  assert.equal(get(d, 'tests/film.mjs'), filmSource());
+  assert.ok(!TEST_KIT.includes(FILM), 'not a kit file: the kit is write-if-absent, the recorder is not');
+});
+
+test('film: a reinstall writes tests/film.mjs again over an edited copy, also when the kit is the app\'s own', () => {
+  const d = stubApp();
+  put(d, 'tests/mx.ts', 'export const mine = 1;\n'); // the person's own mx.ts: the kit's config and teardown are skipped
+  put(d, 'playwright.config.ts', 'export default {};\n');
+  put(d, 'tests/film.mjs', '// edited by hand\n');
+  copyTestKit(d);
+  copyFilm(d);
+  assert.equal(get(d, 'tests/film.mjs'), filmSource());
+  put(d, '.claude/skills/film-tests/SKILL.md', 'stale');
+  install(d, ['claude']);
+  assert.equal(get(d, '.claude/skills/film-tests/SKILL.md').split('\n')[1], 'name: film-tests', 'the skill is refreshed, not left stale or removed');
+  assert.equal(get(d, 'tests/mx.ts'), 'export const mine = 1;\n');
+});
+
+test('film: the installer always writes the recorder, and v1\'s tests/film.sh goes on upgrade while tests/film.mjs stays', () => {
+  const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+  assert.match(src, /say\(`film recorder -> \$\{copyFilm\(app\)\}/);
+  const d = stubApp();
+  put(d, 'tests/film.sh', '#!/usr/bin/env bash\n');
+  copyFilm(d);
+  assert.deepEqual(upgradeCleanup(d), ['tests/film.sh']);
+  assert.ok(exists(d, 'tests/film.mjs'));
 });

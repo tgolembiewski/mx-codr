@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INSTALLED_SKILLS, OPTIONAL_SKILLS } from '../overlay/lib/skills.mjs';
+import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS } from '../overlay/lib/skills.mjs';
 
 const dir = fileURLToPath(new URL('../overlay/skills/', import.meta.url));
 const files = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) e.isDirectory() ? files(path.join(d, e.name), out) : out.push(path.join(d, e.name)); return out; };
@@ -12,7 +12,7 @@ const rel = f => path.relative(dir, f);
 
 // The gate is gone: no skill may send the agent to a verdict, a gate script or a scenario DSL.
 // `\bgate\b` keeps "navigate" and "aggregate"; `verify-` spares mxcli's own verify-with-oql skill.
-const GATE_WORDS = /\bgates?\b|mxgate|\.mxgate|\.mxcodr|tests\/(orient|peek|lib|gate|film|rulebook|checks)|scenario\(|verify-(?!with-oql)|# covers|rulebook|--only\b|journey:/i;
+const GATE_WORDS = /\bgates?\b|mxgate|\.mxgate|\.mxcodr|tests\/(orient|peek|lib|gate|film\.sh|rulebook|checks)|scenario\(|verify-(?!with-oql)|# covers|rulebook|--only\b|journey:/i;
 const VERDICT = /\bDONE\b/; // the gate's verdict word, in capitals
 // The card codes moved into prose; mxcli's own lint rule names (SEC001, CONV011 ...) and Studio Pro's CE codes may stay.
 const CODE = /\b(?!(?:CE|SEC|CONV|MPR|QUAL|ARCH|DESIGN|MOD|REU|UI|CUSTOM)\d)[A-Z]{2,10}\d{2,3}\b/;
@@ -20,9 +20,11 @@ const CODE = /\b(?!(?:CE|SEC|CONV|MPR|QUAL|ARCH|DESIGN|MOD|REU|UI|CUSTOM)\d)[A-Z
 test('the bundle holds the planned skills; requirements-interview is in the repo but not installed by default', () => {
   const names = fs.readdirSync(dir).sort();
   assert.deepEqual(names, [...INSTALLED_SKILLS, ...OPTIONAL_SKILLS].sort());
-  assert.deepEqual([...INSTALLED_SKILLS].sort(), ['app-security', 'durable-tests', 'files-and-images', 'module-structure', 'naming-and-captions', 'reuse-and-snippets', 'spacing-and-layout']);
+  assert.deepEqual([...INSTALLED_SKILLS].sort(), ['app-security', 'durable-tests', 'files-and-images', 'module-structure', 'naming-and-captions', 'reuse-and-snippets', 'spacing-and-layout', 'film-tests'].sort());
   assert.deepEqual(OPTIONAL_SKILLS, ['requirements-interview']);
-  for (const gone of ['test-first-delivery', 'film-tests']) assert.ok(!names.includes(gone), gone);
+  assert.ok(!names.includes('test-first-delivery'));
+  // film-tests came back in 2026.11.01.16 on the v2 kit: installed, never removed as retired
+  assert.deepEqual(RETIRED_SKILLS, ['test-first-delivery']);
 });
 
 test('skills-clean: no gate vocabulary and no card codes in any installed file', () => {
