@@ -1,8 +1,10 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.16** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.01.17** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.01.17: pop-ups never carry the signed-in bar or sign-out, even when the request says every
+  page (`spacing-and-layout`); a requested header still goes in.
 - Since 2026.11.01.16: `film-tests` is back as the eighth skill, with `tests/film.mjs` on the v2 kit, written on
   every install (see *Film a test*).
 - Since 2026.11.01.12 (v1 features back): the installer offers six looks again (`--theme <name>`, or asked
