@@ -114,7 +114,7 @@ create snippet Sales.SNIPPET_OrderHeader
 Used from every page that needs it:
 
 ```mdl
-snippetcall OrderDetail_OrderHeaderSnippet (snippet: Sales.SNIPPET_OrderHeader, params: {Order: $Order})
+snippetcall OrderDetail_OrderHeaderSnippet (snippet: Sales.SNIPPET_OrderHeader, params: (Order = $Order))
 ```
 
 A snippet with a parameter is what lets the same block render different data on

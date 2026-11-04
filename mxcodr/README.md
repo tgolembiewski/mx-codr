@@ -1,8 +1,14 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.04.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.04.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.30.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.04.3: pinned to mxcli **0.30.0** (probed 2026-11-04 on a fresh 11.12.1 app: install with the download,
+  skill folder names, `init --all-tools`/`--sync-skills` survival, `oql --json` stdout, `run --local` and the theme
+  layout are unchanged; the bundle's 36 MDL examples check as on 0.29). `app-security` asks for `./mxcli lint` and a
+  fix of every SEC010-SEC012 finding (SEC011, new: a data source XPath over an association the role may not read
+  opens to an error dialog at Production, which `mx check` and the build miss); `reuse-and-snippets` writes snippet
+  arguments as `params: (Order = $Order)` (the `{...}` form is deprecated, MDL-DEPR126).
 - Since 2026.11.04.2: `naming-and-captions` makes activity captions as hard a rule as decision captions (three
   measured b2b-full runs captioned 80-99% of decisions but 25-46% of activities): the opening rule names both, a
   *Before you finish a flow* self-check (every statement but `return`, `raise error`, structure and loops has an
@@ -146,7 +152,7 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   change the look later), `bin/mxcli` when mxcli had to be downloaded, and `install.log` (the paths a new app
   replaced or kept, when it found any).
 
-All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.29.0 rewrites
+All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.30.0 rewrites
 `settings.json`, `.cursorrules`, `opencode.json` and the inside of its own markers, none of which we touch).
 `mxcli init` regenerates an `AGENTS.md` without its markers whole, so when the file is absent or has none the
 installer writes mxcli's empty markers first and our block after them; `--sync-skills` then fills the section.
@@ -170,7 +176,7 @@ in step 2, no theme question without a terminal or with `--yes`. On Windows, run
    `%LOCALAPPDATA%\Programs\Mendix`); none: it stops and lists what is installed, and never installs one.
    There `mxcli new` skips its first build, and a per-user Studio Pro (which mxcli cannot see) creates the app with
    its own `mx.exe create-project`, then `mxcli init`. `--no-app` stops here instead, writing nothing.
-1. **mxcli**: a found mxcli 0.29.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
+1. **mxcli**: a found mxcli 0.30.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
    `.mxcodr/bin/`. `./mxcli` becomes that binary when it is an earlier bundle's shim, a link to nowhere, or a
    binary that does not run here (`mxcli new` on macOS can leave a Linux one); someone else's wrapper stays.
 2. **Database**: `--db`, else the last install's, else postgres when port 5432 answers, else hsqldb.

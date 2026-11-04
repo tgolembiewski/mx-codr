@@ -25,6 +25,10 @@ alter app security ( SecurityLevel: production, StrictMode: true, EnableDemoUser
   test goes green on an app that shows everyone's data. Build at Production from the start; every
   entity a page reads then needs a rule for that page's role, or the page comes up empty, which you
   notice at once instead of at go-live.
+- **Lint for what a role cannot read.** `./mxcli lint -p App.mpr` reports it before a test or a build
+  does; fix every SEC010 (a list renders empty for the role), SEC011 (a data source XPath crosses an
+  association the role may not read: the page opens to an error dialog, while `mx check` and the build
+  stay clean) and SEC012 (a page the role can reach shows a member it may not read: CE2729).
 - **Strict mode on.** Without it a user can read and change data through the browser in ways no page
   offers. One exception: in an app with an offline profile on Mendix before 11.12.5, strict mode
   breaks every client commit of a synced object; there leave it off and say so in your report.
