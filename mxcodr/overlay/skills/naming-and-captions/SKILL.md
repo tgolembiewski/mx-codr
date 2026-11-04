@@ -9,13 +9,15 @@ A microflow is read in Studio Pro as a diagram, by people who did not write it: 
 names and the captions on the boxes. This skill makes the flow, and the page, readable from the canvas
 without opening a shape.
 
-**Every decision's `@caption` is the question it answers (`Waiting for approval?`), never the condition,
-and every activity gets a caption too.** The detail is in *Decision captions* below.
+**Every activity's `@caption` says what the step does for the business (`Record the approval`), never
+Mendix's default (`Change Order`); every decision's `@caption` is the question it answers (`Waiting for
+approval?`), never the condition.** Both are equally hard (measured runs captioned 96-99% of decisions,
+25-46% of activities): a flow is done only when *Before you finish a flow* passes.
 
 ## Caption every activity as you write it
 
-**Every retrieve, create, change, commit, delete, call, show page and `set` gets an `@caption` on the
-line above it, typed together with the statement**: a short verb phrase saying what the step does in the
+**Every retrieve, create, change, commit, delete, rollback, call, show page, close page, show message,
+log, list operation, validation feedback, `declare` and `set` gets an `@caption` on the line above it, typed together with the statement**: a short verb phrase saying what the step does in the
 process. A call that stores its result (`$Name = call microflow ...`) and a create (`$Line = create ...`)
 count too. Captioning only the decisions leaves most of the canvas showing Mendix's defaults, *"Retrieve
 Order"*, *"Call microflow SUB_User_DisplayName"*, *"Show page Order_Details"*, which repeat the icon and
@@ -34,6 +36,28 @@ the variable. Decisions get a question (below).
   change $Order (ApprovalStatus = Sales.ApprovalStatus.Approved, DecisionBy = $DeciderName) commit;
   @caption 'Open the approved order'
   show page Sales.Order_Details (Order = $Order);
+```
+
+## Before you finish a flow
+
+No lint rule sees activity captions (CONV012 is decisions only). Read the flow back (`./mxcli -p app.mpr -c
+"describe microflow Module.Flow"`) and check, line by line: **every statement has an `@caption` line
+directly above it** -- except `return`, `raise error`, the structure (`begin`, `end ...`, `else`, `when`)
+and loops, which take an `@annotation`. One statement without, or with a caption that is the default
+(`Commit $Line`), and the flow is not done: add the caption and read it again. Before, only the `if` had one
+(the canvas showed *Retrieve OrderLine*, *Show message*, *Commit Order*); after:
+
+```mdl
+  @caption 'Load the order''s lines'
+  retrieve $Lines from Sales.OrderLine where Sales.OrderLine_Order = $Order;
+  @caption 'Over the credit limit?'
+  if $Order/Total > $Customer/CreditLimit then
+    @caption 'Tell the clerk the limit is passed'
+    show message 'Over the credit limit' type Warning;
+    return false;
+  end if;
+  @caption 'Accept the order'
+  commit $Order;
 ```
 
 ## Variable names
@@ -181,6 +205,7 @@ create microflow Sales.SUB_Invoice_CountUnpaid (
 )
 returns Integer as $UnpaidCount
 begin
+  @caption 'Start counting at zero'
   declare $UnpaidCount Integer = 0;
 
   @annotation 'One pass over the customer''s invoices'
@@ -223,6 +248,7 @@ not say:
 @caption 'Store the order'
 commit $Order
   on error begin
+    @caption 'Record why the order was not stored'
     log error 'Saving order {1} failed: {2}' with ({1} = $Order/Number, {2} = $latestError/Message);
     raise error;
   end error;
@@ -257,17 +283,6 @@ retrieve $LatestReminder from Chasing.Reminder
   first;
 ```
 
-## Check it
-
-No lint rule sees captions or annotations. Read the flow back as a reader would:
-
-```bash
-./mxcli -p app.mpr -c "describe microflow Module.Flow"
-```
-
-Every activity line carries your `@caption`, every decision a question, every loop
-an `@annotation`, no variable is a placeholder, and no loop does what one retrieve could.
-
 ## Where the activities go
 
 **Nowhere you have to decide.** Leave `@position` out and mxcli lays the flow out
@@ -277,9 +292,9 @@ nothing; prefer nothing.
 
 ## Validation checklist
 
-- [ ] No variable named `$Int1`, `$tmp`, or only its own type (`$Invoice_List`)
+- [ ] No variable named `$Int1`, `$tmp`, or only its own type (`$Invoice_List`); no loop does what one retrieve could
 - [ ] Every widget named `<Page>_<What><Type>` (`OrderDetail_GenerateInvoiceButton`)
 - [ ] Every `if` caption is a question — not the expression Mendix fills in by default
-- [ ] Every retrieve, create, change, commit, delete, call, show-page and `set` has a business-operation `@caption` — none read as Retrieve/Change/Commit/Call/Show page + type
+- [ ] Every activity (every statement but `return`, `raise error`, structure and loops) has a business-operation `@caption` — none read as Retrieve/Change/Commit/Call/Show page + type
 - [ ] Loops labelled with `@annotation`, never `@caption`
 - [ ] `./mxcli check script.mdl` warns about no dropped loop caption
