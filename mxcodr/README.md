@@ -1,8 +1,13 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.01.24** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
+Bundle **2026.11.04.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.29.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.04.2: `naming-and-captions` makes activity captions as hard a rule as decision captions (three
+  measured b2b-full runs captioned 80-99% of decisions but 25-46% of activities): the opening rule names both, a
+  *Before you finish a flow* self-check (every statement but `return`, `raise error`, structure and loops has an
+  `@caption` above it, none a Mendix default) with one before/after example, and the worked examples caption
+  their `declare` and `log`.
 - Since 2026.11.01.24: the installer asks which coding agent(s) will work in the app (a numbered list,
   Claude Code, Cursor, Codex, opencode, Pi; several as `1,5`; Enter keeps the last install's, else Claude Code),
   on a terminal with no `--agent`, before the theme question (`overlay/lib/agents.mjs`). A Pi session had run
@@ -111,7 +116,8 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   - `app-security`: Production security, roles, demo users, row isolation, refusals proven by attempt
   - `spacing-and-layout`: Atlas spacing, one layout, menu per role, Back, signed-in user, icons,
     stacked lists in tabs, totals as tiles, charts 360 px high
-  - `naming-and-captions`: variable names, captions in business words, widgets `<Page>_<What><Type>`
+  - `naming-and-captions`: variable names, a business-words caption on every activity and decision (a self-check
+    before a flow is done), widgets `<Page>_<What><Type>`
   - `module-structure`: which module, the starting folders, `<Module>Ext` for Marketplace changes
   - `reuse-and-snippets`: reuse a microflow, share a page, extract a snippet
   - `files-and-images`: uploads, images, documents, a generated PDF
