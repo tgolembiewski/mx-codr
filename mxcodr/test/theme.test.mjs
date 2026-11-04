@@ -1,5 +1,5 @@
 // The app's look: the theme the installer offers, on a stub app. mxcli is a stub `run` that writes what
-// `mxcli theme create/apply/remove` write (measured on mxcli 0.28.0, probe-v2-theme, and confirmed identical on 0.29.0, 2026-11-01); the real
+// `mxcli theme create/apply/remove` write (measured on mxcli 0.28.0, probe-v2-theme, and confirmed identical on 0.29.0 (2026-11-01) and 0.30.0 (2026-11-04)); the real
 // mxcli run is the end-to-end proof in the README.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,7 +26,7 @@ function stubApp() {
   put(d, 'theme/web/logo.png', 'mendix logo');
   return d;
 }
-// What mxcli 0.28 writes (identical on 0.29.0, 2026-11-01): create scaffolds theme/mxcli-themes/<name>/files/theme/web/_mxcli-<name>.scss,
+// What mxcli 0.28 writes (identical on 0.29.0 and 0.30.0): create scaffolds theme/mxcli-themes/<name>/files/theme/web/_mxcli-<name>.scss,
 // apply copies that partial to theme/web/ (dropping the other theme's), remove deletes the generated files.
 function stubMxcli(app, calls = []) {
   return args => {
