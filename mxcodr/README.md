@@ -1,8 +1,14 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.04.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.30.0** (`PIN`). The design is
+Bundle **2026.11.05.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.30.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.05.2: the harness no longer teaches a form that fails the build with CE0117. `spacing-and-layout`
+  and `durable-tests/reference/mendix-dom.md` no longer show `formatDecimal(x, '#,##0.00')` in a page's text, which is
+  CE0117 there: bind the attribute with `format (decimalPrecision: 2, groupDigits: true)`. `naming-and-captions` adds
+  to its self-check: a non-String `{1}` in `show message`, `log` or `validation feedback`, and `count(...)` inside an
+  expression, both pass `./mxcli check` and fail the build with CE0117. Measured: failing calls with CE0117 fell from
+  21 to 7 over 3+3 runs of the same prompt.
 - Since 2026.11.04.3: pinned to mxcli **0.30.0** (probed 2026-11-04 on a fresh 11.12.1 app: install with the download,
   skill folder names, `init --all-tools`/`--sync-skills` survival, `oql --json` stdout, `run --local` and the theme
   layout are unchanged; the bundle's 36 MDL examples check as on 0.29). `app-security` asks for `./mxcli lint` and a
