@@ -29,7 +29,7 @@ layout only says so. The `tests/mx.ts` helper that relies on a fact is named in 
 | A validation message is not the field's label | a label "Password (12+ characters)" is not the message "at least 12 characters": assert the message the flow sets |
 | An input commits on blur [`fillInput`] | `fill`, then Tab, before a click on Save |
 | A Decimal input shows two decimals | `23.00` for a stored `23` |
-| `formatDecimal(x, '#,##0.00')` on a page | `55,500.00` |
+| A Decimal on a page: `{1} = Total format (decimalPrecision: 2, groupDigits: true)` | two decimals, digits grouped; `formatDecimal(x, '#,##0.00')` there is CE0117 |
 | The Combobox menu is lazy [`pickCombo`] | click `input.widget-combobox-input`, type, then `.widget-combobox-menu li` |
 | `.btn` inside a form or a grid | also matches pager and column-selector buttons: count buttons by `.mx-name-<widget>` |
 

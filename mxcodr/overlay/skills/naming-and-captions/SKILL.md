@@ -5,9 +5,8 @@ description: "Business-readable names and captions: a variable says what it hold
 
 # Naming and captions
 
-A microflow is read in Studio Pro as a diagram, by people who did not write it: they see the variable
-names and the captions on the boxes. This skill makes the flow, and the page, readable from the canvas
-without opening a shape.
+A microflow is read in Studio Pro as a diagram, by people who did not write it: they see the variable names and
+the captions on the boxes. This skill makes the flow, and the page, readable from the canvas without opening a shape.
 
 **Every activity's `@caption` says what the step does for the business (`Record the approval`), never
 Mendix's default (`Change Order`); every decision's `@caption` is the question it answers (`Waiting for
@@ -44,7 +43,10 @@ No lint rule sees activity captions (CONV012 is decisions only). Read the flow b
 "describe microflow Module.Flow"`) and check, line by line: **every statement has an `@caption` line
 directly above it** -- except `return`, `raise error`, the structure (`begin`, `end ...`, `else`, `when`)
 and loops, which take an `@annotation`. One statement without, or with a caption that is the default
-(`Commit $Line`), and the flow is not done: add the caption and read it again. Before, only the `if` had one
+(`Commit $Line`), and the flow is not done: add the caption and read it again. Two more things `./mxcli check`
+passes and the build fails with CE0117: a `{1}` in `show message`, `log` or `validation feedback` that is not a
+String (`with ({1} = toString($LineCount))`, not `$LineCount`), and `count(...)` inside an expression (count
+in its own step, `$LineCount = count $Lines;`, then use the variable). Before, only the `if` had one
 (the canvas showed *Retrieve OrderLine*, *Show message*, *Commit Order*); after:
 
 ```mdl
@@ -70,8 +72,7 @@ Good names are short, unabbreviated, and would make sense to whoever asked for t
 - `$UnpaidCount`, not `$Int1`
 - `$IsAboveApprovalLimit`, not `$Bool2`
 
-Boolean *attributes* follow the same idea with a fixed prefix — `Is`, `Has`, `Can`,
-`Should`, `Was`, `Will` — and lint rule **CONV001** enforces it.
+Boolean *attributes* follow the same idea with a fixed prefix — `Is`, `Has`, `Can`, `Should`, `Was`, `Will` — and lint rule **CONV001** enforces it.
 
 ### Do not restate the type in the name
 
@@ -86,9 +87,8 @@ the same type:
 `$Order` is fine when there is one order in the flow; with two, `$OriginalOrder` and `$ReplacementOrder`
 beat `$Order` and `$Order2`.
 
-When two members take the same new value (`Quantity` and `NetValue` from one change), compute it once
-into a named variable and use the variable in both: repeated arithmetic in one change has read a stale
-value (`8,250.00` for `6,900.00`).
+When two members take the same new value (`Quantity` and `NetValue` from one change), compute it once into a named
+variable and use the variable in both: repeated arithmetic in one change has read a stale value (`8,250.00` for `6,900.00`).
 
 ## Widget names
 

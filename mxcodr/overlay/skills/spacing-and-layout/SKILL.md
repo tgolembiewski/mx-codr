@@ -125,11 +125,11 @@ create or modify page Sales.Customer_NewEdit (
 
 ## Inputs, captions and what is shown
 
-- **A long text gets a text area**, a `textbox` is one line that scrolls sideways and loses line breaks:
-  an attribute over 500 characters or unlimited (a bare `String`), or one named like prose
-  (Description, Notes, Comment, Reason), is edited in a `textarea`.
+- **A long text gets a text area**, a `textbox` is one line that scrolls sideways and loses line breaks: an attribute
+  over 500 characters or unlimited (a bare `String`), or one named like prose (Description, Notes, Comment, Reason), is edited in a `textarea`.
 - **Captions and labels are words**: `Caption: 'Due date'`, never the attribute name `DueDate`.
-- **Money and totals get a pattern**: `formatDecimal($Order/Total, '#,##0.00')` shows `55,500.00`, not `9810`.
+- **Money and totals get a format**: on a page, bind the attribute, `ContentParams: ({1} = Total format (decimalPrecision: 2,
+  groupDigits: true))`. `formatDecimal(x, '#,##0.00')` and a non-String `{1}` are CE0117 in a page's text (fine in a microflow).
 - **A widget nobody can see proves nothing.** No `Visible: false` widgets on a page, and no test reads
   data through one; show it, or drop it and check the data in the test.
 - **A button that sets one status disappears once the object has it** (Send sets Sent, Finish sets
