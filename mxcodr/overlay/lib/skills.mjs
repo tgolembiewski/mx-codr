@@ -9,6 +9,7 @@ export const INSTALLED_SKILLS = [
   'reuse-and-snippets',
   'files-and-images',
   'film-tests',
+  'java-action-docs',
 ];
 // requirements-interview: kept trimmed in the bundle, not installed while run so1 is compared with sk2
 // (sk2 had no such skill; owner decision 2026-10-31).

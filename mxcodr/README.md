@@ -1,8 +1,13 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.05.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.30.0** (`PIN`). The design is
+Bundle **2026.11.08.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.30.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
+- Since 2026.11.08.1: a ninth skill, `java-action-docs`, installed by default. Every Java action the agent creates
+  or changes is documented in the model (what it does, its side effects, what it returns, when it fails; each
+  parameter; the return value's name) and commented in its javasource file (the steps inside the user code, a javadoc
+  on every helper in the extra code). The rule file's skill line names it. Its discovery, effect and negative cases
+  (`test/skill-cases/java-action-docs.mjs`, a real Claude Code turn each) passed.
 - Since 2026.11.05.2: the harness no longer teaches a form that fails the build with CE0117. `spacing-and-layout`
   and `durable-tests/reference/mendix-dom.md` no longer show `formatDecimal(x, '#,##0.00')` in a page's text, which is
   CE0117 there: bind the attribute with `format (decimalPrecision: 2, groupDigits: true)`. `naming-and-captions` adds
@@ -133,6 +138,9 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   - `module-structure`: which module, the starting folders, `<Module>Ext` for Marketplace changes
   - `reuse-and-snippets`: reuse a microflow, share a page, extract a snippet
   - `files-and-images`: uploads, images, documents, a generated PDF
+  - `java-action-docs`: every Java action's documentation, in the model (the action, its parameters, the return
+    value's name, side effects, failures) and in its javasource file (steps in the user code, javadoc on helpers);
+    cases in `test/skill-cases/java-action-docs.mjs` (discovery, effect, negative; a real Claude Code turn each)
   - `film-tests`: lists the tests and films the one the person picks (or all), only when asked
 
   `requirements-interview` is in the bundle but **not installed**; to switch it on, move it from
