@@ -20,7 +20,7 @@ const CODE = /\b(?!(?:CE|SEC|CONV|MPR|QUAL|ARCH|DESIGN|MOD|REU|UI|CUSTOM)\d)[A-Z
 test('the bundle holds the planned skills; requirements-interview is in the repo but not installed by default', () => {
   const names = fs.readdirSync(dir).sort();
   assert.deepEqual(names, [...INSTALLED_SKILLS, ...OPTIONAL_SKILLS].sort());
-  assert.deepEqual([...INSTALLED_SKILLS].sort(), ['app-security', 'durable-tests', 'files-and-images', 'module-structure', 'naming-and-captions', 'reuse-and-snippets', 'spacing-and-layout', 'film-tests'].sort());
+  assert.deepEqual([...INSTALLED_SKILLS].sort(), ['app-security', 'durable-tests', 'files-and-images', 'module-structure', 'naming-and-captions', 'reuse-and-snippets', 'spacing-and-layout', 'film-tests', 'java-action-docs'].sort());
   assert.deepEqual(OPTIONAL_SKILLS, ['requirements-interview']);
   assert.ok(!names.includes('test-first-delivery'));
   // film-tests came back in 2026.11.01.16 on the v2 kit: installed, never removed as retired
