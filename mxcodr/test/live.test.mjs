@@ -210,7 +210,7 @@ test('skillsOff in writeRules and copySkills: the switched-off skill waits in .m
 test("a kept Playwright config gets the Tests tab's reporters (wireTestsTab): the plain kit becomes the live kit, the person's edits stay", async () => {
   const { wireTestsTab, liveKitText } = await import('../overlay/lib/live.mjs');
   const plain = fs.readFileSync(new URL('../overlay/templates/tests/playwright.config.ts', import.meta.url), 'utf8');
-  // the plain kit (an app set up before the live kit edits, MxCodrTMasterMind 2026-11-06): exactly the live kit
+  // the plain kit (an app set up before the live kit edits, a test app, 2026-11-06): exactly the live kit
   const a = wireTestsTab(plain);
   assert.equal(a.changed, true);
   assert.equal(a.text, liveKitText('playwright.config.ts', plain));
@@ -377,6 +377,17 @@ for (const coverage of [false, true]) {
 test('1.75.11 live rule file: script files are written with the Write or Edit tool, never by shell redirection (that asks every time)', () => {
   const t = fs.readFileSync(new URL('../overlay/templates/live.md', import.meta.url), 'utf8');
   assert.match(t, /Create or change files \(`mdlsource\/\*\.mdl`, tests\) with the Write or Edit tool, never with shell redirection,\n  `printf`, `echo >` or heredocs: those ask the person every time\. Write creates the folder too \(no `mkdir`\)\./);
+});
+
+// bundle 2026.11.18.4: Codex, asked to "use Mendix Studio Pro 11.15.0 ... build a working app", created a new Mendix
+// project instead of building in the app open in Studio Pro; nothing said the open app is the only target
+test('live mxcodr-live.md: the app open in Studio Pro is the only app built in; no reach: stop and tell the person', () => {
+  const d = tmp();
+  writeRules(d, ['claude'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  assert.match(lr, /- The app open in Studio Pro is the only app you build in\. Never create another Mendix project or `\.mpr`\n  \(`mxcli new`, a copy of the app, a scratch project\), not even when the request names another Studio Pro version\n  or asks for "a new app": build in this app, and when the request names a different Studio Pro version than this\n  app's \(`\.\/mxcodr-live status` says it\), say so in your summary\./);
+  assert.match(lr, /- When you cannot reach Studio Pro \(`\.\/mxcodr-live status` fails\), stop and tell the person what is wrong \(the\n  pane's checklist, its own instruction word for word\) instead of building elsewhere\./);
+  assert.ok(lr.indexOf('only app you build in') < lr.indexOf('./mxcodr-live exec <script.mdl>'), 'near the top, before how to write a change');
 });
 
 // bundle 2026.11.18.3 (CarFleetCodexSol, Codex): Plan first for the agents that read AGENTS.md, in their words; the

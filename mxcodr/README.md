@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.18.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.18.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,15 @@ Bundle **2026.11.18.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.18.4 (2026-11-18, live mode only; file mode writes what it did): **the open app is the only target**. On a
+  colleague's machine Codex, given a requirements prompt saying "Use Mendix Studio Pro 11.15.0 ... build a working
+  app", created a new Mendix project instead of building in the app open in Studio Pro (cause unconfirmed: likely a
+  version other than the open app's, or the bridge unreachable); nothing in the rules said the open app is the only
+  one. `templates/live.md` opens its list with two bullets: never another Mendix project or `.mpr` (`mxcli new`, a
+  copy, a scratch project), not even for another Studio Pro version or "a new app" (a different version is named in
+  the summary); when `./mxcodr-live status` cannot reach Studio Pro, stop and tell the person instead of building
+  elsewhere. Codex and Pi get it through the live block in AGENTS.md. Tests: `live.test.mjs` (the installed
+  `mxcodr-live.md`) and the extension's setup test (the AGENTS.md live block with Codex); both fail on 2026.11.18.3.
 - 2026.11.18.3 (2026-11-18, live mode only; file mode writes what it did): **Plan first for Codex, Pi and Copilot**.
   Measured in a Codex session from the pane (CarFleetCodexSol, Plan first on): the rule reached only Claude Code
   (`.claude/rules/mxcodr-plan.md`, naming EnterPlanMode/ExitPlanMode); Codex wrote the model within a minute, no plan.
@@ -221,7 +230,7 @@ Bundle **2026.11.18.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
 - 2026.11.15.2 (2026-11-15): the live rule (`overlay/templates/live.md`) says corners and fonts go through Atlas's
   variables (`var(--btn-border-radius)`, `var(--border-radius-default)`, `var(--font-family-base)`), as colours
   already did: an app rule `.region-content .btn { border-radius: 8px }` kept the Look tab's corners off every
-  button (owner report, MxCodrTMasterMind). The `slight` corners knob is 4px/6px, what the stock themes ship
+  button (owner report, a test app). The `slight` corners knob is 4px/6px, what the stock themes ship
   (`overlay/lib/theme.mjs`, `KNOBS`; was 4px/8px).
 - 2026.11.15.1 (2026-11-15): the `app-docs` skill (installed always since 2026-11-15) with template v4, whose
   data-model drawing uses Studio Pro's domain-model colours and notation (see `app-docs` below); the bump makes an

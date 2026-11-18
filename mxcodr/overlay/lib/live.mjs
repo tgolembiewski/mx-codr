@@ -44,7 +44,7 @@ export const SKILL_EDITS = {
     ['one worker, the whole suite early;', 'one worker, the affected tests early (the full suite when the person asks);'],
     ['2. **Run the whole suite once, shuffled**: `npx playwright test --shuffle` in `tests/`, in the foreground,\n   with a tool timeout longer than the run. Show its output passing, with `sessions left: 0` as its last\n   line; the random order proves the tests do not depend on order. If a test stays red, say which and why.',
       '2. **Run the affected tests**: `./mxcodr-live tests affected`, in the foreground, with a tool timeout longer\n   than the run. Show its last line, `affected: N run, N passed, 0 failed (M not selected)`, and `sessions left: 0`\n   (or `unknown`) above it; `tests status` shows the latest result of every test across runs, not this run. If a\n   test stays red, say which and why. Then propose the full suite with the line it prints; never start it unasked.'],
-    // while working: only the test being worked on, never whole files (MxCodrTMasterMind 2026-11-06: after a green
+    // while working: only the test being worked on, never whole files (a test app, 2026-11-06: after a green
     // tests affected, `npx playwright test mastermind.spec.ts settings.spec.ts` ran 20 tests, 62 s, unasked)
     ['Run one spec file while you work on it (`npx playwright test orders.spec.ts` in `tests/`). ',
       'While you work on a test, run only that test (`./mxcodr-live tests run orders.spec.ts:42`, or `--grep \'<its title>\'`):\nit deploys a changed model first and lists each failure with its error and screenshot. Never a whole spec file or\nseveral; once `./mxcodr-live tests affected` is green, run nothing broader unless the person asks. '],
@@ -160,7 +160,7 @@ export const liveFilmText = text => apply(text, FILM_EDITS, 'templates/film.mjs'
 // and replaces it only while its text is one mx-codr shipped (lib/kit-shipped.json), so an app whose
 // tests/playwright.config.ts was written before KIT_EDITS existed (or in file mode) and then edited kept a config
 // without them: the agent's own `npx playwright test` then wrote nothing the tab reads, and the tab showed
-// a new spec as not run after the agent had run it green (MxCodrTMasterMind, 2026-11-06). Live setup wires them in:
+// a new spec as not run after the agent had run it green (a test app, 2026-11-06). Live setup wires them in:
 //   - the kit's anchors are there (the plain kit, or the kit with the person's or agent's own changes elsewhere):
 //     KIT_EDITS' import and reporter edits, the screenshot edit when its anchor is there too; the plain kit becomes
 //     exactly the live kit text;

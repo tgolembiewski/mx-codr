@@ -9,7 +9,7 @@ starter Playwright test kit. One thing runs while the agent builds, in Claude Co
 has read the project skill for it whole. `MXCODR_SKILL_GATE=0` switches it off. There is no other gate and
 no other refusal.
 
-The bundle is **2026.11.18.3**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.32.0.
+The bundle is **2026.11.18.4**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.32.0.
 
 ## What you get
 
