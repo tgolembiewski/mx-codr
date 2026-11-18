@@ -202,3 +202,66 @@ test('the installer takes --theme and --yes, records the theme, and installs the
   assert.match(src, /installThemeTool\(app\)/);
   assert.match(fs.readFileSync(fileURLToPath(new URL('../install.sh', import.meta.url)), 'utf8'), /--theme <name>\] \[--yes\]/);
 });
+
+// ---- live.36: the Look tab's knobs make a theme "custom" from tokens only (no CSS of ours) ----------------------
+import { customTokens, customSkin, makeCustom, KNOBS } from '../overlay/lib/theme.mjs';
+const tokensOf = text => Object.fromEntries([...text.matchAll(/--mxt-([a-z-]+):\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
+const darkOf = text => tokensOf(text.slice(text.indexOf('@media (prefers-color-scheme: dark)')));
+const lightOf = text => tokensOf(text.slice(0, text.indexOf('@media (prefers-color-scheme: dark)')));
+
+test('custom tokens: the base theme\'s palette with the brand colour and its derived tones, the radius and the font; only --mxt-* tokens the base declares', () => {
+  const css = customTokens({ base: 'navy', brand: '#7f5af0', radius: 'round', font: 'system' });
+  const base = fs.readFileSync(path.join(THEMES_DIR, 'navy.css'), 'utf8');
+  const l = lightOf(css), d = darkOf(css);
+  assert.equal(l.brand, '#7f5af0');
+  assert.equal(l['brand-hover'], '#6346bb', 'hover: the brand 22% towards black, as the catalog does');
+  assert.equal(l['brand-ink'], '#ffffff');
+  assert.equal(l['surface-selected'], '#f0ebfd', 'a tint: 88% towards white');
+  assert.equal(d.brand, '#b9a4f7', 'dark: the brand 45% towards white');
+  assert.equal(l.radius, KNOBS.radius.round[0]);
+  assert.equal(l['radius-lg'], KNOBS.radius.round[1]);
+  assert.equal(l.font, KNOBS.font.system.value);
+  for (const k of Object.keys({ ...l, ...d })) assert.ok(SIGNAL_TOKENS.includes(k), `--mxt-${k} is one of mxcli's tokens`);
+  assert.equal(l.ground, lightOf(base).ground, 'the rest of the palette is the base theme\'s');
+  assert.doesNotMatch(css, /[{;]\s*(?!--mxt-)[a-z-]+\s*:/, 'nothing but --mxt-* declarations');
+  assert.equal(lightOf(customTokens({ base: 'navy', brand: '#f5d90a' }))['brand-ink'], '#14202e', 'a light brand gets dark text');
+  assert.throws(() => customTokens({ base: 'navy', brand: 'red' }), /#rrggbb/);
+  assert.throws(() => customTokens({ base: 'atlas', brand: '#123456' }), /base/);
+});
+const SIGNAL_TOKENS = ['brand', 'brand-hover', 'brand-ink', 'control-height', 'danger', 'focus-halo', 'font', 'font-heading', 'font-mono', 'font-size', 'ground', 'info', 'ink', 'ink-faint', 'ink-muted', 'line', 'line-height', 'radius', 'radius-lg', 'rail', 'rail-ink', 'rail-ink-active', 'rail-line', 'row-height', 'shadow', 'success', 'surface', 'surface-alt', 'surface-hover', 'surface-selected', 'tint-info', 'tint-neutral', 'tint-ok', 'tint-risk', 'tint-warn', 'tone-info', 'tone-ok', 'tone-risk', 'tone-warn', 'warning'];
+
+test('custom frame: the base theme\'s frame with only its Atlas variables\' colours changed', () => {
+  const skin = customSkin({ base: 'teal', brand: '#7f5af0' });
+  const base = fs.readFileSync(path.join(THEMES_DIR, 'teal.skin.scss'), 'utf8');
+  assert.match(skin, /--navtopbar-bg: #59... ?;|--navtopbar-bg: #[0-9a-f]{6};/);
+  assert.doesNotMatch(skin, /#0c6766|#14595a/, 'the base colours replaced');
+  assert.equal(skin.replace(/#[0-9a-f]{6}/g, '#x'), base.replace(/#[0-9a-f]{6}/g, '#x').replace(/teal/g, 'custom'), 'same rules, colours only');
+});
+
+test('makeCustom: create (or --force over an earlier custom), its frame, apply with the chosen variant; theme/ only', () => {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-custom-'));
+  const calls = [];
+  const partial = path.join(app, 'theme', 'mxcli-themes', 'custom', 'files', 'theme', 'web', '_mxcli-custom.scss');
+  const run = args => {
+    calls.push(args.join(' '));
+    if (args[1] === 'create') { fs.mkdirSync(path.dirname(partial), { recursive: true }); fs.writeFileSync(partial, '// scaffold\n'); }
+    return { status: 0, stdout: '', stderr: '' };
+  };
+  const dir = path.join(app, '.mxcodr', 'look');
+  let r = makeCustom({ app, mpr: 'A.mpr', run, dir, knobs: { base: 'navy', brand: '#7f5af0', radius: 'slight', font: 'plex', variant: 'dark' } });
+  assert.equal(r.ok, true, r.line);
+  assert.match(calls[0], /^theme create custom -p A\.mpr --from .*custom\.css --base signal$/);
+  assert.equal(calls[1], 'theme apply custom -p A.mpr --variant dark');
+  assert.match(fs.readFileSync(partial, 'utf8'), /mx-codr frame for/);
+  r = makeCustom({ app, mpr: 'A.mpr', run, dir, knobs: { base: 'navy', brand: '#123456', radius: 'sharp', font: 'open', variant: 'light' } });
+  assert.match(calls[2], /--force$/, 're-editing overwrites the earlier custom');
+});
+
+test('applyTheme passes the variant (light by default, as file mode)', () => {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-variant-'));
+  const calls = [];
+  const partial = path.join(app, 'theme', 'mxcli-themes', 'teal', 'files', 'theme', 'web', '_mxcli-teal.scss');
+  const run = args => { calls.push(args.join(' ')); if (args[1] === 'create') { fs.mkdirSync(path.dirname(partial), { recursive: true }); fs.writeFileSync(partial, '// s\n'); } return { status: 0 }; };
+  applyTheme({ app, mpr: 'A.mpr', choice: { name: 'teal', how: 'flag', variant: 'auto' }, run });
+  assert.equal(calls.at(-1), 'theme apply teal -p A.mpr --variant auto');
+});

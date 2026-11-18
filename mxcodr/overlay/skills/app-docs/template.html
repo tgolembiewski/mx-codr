@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!-- app-docs template v4 (skill app-docs): an engineering handbook page. Replace every {{...}}; keep ids, classes, data-src, data-hash.
+     Layout: every <section class="page"> is a two-column grid. Children go to the text column; .margin goes to the left margin
+     column (short facts: a URL, the demo users, the constants); .wide and h2 span both. h2 holds <span class="no">N</span> and the title.
+     Diagram: <figure class="drawing wide"><div class="sheet"><svg>…</svg></div><div class="titleblock">…<div class="keycell"><b>Key</b><div class="key">samples</div></div></div></figure>.
+       Studio Pro's domain-model colours (the --dm-* tokens). Per entity (box at x,y): rect.box (+np|ext) rx 3; line.hd
+       (+np|ext) from x to x+200 at y+26; the icon rect.ico (+np) x+8 y+6 14x14 rx 2 with text.ico (+np) "e" at x+15 y+17;
+       text.name (+np|ext) at x+28 y+18; attribute lines "Name (Type)" text.attr (+np|ext) from y+42 every 16
+       (text.attr.note for "temporary", "uploaded picture", "login account"). A generalization: rect.gen 14 high just
+       above the box (y-17) with text.gen (e.g. System.Image) at y-7. line.assoc / polyline.assoc; each end a circle.mult
+       r 7 on the line 12 from the box with text.mult ("1" / "*") at its centre; the association name text.label in a
+       rect.label (red border) above the middle of the line; text.caption (a group heading).
+     Element links: every Mendix name (entity, microflow, nanoflow, page, snippet, enumeration, module role) is
+       <a class="mx" href="#" data-mx="Module.Name" data-kind="entity|microflow|nanoflow|page|snippet|enumeration|role"><code>Name</code></a>;
+       in the drawing the entity's name: <a class="mx" href="#" data-mx="Module.Entity" data-kind="entity"><text class="name">…</text></a>.
+       The mx-codr panel opens them in Studio Pro; in a plain browser a click does nothing.
+     Things to know: <ol class="known">. Where to start: <table class="path">. Status: <td class="built">built</td>, <td class="planned">not built</td>.
+     Scripts: two inline scripts (head: apply the stored theme before paint; end of body: the theme switch and the element links).
+     Copy them byte for byte: the panel runs only these two. The logo SVG is the mx-codr mark; keep it exact. -->
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="mxcodr-docs" content='{{fingerprint JSON, one line}}'>
+<title>{{App title}} · {{App documentation}}</title>
+<script>/* reader's theme choice, applied before paint */(function(){try{var t=localStorage.getItem("mxcodr-docs-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Red+Hat+Mono:wght@400;500&display=swap">
+<style>
+/* Design plan (v3): an engineering handbook for one app. A printed reference page: section numbers and margin notes in a
+   left column, running text at 65ch, the domain model as a full-width drawing sheet on a fine grid with a title block.
+   Rules and whitespace structure it; no cards, chips or pills. Barlow Condensed for heads and the drawing, Source Serif 4
+   for text, Red Hat Mono for every Mendix name. Six colour tokens, one accent (the logo blue, darker and greyer);
+   boldness is spent once, on the drawing. */
+:root {
+  color-scheme: light;
+  --paper: #f6f7f9; --ink: #18202b; --quiet: #556070; --rule: #c5ccd6; --accent: #2c5d98; --sheet: #ffffff;
+  --band-ink: #ffffff; --grid: #e6eaf0; --ok: #2d6a45; --warn: #8a5512;
+  /* the drawing: Studio Pro's domain-model editor (light theme): indigo entities, amber temporary ones, a blue
+     generalization tag, grey links with circled ends, association names in red-bordered boxes */
+  --dm-ent: #4b4fd6; --dm-ent-fill: #ecebfb; --dm-ent-ink: #1d2140; --dm-np: #c08a1e; --dm-np-fill: #fdf5dc; --dm-np-ink: #3a2e10;
+  --dm-gen: #5b8def; --dm-gen-ink: #0f1420; --dm-line: #7d8590; --dm-red: #d9534f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #15181d; --ink: #dfe4ea; --quiet: #9ba6b4; --rule: #39424e; --accent: #8db3e2;
+    --sheet: #1b1f26; --band-ink: #0f141b; --grid: #232933; --ok: #7fc398; --warn: #dcaa5e;
+    --dm-ent: #4b4fd6; --dm-ent-fill: #2b2f52; --dm-ent-ink: #e6e8f7; --dm-np: #d4a23c; --dm-np-fill: #4a4430; --dm-np-ink: #f3ead2;
+    --dm-gen: #5b8def; --dm-gen-ink: #0f1420; --dm-line: #8a919c; --dm-red: #d9534f;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #15181d; --ink: #dfe4ea; --quiet: #9ba6b4; --rule: #39424e; --accent: #8db3e2;
+  --sheet: #1b1f26; --band-ink: #0f141b; --grid: #232933; --ok: #7fc398; --warn: #dcaa5e;
+    --dm-ent: #4b4fd6; --dm-ent-fill: #2b2f52; --dm-ent-ink: #e6e8f7; --dm-np: #d4a23c; --dm-np-fill: #4a4430; --dm-np-ink: #f3ead2;
+    --dm-gen: #5b8def; --dm-gen-ink: #0f1420; --dm-line: #8a919c; --dm-red: #d9534f;
+}
+html { background: var(--paper); }
+body { background: var(--paper); color: var(--ink); margin: 0; font: 16.5px/1.6 "Source Serif 4", Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif; }
+.display, h1, h2, h3, nav.toc, th, .titleblock { font-family: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif; }
+code, .mono { font-family: "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .86em; } code { overflow-wrap: anywhere; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+/* element links: quiet in the text, the accent on hover; in the drawing the name keeps its band colour */
+a.mx { color: inherit; text-decoration: underline dotted 1px; text-decoration-color: var(--quiet); text-underline-offset: 3px; }
+a.mx:hover, a.mx:focus-visible { color: var(--accent); text-decoration-style: solid; text-decoration-color: var(--accent); }
+svg a.mx { text-decoration: none; } svg a.mx:hover .name, svg a.mx:focus-visible .name { text-decoration: underline; }
+/* page: margin column + text column */
+main { max-width: 1060px; margin: 0 auto; padding: 28px 24px 64px; } .page { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); column-gap: 28px; }
+.page > * { grid-column: 2; min-width: 0; } .page > .wide, .page > h2 { grid-column: 1 / -1; }
+.margin { grid-column: 1; color: var(--quiet); font-size: 13.5px; line-height: 1.45; } p, li { max-width: 65ch; }
+/* header */
+.top { border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 8px; }
+.brand { display: flex; align-items: center; gap: 7px; font: 500 13px/1 "Red Hat Mono", ui-monospace, Menlo, monospace; color: var(--quiet); }
+.brand svg { width: 20px; height: 20px; } h1 { font-size: 46px; font-weight: 600; line-height: 1.02; letter-spacing: .005em; margin: 18px 0 2px; text-wrap: balance; }
+.kind { font: 500 18px/1.2 "Barlow Condensed", "Arial Narrow", sans-serif; color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 12px; }
+.lead { font-size: 18px; margin: 0 0 10px; } .meta { color: var(--quiet); font-size: 13.5px; margin: 0; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 12px; font-size: 17px; font-weight: 500; }
+nav.toc a { color: var(--ink); text-decoration: none; } nav.toc a span { color: var(--accent); margin-right: 5px; }
+/* sections: number in the margin, head on a rule */
+h2 { grid-column: 1 / -1; display: grid; grid-template-columns: 8.5rem 1fr; column-gap: 28px; align-items: baseline;
+  font-size: 30px; font-weight: 600; line-height: 1.1; margin: 52px 0 12px; padding-top: 10px; border-top: 1px solid var(--rule); text-wrap: balance; }
+h2 .no { color: var(--accent); font-variant-numeric: tabular-nums; }
+h3 { font-size: 20px; font-weight: 600; margin: 26px 0 4px; text-wrap: balance; } h3 + p { margin-top: 0; }
+/* tables: hairlines only */
+table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--quiet); padding: 4px 10px 4px 0; border-bottom: 1px solid var(--ink); }
+td { vertical-align: top; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--rule); } td:first-child code { white-space: nowrap; overflow-wrap: normal; }
+@media (max-width: 720px) {
+  .page { grid-template-columns: minmax(0, 1fr); } .page > *, .margin, .page > .wide, .page > h2 { grid-column: 1; }
+  h2 { grid-template-columns: 2.4rem 1fr; column-gap: 8px; font-size: 26px; } h1 { font-size: 36px; } table { display: block; overflow-x: auto; }
+}
+/* the drawing: the one bold element */
+figure.drawing { margin: 10px 0 6px; }
+.sheet { background-color: var(--sheet); border: 1.5px solid var(--ink); padding: 10px; overflow-x: auto; background-size: 20px 20px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); }
+.sheet svg { display: block; width: 100%; height: auto; min-width: 620px; }
+svg .box { fill: var(--dm-ent-fill); stroke: var(--dm-ent); stroke-width: 1.5; } svg .box.np { fill: var(--dm-np-fill); stroke: var(--dm-np); }
+svg .box.ext { fill: var(--sheet); stroke: var(--quiet); stroke-dasharray: 2 3; }
+svg .hd { stroke: var(--dm-ent); stroke-width: 1; } svg .hd.np { stroke: var(--dm-np); } svg .hd.ext { stroke: var(--quiet); stroke-dasharray: 2 3; }
+svg rect.ico { fill: var(--dm-ent); } svg rect.ico.np { fill: none; stroke: var(--dm-np); stroke-width: 1.3; stroke-dasharray: 3 2; }
+svg text.ico { fill: #ffffff; font: 600 11px "Red Hat Mono", ui-monospace, Menlo, monospace; text-anchor: middle; } svg text.ico.np { fill: var(--dm-np-ink); }
+svg .name { fill: var(--dm-ent-ink); font: 600 15px "Barlow Condensed", "Arial Narrow", sans-serif; letter-spacing: .02em; } svg .name.np { fill: var(--dm-np-ink); } svg .name.ext { fill: var(--ink); }
+svg .attr { fill: var(--dm-ent-ink); letter-spacing: -.15px; font: 10px "Red Hat Mono", ui-monospace, Menlo, monospace; } svg .attr.np { fill: var(--dm-np-ink); } svg .attr.ext { fill: var(--ink); }
+svg .attr.note { opacity: .78; font-style: italic; }
+svg rect.gen { fill: var(--dm-gen); } svg text.gen { fill: var(--dm-gen-ink); font: 500 9.5px "Red Hat Mono", ui-monospace, Menlo, monospace; }
+svg .assoc { stroke: var(--dm-line); stroke-width: 1.2; fill: none; }
+svg circle.mult { fill: var(--sheet); stroke: var(--dm-line); stroke-width: 1.1; } svg text.mult { fill: var(--ink); font: 600 10px "Red Hat Mono", ui-monospace, Menlo, monospace; text-anchor: middle; }
+svg rect.label { fill: var(--sheet); stroke: var(--dm-red); stroke-width: 1; } svg text.label { fill: var(--ink); font: 9.5px "Red Hat Mono", ui-monospace, Menlo, monospace; text-anchor: middle; }
+svg .caption { fill: var(--quiet); font: 600 12px "Barlow Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+.titleblock { display: grid; grid-template-columns: auto auto auto auto minmax(0, 1fr); justify-content: start; border: 1.5px solid var(--ink); border-top: 0; font-size: 14px; }
+.titleblock div { padding: 3px 14px 4px 8px; border-right: 1px solid var(--rule); } .titleblock div:last-child, .titleblock .keycell { border-right: 0; }
+.titleblock b { display: block; font-weight: 500; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--quiet); }
+.legend { color: var(--quiet); font-size: 14px; margin: 8px 0 0; }
+/* key: a cell of the title block, inside the drawing's border; samples use the drawing's own classes */
+.key { display: flex; flex-wrap: wrap; gap: 3px 18px; align-items: center; font-size: 14px; color: var(--ink); }
+.key div { display: flex; align-items: center; gap: 6px; padding: 0; border: 0; }
+.key svg { width: 34px; height: 20px; flex-shrink: 0; overflow: visible; } .key svg.wide-key { width: 72px; height: 30px; margin: -5px 0; }
+@media (max-width: 900px) { .titleblock { grid-template-columns: repeat(4, auto) 1fr; } .titleblock .keycell { grid-column: 1 / -1; border-top: 1px solid var(--rule); } }
+@media (max-width: 560px) { .titleblock { grid-template-columns: 1fr 1fr; } .titleblock div:nth-child(2n) { border-right: 0; } .titleblock > div { border-bottom: 1px solid var(--rule); } .key { flex-direction: column; align-items: flex-start; } }
+/* things to know: one ruled block; where to start: the reading path as a table */
+ol.known { list-style: none; padding: 0 0 0 16px; margin: 6px 0; border-left: 3px solid var(--warn); counter-reset: k; }
+ol.known li { counter-increment: k; padding: 7px 0 8px; border-bottom: 1px solid var(--rule); } ol.known li:last-child { border-bottom: 0; }
+ol.known li::before { content: counter(k) "  "; font: 500 13px "Red Hat Mono", ui-monospace, monospace; color: var(--warn); }
+table.path td:first-child { width: 2.2em; font: 500 14px "Red Hat Mono", ui-monospace, monospace; color: var(--accent); } table.path td:nth-child(2) { width: 36%; }
+.built { color: var(--ok); font-style: italic; white-space: nowrap; } .planned { color: var(--warn); font-style: italic; white-space: nowrap; }
+footer { margin-top: 48px; color: var(--quiet); font-size: 13.5px; border-top: 1px solid var(--rule); padding-top: 10px; }
+/* theme switch: the reader's override; System removes data-theme */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.theme { display: flex; align-items: baseline; gap: 2px; font: 500 12.5px/1 "Red Hat Mono", ui-monospace, Menlo, monospace; color: var(--quiet); } .theme span { margin-right: 6px; }
+.theme button { font: inherit; color: var(--quiet); background: none; border: 0; border-bottom: 2px solid transparent; padding: 3px 5px 1px; cursor: pointer; } .theme button:hover { color: var(--ink); }
+.theme button[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent); } .theme button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* print (Save as PDF): always the light theme, no theme switch, a section per page, the drawing never split, names plain */
+@media print {
+  :root, :root[data-theme="dark"], :root:not([data-theme="light"]) { color-scheme: light; --paper: #ffffff; --ink: #18202b; --quiet: #556070; --rule: #c5ccd6; --accent: #2c5d98; --sheet: #ffffff; --band-ink: #ffffff; --grid: #e6eaf0; --ok: #2d6a45; --warn: #8a5512;
+    --dm-ent: #4b4fd6; --dm-ent-fill: #ecebfb; --dm-ent-ink: #1d2140; --dm-np: #c08a1e; --dm-np-fill: #fdf5dc; --dm-np-ink: #3a2e10; --dm-gen: #5b8def; --dm-gen-ink: #0f1420; --dm-line: #7d8590; --dm-red: #d9534f; }
+  html, body { background: #ffffff; } main { max-width: none; padding: 0; } .theme { display: none; }
+  main > section.page ~ section.page { break-before: page; } h2, h3 { break-after: avoid; }
+  figure.drawing, .sheet, .titleblock, tr, ol.known li { break-inside: avoid; } .sheet { overflow: visible; } .sheet svg { min-width: 0; }
+  a.mx, a.mx:hover { color: inherit; text-decoration: none; } nav.toc a { text-decoration: none; }
+}
+</style>
+</head>
+<body>
+<main>
+<header class="top" data-src="app" data-hash="{{app hash}}">
+  <div class="topbar"><div class="brand"><svg aria-hidden="true" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#2f3a4a"></rect><path d="M9 21 L20 32 L9 43" fill="none" stroke="#7fb6ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path><path d="M53.8 24.6 A11.5 11.5 0 1 0 53.8 39.4" fill="none" stroke="#ffffff" stroke-width="8.5"></path></svg><span>mx-codr</span></div><div class="theme" role="group" aria-label="Colour theme"><span>theme</span><button type="button" data-set="system" aria-pressed="false">System</button><button type="button" data-set="light" aria-pressed="false">Light</button><button type="button" data-set="dark" aria-pressed="false">Dark</button></div></div>
+  <h1>{{App title}}</h1>
+  <p class="kind">{{App documentation}}</p>
+  <p class="lead">{{Two or three short sentences: what the app does and for whom.}}</p>
+  <p class="meta">{{Generated}} {{date}} {{from the model with}} mxcli {{version}}, Mendix {{version}}. {{Do not edit by hand.}}</p>
+  <nav class="toc"><a href="#model"><span>1</span>{{Data model}}</a><a href="#build"><span>2</span>{{How it is built}}</a><a href="#known"><span>3</span>{{Things to know}}</a><a href="#start"><span>4</span>{{Where to start}}</a><a href="#reqs"><span>5</span>{{Requirements}}</a></nav>
+</header>
+<section id="model" class="page">
+  <h2><span class="no">1</span>{{Data model}}</h2>
+  <section id="model-{{Module}}" class="page wide" data-src="module:{{Module}}" data-hash="{{module hash}}">
+    <h3>{{Module}}</h3>
+    <p class="margin">{{one short fact about the module}}</p>
+    <figure class="drawing wide">
+      <div class="sheet">{{inline svg}}</div>
+      <div class="titleblock"><div><b>{{Drawing}}</b>{{Module}} {{domain model}}</div><div><b>{{Entities}}</b>{{n (n stored)}}</div><div><b>{{Associations}}</b>{{n}}</div><div><b>{{Sheet}}</b>{{1 of 1}}</div><div class="keycell"><b>{{Key}}</b><div class="key" role="group" aria-label="{{Key to the drawing}}"><div><svg viewBox="0 0 60 36" aria-hidden="true"><rect class="box" x="2" y="2" width="56" height="32" rx="3"/><line class="hd" x1="2" y1="13" x2="58" y2="13"/><rect class="ico" x="5" y="4" width="7" height="7" rx="1"/></svg><span>{{Saved in the database}}</span></div><div><svg viewBox="0 0 60 36" aria-hidden="true"><rect class="box np" x="2" y="2" width="56" height="32" rx="3"/><line class="hd np" x1="2" y1="13" x2="58" y2="13"/><rect class="ico np" x="5" y="4" width="7" height="7" rx="1"/></svg><span>{{Temporary, only while a page is open}}</span></div><div><svg viewBox="0 0 60 36" aria-hidden="true"><rect class="gen" x="2" y="0" width="34" height="8" rx="1.5"/><rect class="box" x="2" y="10" width="56" height="25" rx="3"/><line class="hd" x1="2" y1="19" x2="58" y2="19"/></svg><span>{{Image file (uploaded picture)}}</span></div><div><svg class="wide-key" viewBox="0 0 86 36" aria-hidden="true"><line class="assoc" x1="2" y1="22" x2="84" y2="22"/><circle class="mult" cx="10" cy="22" r="7"/><text class="mult" x="10" y="25.5">1</text><circle class="mult" cx="76" cy="22" r="7"/><text class="mult" x="76" y="25.5">*</text><rect class="label" x="26" y="6" width="34" height="10" rx="2"/></svg><span>{{one A has many B, with real names}}</span></div></div></div></div></div>
+    </figure>
+    <p>{{What deleting takes with it, and what the app refuses to delete, in plain sentences.}}</p>
+    <table><tr><th>{{Entity}}</th><th>{{What it holds}}</th><th>{{Key attributes}}</th><th>{{Who can see it}}</th></tr></table>
+  </section>
+  <p>{{Marketplace modules, one line.}}</p>
+</section>
+<section id="build" class="page" data-src="all" data-hash="{{overall}}">
+  <h2><span class="no">2</span>{{How it is built}}</h2>
+</section>
+<section id="known" class="page" data-src="all" data-hash="{{overall}}">
+  <h2><span class="no">3</span>{{Things to know}}</h2>
+  <ol class="known"><li>{{one point}}</li></ol>
+</section>
+<section id="start" class="page" data-src="all" data-hash="{{overall}}">
+  <h2><span class="no">4</span>{{Where to start}}</h2>
+  <table class="path"><tr><th>#</th><th>{{Open}}</th><th>{{Why}}</th></tr></table>
+  <h3>{{Where to change}}</h3>
+  <table><tr><th>{{To change}}</th><th>{{Edit}}</th></tr></table>
+</section>
+<section id="reqs" class="page" data-src="brain" data-hash="{{brain hash}}">
+  <h2><span class="no">5</span>{{Requirements}}</h2>
+  <table><tr><th>{{Req.}}</th><th>{{Requirement}}</th><th>{{Built in}}</th><th>{{Status}}</th></tr></table>
+</section>
+<footer>{{language chosen and why}}. {{Fingerprint}} <span class="mono">{{overall}}</span>.</footer>
+</main>
+<script>/* theme switch and element links (the mx-codr panel opens a.mx in Studio Pro; alone, a click does nothing) */(function(){var r=document.documentElement,b=document.querySelectorAll(".theme button"),up=window.parent!==window;function show(){var t=r.getAttribute("data-theme")||"system";b.forEach(function(x){x.setAttribute("aria-pressed",String(x.dataset.set===t));});}b.forEach(function(x){x.addEventListener("click",function(){var t=x.dataset.set;if(t==="system")r.removeAttribute("data-theme");else r.setAttribute("data-theme",t);try{if(t==="system")localStorage.removeItem("mxcodr-docs-theme");else localStorage.setItem("mxcodr-docs-theme",t);}catch(e){}if(up)window.parent.postMessage({mxcodrDocs:"theme",theme:t},"*");show();});});document.addEventListener("click",function(e){var h=e.target&&e.target.closest?e.target.closest("a[href^='#']"):null,a=h&&h.closest("a.mx"),id=h&&!a&&h.getAttribute("href").slice(1),g=id&&document.getElementById(id);if(g){e.preventDefault();g.scrollIntoView();}if(!a)return;e.preventDefault();if(up)window.parent.postMessage({mxcodrDocs:"open",name:a.getAttribute("data-mx"),kind:a.getAttribute("data-kind")},"*");});show();})();</script>
+</body>
+</html>

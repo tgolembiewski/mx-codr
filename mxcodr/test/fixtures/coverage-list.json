@@ -1,0 +1,200 @@
+{
+  "config": {
+    "rootDir": "<app>/tests"
+  },
+  "suites": [
+    {
+      "title": "invoices.spec.ts",
+      "file": "invoices.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "[R1] a customer sees only its own invoices (not written yet)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "location": {
+                    "file": "<app>/tests/invoices.spec.ts",
+                    "line": 3,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf10ff72eb560ee5dde5-15568961051355f248fd",
+          "file": "invoices.spec.ts",
+          "line": 3,
+          "column": 6
+        },
+        {
+          "title": "[R8] a tag that names no requirement",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf10ff72eb560ee5dde5-d578a78da0a05b91bb22",
+          "file": "invoices.spec.ts",
+          "line": 18,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "[R2] the Customers list",
+          "file": "invoices.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "is refused to a customer",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "bf10ff72eb560ee5dde5-47c73a2af9e75f5cc78e",
+              "file": "invoices.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "is refused to a clerk",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "bf10ff72eb560ee5dde5-0d169b6698497795a8e7",
+              "file": "invoices.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "opens for a manager",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "bf10ff72eb560ee5dde5-3d6a378794b947948830",
+              "file": "invoices.spec.ts",
+              "line": 9,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "invoices",
+          "file": "invoices.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "totals",
+              "file": "invoices.spec.ts",
+              "line": 13,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "[R3][R4] the manager dashboard shows the total in EUR",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 90000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "",
+                      "projectName": "",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "bf10ff72eb560ee5dde5-921719cd91ba72d231ac",
+                  "file": "invoices.spec.ts",
+                  "line": 14,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "seed.spec.ts",
+      "file": "seed.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "startup runs twice without a second seed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "11ceb7af692008938f3b-4c3299dd96ddc5731765",
+          "file": "seed.spec.ts",
+          "line": 3,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

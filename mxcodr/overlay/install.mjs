@@ -1,27 +1,36 @@
 // The mx-codr installer (harness v2, skills only). install.sh runs it from the bundle:
-//   node overlay/install.mjs <app folder> [--db hsqldb|postgres] [--agent claude,cursor,codex,opencode,pi] [--remove-agent <name>] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
+//   node overlay/install.mjs <app folder> [--db hsqldb|postgres] [--agent claude,cursor,codex,opencode,pi] [--remove-agent <name>] [--coverage | --no-coverage] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
 // A folder with no .mpr first gets a new Mendix app (mxcli new; MX_VERSION, APP_NAME), unless --no-app.
-// It installs nothing that runs while the agent builds: the pinned mxcli, MxBuild and the runtime cached,
+// It installs one thing that runs while the agent builds, Claude Code's skill gate (lib/skill-gate.mjs: hooks in
+// .claude/settings.local.json that refuse a model write or a test file until its project skill was read), and: the pinned mxcli, MxBuild and the runtime cached,
 // the database chosen, mxcli's own skills refreshed, one always-on rule file per agent (asked on a terminal,
 // --agent adds one to the last install's, --remove-agent takes one out), our skills beside
-// mxcli's, a starter test kit in tests/ (only the files that are absent), tests/film.mjs (always), the app's look when one is chosen (theme/ only),
-// .mxcodr/theme.mjs to change it later, and .mxcodr/installed.json (+ .mxcodr/bin/mxcli when it had to download mxcli). Run it again to
+// mxcli's, a starter test kit in tests/ (absent files, and files unedited since an earlier install), tests/film.mjs (always), the app's look when one is chosen (theme/ only),
+// .mxcodr/theme.mjs to change it later, and .mxcodr/installed.json (+ .mxcodr/bin/mxcli when it had to download mxcli).
+// With coverage on (asked on a terminal, or --coverage) the agent is held to a test per numbered requirement:
+// lib/coverage.mjs says what changes; off installs exactly what it did before. Run it again to
 // repair or upgrade; an earlier bundle's gate (./mxgate, .mxgate/) and v1's hooks and checkers are removed.
 // What it prints looks like v1's installer (lib/ui.mjs): the banner, one numbered bar over the steps, a ✔ line
 // per step, ! notes, a red ✘ on failure, and the summary.
 import fs from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readJson, writeAtomic } from './lib/cache.mjs';
 import { PIN, BUNDLE } from './lib/mx.mjs';
 import { readTemplate, ruleText, mdcText, agentsBlockDir, checkRule, SKILLS_DIR, AGENTS, START, END } from './lib/rules.mjs';
-import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS } from './lib/skills.mjs';
+import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS, skillsFor, durableTestsForCoverage } from './lib/skills.mjs';
+import { decideCoverage, askCoverage, coverageRecord } from './lib/coverage.mjs';
 import { decideTheme, activeFrameTheme, applyTheme, askTheme, installThemeTool } from './lib/theme.mjs';
 import { makeUi } from './lib/ui.mjs';
+import { portFree } from './lib/ports.mjs';
+import { liveSkills, LIVE_RULE_FILE, liveKitText, liveFilmText } from './lib/live.mjs';
+import { liveRuleWithoutSkills, offList, SKILLS_OFF_DIR } from './lib/skilloff.mjs';
 import { decideAgents, askAgents, agentsNote, agentNames, agentStartLines, AGENT_INFO } from './lib/agents.mjs';
+import { withGateHooks, withoutGateHooks } from './lib/skill-gate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ui = makeUi();
@@ -32,7 +41,7 @@ export const FOOTPRINT = '.mxcodr';
 
 async function main() {
   const argv = process.argv.slice(2);
-  const app = argv[0] && !argv[0].startsWith('--') ? path.resolve(argv.shift()) : die('usage: node install.mjs <app folder> [--db hsqldb|postgres] [--agent claude] [--remove-agent <name>] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]');
+  const app = argv[0] && !argv[0].startsWith('--') ? path.resolve(argv.shift()) : die('usage: node install.mjs <app folder> [--db hsqldb|postgres] [--agent claude] [--remove-agent <name>] [--coverage | --no-coverage] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]');
   const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const env = { ...process.env, MXCLI_QUIET: '1' };
   const run = (cmd, args, o = {}) => spawnSync(cmd, args, { encoding: 'utf8', cwd: app, env, timeout: o.timeout || 600000, stdio: 'pipe' });
@@ -66,21 +75,25 @@ async function main() {
   const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   let picked;
   try { picked = decideAgents({ flag: argv.includes('--agent') ? opt('--agent') ?? '' : undefined, remove: argv.includes('--remove-agent') ? opt('--remove-agent') ?? '' : undefined, prev, tty, yes: argv.includes('--yes') }); } catch (e) { die(e.message, e.fix); }
+  // a test per requirement: --coverage / --no-coverage, else the last install's choice, else asked on a terminal
+  let cov;
+  try { cov = decideCoverage({ flag: argv.includes('--coverage'), noFlag: argv.includes('--no-coverage'), prev, tty, yes: argv.includes('--yes') }); } catch (e) { die(e.message, e.fix); }
   let choice;
   try { choice = decideTheme({ flag: argv.includes('--theme') ? opt('--theme') ?? '' : undefined, prev, tty, yes: argv.includes('--yes'), active: activeFrameTheme(app) }); } catch (e) { die(e.message, 'node overlay/lib/theme.mjs list shows the themes'); }
-  if (picked.how === 'ask' || choice.how === 'ask') {
+  if (picked.how === 'ask' || cov.how === 'ask' || choice.how === 'ask') {
     const readline = await import('node:readline/promises');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const write = t => process.stdout.write(t);
     // the agents first: the theme question opens a preview in the browser
     if (picked.how === 'ask') picked = await askAgents({ rl, write, prev });
+    if (cov.how === 'ask') cov = await askCoverage({ rl, write });
     if (choice.how === 'ask') choice = { name: await askTheme({ rl, write, plain: Boolean(process.env.NO_COLOR) }), how: 'flag' };
     rl.close();
   }
   const { agents } = picked;
 
   // the bar's steps, counted up front (v1: a plan one short pushed the bar past 100%)
-  ui.plan(13 + (newApp ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
+  ui.plan(15 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
   const warnings = [];
   const warn = s => { ui.note(s); warnings.push(s); };
   const lastLine = r => `${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
@@ -134,21 +147,41 @@ async function main() {
   // 4-6. the earlier bundles' files out, then our rule file and skills in
   for (const line of upgradeCleanup(app)) ui.note(`removed ${line}`);
   ui.begin('installing the session rule');
-  let ruleLines; try { ruleLines = writeRules(app, agents); } catch (e) { die(`the rule file failed its format check: ${e.message}`); }
+  let ruleLines; try { ruleLines = writeRules(app, agents, { coverage: cov.on }); } catch (e) { die(`the rule file failed its format check: ${e.message}`); }
   const ruleTargets = [];
   for (const line of ruleLines) { const m = /^rule (?:file|text) -> (\S+)/.exec(line); if (m) ruleTargets.push(m[1]); }
   ui.done('session rule', `${ruleTargets.length} ${ui.i.arrow} ${ruleTargets.join(', ') || 'none'}`);
   for (const line of ruleLines) if (!/^rule (?:file|text) -> /.test(line)) ui.note(/\s/.test(line) ? line : `removed ${line} (no agent that reads it was chosen)`);
   ui.begin('installing skills');
-  const skillDirs = copySkills(app, agents).map(l => l.replace(/^\d+ skills -> /, ''));
-  ui.done('skills', `${INSTALLED_SKILLS.length} ${ui.i.arrow} ${skillDirs.length > 1 ? `each of ${skillDirs.join(' ')}` : skillDirs[0]}`);
+  const skills = skillsFor({ coverage: cov.on });
+  const skillDirs = copySkills(app, agents, undefined, { coverage: cov.on }).map(l => l.replace(/^\d+ skills -> /, ''));
+  ui.done('skills', `${skills.length} ${ui.i.arrow} ${skillDirs.length > 1 ? `each of ${skillDirs.join(' ')}` : skillDirs[0]}`);
+  ui.begin('installing the skill gate');
+  let gate = null, gateErr = null;
+  try { gate = installSkillGate(app, agents); } catch (e) { gateErr = e.message; }
+  ui.done('skill gate', gateErr ? 'not installed' : gate ? `${ui.i.arrow} ${gate}` : 'none (Claude Code not chosen)');
+  if (gateErr) warn(`skill gate: ${gateErr}`);
   ui.begin('installing the test kit');
   const kit = copyTestKit(app, Array.isArray(prev.testKit) ? prev.testKit : []);
-  const keptLine = `kept the app's own ${kit.kept.join(', ')}`;
-  ui.done('test kit', kit.written.length ? `${kit.written.length} ${ui.i.arrow} ${kit.written.join(', ')}` : kit.kept.length ? keptLine : 'nothing written');
-  for (const line of kit.lines) if (!line.startsWith('test kit -> ') && !(line === `test kit: ${keptLine}` && !kit.written.length)) ui.note(line);
+  const changed = [...kit.written, ...kit.updated];
+  ui.done('test kit', changed.length ? `${changed.length} ${ui.i.arrow} ${changed.join(', ')}${kit.updated.length ? ` (${kit.updated.length} updated)` : ''}` : kit.kept.length ? `kept ${kit.kept.join(', ')}` : 'nothing written');
+  // the written ones are on the done line; every other line (updated, yours, skipped, pin) is a note
+  for (const line of kit.lines) if (!line.startsWith('test kit -> ') && !(!changed.length && line.startsWith('test kit: kept '))) ui.note(line);
   ui.begin('installing the film recorder');
   ui.done('film recorder', `1 ${ui.i.arrow} ${copyFilm(app)} (written on every install; the film-tests skill says how to use it)`);
+  // the project brain on every install (owner contract 2026-11-14): the agent captures requirements, open questions
+  // and findings into it with or without coverage; docs/brain/ is the app's and is never overwritten or removed
+  ui.begin('creating the project brain');
+  const brain = initBrain(app, mpr, args => run(mxcli, args));
+  ui.done('project brain', brain === null ? 'docs/brain/ kept as it was (the app\'s, never overwritten)' : brain.ok ? 'docs/brain/ created (mxcli brain init)' : 'docs/brain/ not created');
+  if (brain && !brain.ok) warn(brain.line);
+  if (cov.on) {
+    ui.begin('installing the coverage check');
+    ui.done('coverage', `1 ${ui.i.arrow} ${copyCoverage(app)} (written on every install; requirements in ${PLAN_DIR}/)`);
+  } else {
+    const off = coverageOff(app, prev);
+    if (off) ui.note(off);
+  }
   ui.begin('installing the theme tool');
   ui.done('theme tool', `${ui.i.arrow} ${installThemeTool(app)}`);
   // mxcli's own skills and its section of CLAUDE.md/AGENTS.md, after writeRules: an AGENTS.md that had no mxcli
@@ -159,7 +192,7 @@ async function main() {
   else { ui.done('mxcli skills', 'not refreshed'); warn(`mxcli init --sync-skills failed: ${lastLine(sync)}`); }
 
   // installed.json: what a later person-run report or gate would read, nothing else
-  const inst = { bundle: BUNDLE, mxcli: { path: mxcli, version: PIN }, db, ...(db === 'postgres' ? { dbName } : {}), agents, skills: INSTALLED_SKILLS, testKit: kit.ours, theme: themeResult.theme, requests: prev.requests || {} };
+  const inst = { bundle: BUNDLE, mxcli: { path: mxcli, version: PIN }, db, ...(db === 'postgres' ? { dbName } : {}), agents, skills, ...coverageRecord(cov), testKit: kit.ours, ...(kit.edited.length ? { testKitEdited: kit.edited } : {}), theme: themeResult.theme, requests: prev.requests || {} };
   let request = null;
   if (opt('--request')) {
     ui.begin('saving the request');
@@ -188,13 +221,14 @@ async function main() {
     if (w.status !== 0) die(`the app is not ready: ${lastLine(w)}`, 'see .mxcli/run.log');
     ui.done('smoke boot', `the app boots (${(st.stdout || '').trim().split('\n').pop()}); stopped again`);
   }
-  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked });
+  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked, coverage: cov.on, brain });
 }
 
 // ---- the summary: what landed, what to do now (v1's summary.sh, with v2's content) --------------------
 
 // out: the ui to print with (the tests pass their own)
-export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, kit, theme, db, dbName, request, warnings, agents, picked = { added: [], removed: [] } }, out = ui) {
+// brain: what initBrain returned (null: docs/brain/ was there already; undefined: not said, no row)
+export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, kit, theme, db, dbName, request, warnings, agents, picked = { added: [], removed: [] }, coverage = false, brain }, out = ui) {
   const ui = out;
   const { c, i } = ui;
   const note = s => `${c.grey}${s}${c.reset}`;
@@ -208,10 +242,13 @@ export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skil
   ui.row('agents', agents.length, `${agentNames(agents)}${picked.added.length ? `  ${note(`(${agentNames(picked.added)} added now)`)}` : ''}`);
   if (picked.removed.length) ui.row('removed', picked.removed.length, `${agentNames(picked.removed)}  ${note('(deselected: its rule and our skills were taken out)')}`);
   ui.row('rule', ruleTargets.length, `${ruleTargets.join('  ')}  ${note('(every session)')}`);
-  ui.row('skills', INSTALLED_SKILLS.length, `${skillDirs.join('  ')}  ${note("(beside mxcli's own)")}`);
-  if (kit.written.length) ui.row('test kit', kit.written.length, `tests/  ${note('(written only when absent; yours from now on)')}`);
-  else ui.row('test kit', 0, 'tests/ already had them, nothing overwritten');
+  ui.row('skills', skillsFor({ coverage }).length, `${skillDirs.join('  ')}  ${note("(beside mxcli's own)")}`);
+  const upd = kit.updated?.length || 0;
+  if (kit.written.length || upd) ui.row('test kit', kit.written.length + upd, `tests/  ${note(`(${upd ? `${upd} unedited from an earlier install updated; ` : ''}a file you edit is never overwritten)`)}`);
+  else ui.row('test kit', 0, `tests/ already had them, nothing overwritten${kit.edited?.length ? `  ${note(`(${kit.edited.join(', ')} yours: the kit's fixes not in it)`)}` : ''}`);
   ui.row('film', 1, `tests/film.mjs  ${note('(node tests/film.mjs --list)')}`);
+  if (brain !== undefined) ui.row('brain', brain && !brain.ok ? 0 : 1, brain && !brain.ok ? 'docs/brain/ not created  ' + note('(the agent runs ./mxcli brain init first)') : `docs/brain/  ${note(`(${brain ? 'created by mxcli brain init' : 'kept as it was'}; the app's, never overwritten)`)}`);
+  if (coverage) ui.row('coverage', 'on', `${PLAN_DIR} + ${COVERAGE}  ${note('(a test per numbered requirement; 0 missing before done)')}`);
   ui.row('theme', theme && theme !== 'as-is' ? 1 : 0, `${theme && theme !== 'as-is' ? theme : 'as mxcli new made it'}  ${note('(node .mxcodr/theme.mjs changes it)')}`);
   ui.row('database', 1, `${db === 'postgres' ? `postgres, ${dbName}` : 'hsqldb'}  ${note('(MxBuild and the runtime cached)')}`);
   if (request) ui.row('request', 1, `${request}  ${note('(word for word)')}`);
@@ -242,7 +279,9 @@ export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skil
   ui.line('     just wrote are invisible to the session that ran it. Measured: a session that installed');
   ui.line('     and then built without restarting read twelve SKILL.md files by hand -- 216k characters,');
   ui.line('     36 commands, 6.5 minutes -- before its first real command. After a restart: 8 commands.');
-  ui.line('     The agent reads the rule file by itself; nothing runs while it builds: no hooks, no gate.');
+  ui.line('     The agent reads the rule file by itself. One thing runs while it builds, in Claude Code only: the skill');
+  ui.line('     gate refuses a model write or a test file until the project skill for it was read whole');
+  ui.line(`     (${c.bold}MXCODR_SKILL_GATE=0${c.reset} in the environment Claude Code starts in switches it off).`);
   if (agents.includes('cursor')) ui.line(`     Cursor reads ${c.bold}.cursor/rules/mxcodr.mdc${c.reset} (alwaysApply); restart an open session to pick it up.`);
   if (agents.some(a => ['codex', 'opencode', 'pi'].includes(a))) ui.line(`     Codex, opencode and Pi read our block in ${c.bold}AGENTS.md${c.reset}, after mxcli's section.`);
   ui.line(`     Another agent: ${c.bold}bash mxcodr/install.sh --agent <name>${c.reset} adds it (${Object.keys(AGENT_INFO).join(', ')}); --remove-agent <name> takes one out.`);
@@ -419,7 +458,7 @@ export function isScaffoldLeftover(rel, theirs, fresh) {
   const text = f => { try { return fs.readFileSync(f, 'utf8'); } catch { return null; } };
   if (rel === 'CLAUDE.md' || rel === 'AGENTS.md') {
     const t = text(theirs);
-    return t !== null && t.includes(MXCLI_BEGIN) && !unfence(unfence(t, MXCLI_BEGIN, MXCLI_END), START, END).trim();
+    return t !== null && t.includes(MXCLI_BEGIN) && !unfence(unfence(unfence(t, MXCLI_BEGIN, MXCLI_END), START, END), PLAN_START, PLAN_END).trim();
   }
   if (rel === '.gitignore') {
     const t = text(theirs), n = text(fresh);
@@ -495,8 +534,12 @@ function moveEntry(s, d) {
 const RULE_FILES = { claude: '.claude/rules/mxcodr.md', cursor: '.cursor/rules/mxcodr.mdc' };
 
 // Writes the rule file for each agent and checks what it wrote; removes our copy for agents not chosen.
-// Returns the lines to print. Throws when a written file fails the format check.
-export function writeRules(app, agents) {
+// coverage: the done sentence of the coverage variant (lib/rules.mjs). Returns the lines to print. Throws when a
+// written file fails the format check.
+// live: the Studio Pro extension's live mode (lib/live.mjs): the live edits, and .claude/rules/mxcodr-live.md.
+// skillsOff: skills switched off in the extension's Rules tab (lib/skilloff.mjs): the texts leave them out; [] =
+// what it always wrote.
+export function writeRules(app, agents, { coverage = false, live = false, skillsOff = [] } = {}) {
   const out = [];
   const text = readTemplate('mxcodr.md');
   const write = (rel, body, mdc) => {
@@ -507,15 +550,20 @@ export function writeRules(app, agents) {
     if (errs.length) throw new Error(`${rel}: ${errs.join('; ')}`);
     out.push(`rule file -> ${rel}`);
   };
-  if (agents.includes('claude')) write(RULE_FILES.claude, ruleText(SKILLS_DIR.claude, text), false);
+  if (agents.includes('claude')) write(RULE_FILES.claude, ruleText(SKILLS_DIR.claude, text, { coverage, live, skillsOff }), false);
   else rmIf(app, RULE_FILES.claude, out);
-  if (agents.includes('cursor')) write(RULE_FILES.cursor, mdcText(text), true);
+  if (live && agents.includes('claude')) {
+    const f = path.join(app, LIVE_RULE_FILE);
+    fs.writeFileSync(f, liveRuleWithoutSkills(readTemplate('live.md'), skillsOff));
+    out.push(`rule file -> ${LIVE_RULE_FILE}`);
+  }
+  if (agents.includes('cursor')) write(RULE_FILES.cursor, mdcText(text, { coverage, live, skillsOff }), true);
   else rmIf(app, RULE_FILES.cursor, out);
   const agentsMd = path.join(app, 'AGENTS.md');
   const dir = agentsBlockDir(agents);
   let old = fs.existsSync(agentsMd) ? fs.readFileSync(agentsMd, 'utf8') : '';
   if (dir) {
-    const block = ruleText(dir, text);
+    const block = ruleText(dir, text, { coverage, live, skillsOff });
     const errs = checkRule(block);
     if (errs.length) throw new Error(`AGENTS.md block: ${errs.join('; ')}`);
     // `mxcli init` regenerates an AGENTS.md without its markers whole, and keeps what lies outside them:
@@ -532,6 +580,10 @@ export function writeRules(app, agents) {
   }
   return out;
 }
+
+// The extension's "Plan first" block in AGENTS.md (translator/src/permissions.mjs, PLAN_START/PLAN_END; bundle
+// 2026.11.18.3): generated like our block, so an AGENTS.md with nothing else of the person's still counts as mxcli's.
+export const PLAN_START = '<!-- mxcodr-plan:start -->', PLAN_END = '<!-- mxcodr-plan:end -->';
 
 // mxcli's section of AGENTS.md: `mxcli init` replaces what lies between these markers and keeps the rest;
 // `mxcli init --sync-skills` fills an empty pair. Put first, before any text the file already had.
@@ -559,66 +611,154 @@ const ALL_SKILL_DIRS = [...new Set([...Object.values(SKILLS_DIR), '.ai-context/s
 const OURS = [...INSTALLED_SKILLS, ...OPTIONAL_SKILLS, ...RETIRED_SKILLS];
 
 // Removes every skill of ours from every skills folder (mxcli ships none of these names), then copies
-// the installed ones into each chosen agent's folder. Returns the lines to print.
-export function copySkills(app, agents, src = path.join(here, 'skills')) {
+// the installed ones into each chosen agent's folder. coverage: requirements-interview too, and durable-tests'
+// first finishing step points at tests/coverage.mjs (lib/skills.mjs). Returns the lines to print.
+// live: the live edits of lib/live.mjs on the copies (the Studio Pro extension; never the file-mode installer).
+// skillsOff: skills switched off in the extension's Rules tab: written to .mxcodr/skills-off/<name>/ (this bundle's
+// text, so switching one on again gives the current version) instead of an agent's folder; [] = as always.
+export function copySkills(app, agents, src = path.join(here, 'skills'), { coverage = false, live = false, skillsOff = [] } = {}) {
   const out = [];
+  const off = offList(skillsOff);
+  const all = skillsFor({ coverage });
+  const skills = all.filter(s => !off.includes(s));
+  if (off.length || fs.existsSync(path.join(app, SKILLS_OFF_DIR))) {
+    fs.rmSync(path.join(app, SKILLS_OFF_DIR), { recursive: true, force: true });
+    for (const s of all.filter(x => off.includes(x))) {
+      fs.cpSync(path.join(src, s), path.join(app, SKILLS_OFF_DIR, s), { recursive: true });
+      if (live) liveSkills(path.join(app, SKILLS_OFF_DIR), [s]);
+    }
+    if (off.length) out.push(`${off.length} skills switched off -> ${SKILLS_OFF_DIR}/`);
+  }
   for (const d of ALL_SKILL_DIRS) for (const s of OURS) fs.rmSync(path.join(app, d, s), { recursive: true, force: true });
   const dirs = [...new Set(agents.map(a => SKILLS_DIR[a]))];
   for (const d of dirs) {
-    for (const s of INSTALLED_SKILLS) fs.cpSync(path.join(src, s), path.join(app, d, s), { recursive: true });
-    out.push(`${INSTALLED_SKILLS.length} skills -> ${d}/`);
+    for (const s of skills) fs.cpSync(path.join(src, s), path.join(app, d, s), { recursive: true });
+    if (coverage) {
+      const f = path.join(app, d, 'durable-tests', 'SKILL.md');
+      fs.writeFileSync(f, durableTestsForCoverage(fs.readFileSync(f, 'utf8')));
+    }
+    if (live) liveSkills(path.join(app, d), skills);
+    out.push(`${skills.length} skills -> ${d}/`);
   }
   return out;
+}
+
+// ---- 5a. the skill gate (Claude Code only) -------------------------------------------------------------------
+
+export const SKILL_GATE = `${FOOTPRINT}/skill-gate.mjs`;
+
+/** Claude Code's skill gate (lib/skill-gate.mjs): the script copied to .mxcodr/skill-gate.mjs and its two hooks in
+ * .claude/settings.local.json (mxcli init overwrites settings.json, never this file), in place of earlier ones; the
+ * person's own settings stay. Without Claude Code among the agents both go. -> what it wrote, or null. */
+export function installSkillGate(app, agents, src = path.join(here, 'lib', 'skill-gate.mjs')) {
+  const f = path.join(app, '.claude', 'settings.local.json');
+  let cfg = null;
+  if (fs.existsSync(f)) { try { cfg = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { throw new Error(`${f} is not valid JSON; fix it, then install again`); } }
+  if (!agents.includes('claude')) {
+    fs.rmSync(path.join(app, SKILL_GATE), { force: true });
+    if (cfg) { const before = JSON.stringify(cfg); withoutGateHooks(cfg); if (JSON.stringify(cfg) !== before) fs.writeFileSync(f, JSON.stringify(cfg, null, 2) + '\n'); }
+    return null;
+  }
+  fs.mkdirSync(path.join(app, FOOTPRINT), { recursive: true });
+  fs.copyFileSync(src, path.join(app, SKILL_GATE));
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, JSON.stringify(withGateHooks(cfg ?? {}), null, 2) + '\n');
+  return `${SKILL_GATE} (hooks in .claude/settings.local.json)`;
 }
 
 // ---- 5b. the starter test kit -------------------------------------------------------------------
 
 // The kit (templates/tests/): helpers for sign-in and sign-out, dialogs, grids, OQL and forged calls, its
-// teardown and a Playwright config. Each file is written only when absent: once written it is the app's own,
-// so a later bundle never overwrites it, and the agent's specs and helpers.ts are never touched. The config is
-// left out when the app already has a Playwright config at its root (two configs: the kit's teardown would
-// silently not run). The teardown and the config import from ./mx, so they are left out too when tests/mx.ts
-// is the person's own: not in the last install's record (prevKit) and not the bundle's text. A kept
-// tests/package.json that pins another Playwright gets the pin hint (the finish condition needs --shuffle).
-// mxcli init does not touch tests/.
-// -> { written, kept, ours, lines }; ours = the kit files there now that are the kit's (written now, or kept
-// and recorded before or still the bundle's text): what installed.json records as testKit.
+// teardown and a Playwright config. An absent file is written. A file already there is left alone unless its text is
+// one mx-codr shipped before (lib/kit-shipped.json: every past version, plain, live and as setup wired it; CRLF
+// counts as LF): then the person never edited it and it is replaced with the current kit (its CRLF kept), so a fix
+// in the kit reaches apps installed earlier. Any other text is the person's: kept, and `edited` names it once
+// (the kit's later fixes are not in it). A link or other non-file is never written through. The agent's specs and
+// helpers.ts are never touched. The config is left out when the app already has a Playwright config at its root
+// (two configs: the kit's teardown would silently not run). The teardown and the config import from ./mx, so they
+// are left out too when tests/mx.ts is the person's own: not in the last install's record (prevKit) and not a text
+// mx-codr shipped; and an unedited teardown or config is not updated when it would import a name the person's
+// edited tests/mx.ts does not export. A kept tests/package.json that pins another Playwright gets the pin hint
+// (the finish condition needs --shuffle). mxcli init does not touch tests/.
+// -> { written, updated, kept, edited, ours, lines }; kept = the files there that were not written (current or the
+// person's), edited = those of them that are the person's text; ours = the kit files there now that are the kit's
+// (written or updated now, or kept and recorded before or the current kit's text): what installed.json records as testKit.
 export const TEST_KIT = ['tests/mx.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json'];
 export const PLAYWRIGHT = '1.64.1'; // the version tests/package.json pins: it has --shuffle
 const MX_DEPENDENTS = ['tests/mx.teardown.ts', 'tests/playwright.config.ts'];
-export function copyTestKit(app, prevKit = [], src = path.join(here, 'templates', 'tests')) {
-  const written = [], kept = [], ours = [], lines = [];
+// what kit-shipped.json hashes: the text with CRLF as LF (an app's git with autocrlf checks a kit file out CRLF)
+export const lfText = t => t.replace(/\r\n/g, '\n');
+export const kitHash = t => crypto.createHash('sha256').update(lfText(t), 'utf8').digest('hex');
+// the hashes of the kit versions mx-codr shipped, per kit file ({} when the data file is missing: nothing is replaced)
+export function kitShipped(file = path.join(here, 'lib', 'kit-shipped.json')) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')).files || {}; } catch { return {}; }
+}
+// live: the Studio Pro extension's kit (lib/live.mjs KIT_EDITS), compared and written as edited; file mode copies.
+// shipped: the hashes to replace (tests pass their own).
+export function copyTestKit(app, prevKit = [], src = path.join(here, 'templates', 'tests'), { live = false, shipped = kitShipped() } = {}) {
+  const written = [], updated = [], kept = [], edited = [], ours = [], lines = [];
   const isThere = f => { try { fs.lstatSync(f); return true; } catch { return false; } };
-  const sameAsKit = rel => { try { return fs.readFileSync(path.join(app, rel), 'utf8') === fs.readFileSync(path.join(src, path.basename(rel)), 'utf8'); } catch { return false; } };
+  const kitText = name => { const t = fs.readFileSync(path.join(src, name), 'utf8'); return live ? liveKitText(name, t) : t; };
+  const appText = rel => { try { const f = path.join(app, rel); return fs.lstatSync(f).isFile() ? fs.readFileSync(f, 'utf8') : null; } catch { return null; } };
+  // an existing kit file: the current kit's text, a text mx-codr shipped before, or the person's (a link counts as theirs)
+  const stateOf = rel => {
+    const t = appText(rel);
+    if (t === null) return 'own';
+    if (lfText(t) === lfText(kitText(path.basename(rel)))) return 'current';
+    return shipped[rel]?.[kitHash(t)] ? 'shipped' : 'own';
+  };
   const rootConfig = ['ts', 'js', 'mjs', 'cjs'].map(e => `playwright.config.${e}`).find(f => fs.existsSync(path.join(app, f)));
   // a package.json or Playwright config at the root is the app's setup: no second one in tests/
   const rootSetup = fs.existsSync(path.join(app, 'package.json')) ? 'package.json' : rootConfig;
-  const ownMx = isThere(path.join(app, 'tests/mx.ts')) && !prevKit.includes('tests/mx.ts') && !sameAsKit('tests/mx.ts');
-  const skipped = [];
+  const mxState = isThere(path.join(app, 'tests/mx.ts')) ? stateOf('tests/mx.ts') : null;
+  const ownMx = mxState === 'own' && !prevKit.includes('tests/mx.ts');
+  // the names a kit text imports from ./mx that the person's edited tests/mx.ts does not export
+  const mxOwn = mxState === 'own' ? appText('tests/mx.ts') ?? '' : null;
+  const missingFromMx = text => mxOwn === null ? [] : [...text.matchAll(/^import\s*\{([^}]*)\}\s*from\s*'\.\/mx'/gm)]
+    .flatMap(m => m[1].split(',').map(n => n.trim().split(/\s+as\s+/)[0]).filter(Boolean))
+    .filter(n => !new RegExp(`export\\s+(?:async\\s+)?(?:function|const|let|var|type|interface|class)\\s+${n}\\b|export\\s*\\{[^}]*\\b${n}\\b`).test(mxOwn));
+  const skipped = [], held = [], heldRel = [];
   for (const rel of TEST_KIT) {
     const f = path.join(app, rel);
     if (isThere(f)) {
+      const st = stateOf(rel);
+      if (st === 'shipped') {
+        const text = kitText(path.basename(rel));
+        const missing = MX_DEPENDENTS.includes(rel) ? missingFromMx(text) : [];
+        if (missing.length) { held.push(`${rel} (imports ${missing.join(', ')})`); heldRel.push(rel); kept.push(rel); ours.push(rel); continue; }
+        const old = appText(rel);
+        fs.writeFileSync(f, old.includes('\r\n') ? lfText(text).replace(/\n/g, '\r\n') : text);
+        updated.push(rel);
+        ours.push(rel);
+        continue;
+      }
       kept.push(rel);
-      if (prevKit.includes(rel) || sameAsKit(rel)) ours.push(rel);
+      if (st === 'own') edited.push(rel);
+      if (st === 'current' || prevKit.includes(rel)) ours.push(rel);
       continue;
     }
     if (ownMx && MX_DEPENDENTS.includes(rel)) { skipped.push(rel); continue; }
     if (rel === 'tests/playwright.config.ts' && rootConfig) { lines.push(`test kit: no tests/playwright.config.ts, the app has ${rootConfig}; name globalTeardown: './tests/mx.teardown.ts' in it`); continue; }
     if (rel === 'tests/package.json' && rootSetup) { lines.push(`test kit: no tests/package.json, the app has ${rootSetup} at its root; pin @playwright/test there: npm install -D -E @playwright/test@${PLAYWRIGHT}`); continue; }
     fs.mkdirSync(path.dirname(f), { recursive: true });
-    fs.copyFileSync(path.join(src, path.basename(rel)), f);
+    if (live) fs.writeFileSync(f, kitText(path.basename(rel)));
+    else fs.copyFileSync(path.join(src, path.basename(rel)), f);
     written.push(rel);
     ours.push(rel);
   }
+  const current = kept.filter(r => !edited.includes(r) && !heldRel.includes(r));
   if (written.length) lines.push(`test kit -> ${written.join(', ')}`);
-  if (kept.length) lines.push(`test kit: kept the app's own ${kept.join(', ')}`);
+  if (updated.length) lines.push(`test kit: updated ${updated.join(', ')} to the current kit (unchanged since an earlier mx-codr wrote them)`);
+  if (current.length) lines.push(`test kit: kept ${current.join(', ')}`);
+  if (edited.length) lines.push(`test kit: ${edited.join(', ')} ${edited.length > 1 ? 'are' : 'is'} yours (not a text mx-codr shipped), kept as ${edited.length > 1 ? 'they are' : 'it is'}: the kit's later fixes are not in ${edited.length > 1 ? 'them' : 'it'}; to take the current kit, move ${edited.length > 1 ? 'them' : 'it'} aside and install again (in Studio Pro: run the mx-codr setup again)`);
+  if (held.length) lines.push(`test kit: not updated ${held.join(', ')}: your tests/mx.ts does not export what the current kit imports; kept as before`);
   if (skipped.length) lines.push(`test kit: skipped ${skipped.join(', ')}: tests/mx.ts is the app's own and they import from the kit's mx.ts; to get the kit, move tests/mx.ts aside and install again`);
   if (kept.includes('tests/package.json')) {
     const pin = playwrightPin(path.join(app, 'tests/package.json'));
     if (pin !== PLAYWRIGHT) lines.push(`test kit: tests/package.json ${pin ? `pins @playwright/test ${pin}` : 'does not pin @playwright/test'}; the finish condition needs --shuffle, so pin it in tests/: npm install -D -E @playwright/test@${PLAYWRIGHT}`);
   }
   ours.sort((x, y) => TEST_KIT.indexOf(x) - TEST_KIT.indexOf(y));
-  return { written, kept, ours, lines };
+  return { written, updated, kept, edited, ours, lines };
 }
 // The @playwright/test version a package.json names (dev or plain dependency), or null.
 function playwrightPin(f) {
@@ -631,12 +771,48 @@ function playwrightPin(f) {
 // the bundle's, not the app's: written on every install and reinstall, whatever the kit's files are, so a later
 // bundle's fix reaches every app. It only adds a temporary config while it films; the app's config is never edited.
 export const FILM = 'tests/film.mjs';
-export function copyFilm(app, src = path.join(here, 'templates', 'film.mjs')) {
+// live: the Studio Pro extension's text (lib/live.mjs FILM_EDITS: Studio Pro runs the app).
+export function copyFilm(app, src = path.join(here, 'templates', 'film.mjs'), { live = false } = {}) {
   const f = path.join(app, FILM);
   fs.mkdirSync(path.dirname(f), { recursive: true });
   fs.rmSync(f, { force: true }); // a link or a read-only copy is replaced, not written through
-  fs.copyFileSync(src, f);
+  if (live) fs.writeFileSync(f, liveFilmText(fs.readFileSync(src, 'utf8')));
+  else fs.copyFileSync(src, f);
   return FILM;
+}
+
+// ---- 5d. the coverage check (coverage on) -------------------------------------------------------------------
+
+// tests/coverage.mjs names the numbered requirements in docs/brain/plan/ that no test title cites. Like
+// tests/film.mjs it is the bundle's: written on every install while coverage is on, removed when it is switched off.
+export const COVERAGE = 'tests/coverage.mjs';
+export const PLAN_DIR = 'docs/brain/plan';
+export function copyCoverage(app, src = path.join(here, 'templates', 'coverage.mjs')) {
+  const f = path.join(app, COVERAGE);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.rmSync(f, { force: true }); // a link or a read-only copy is replaced, not written through
+  fs.copyFileSync(src, f);
+  return COVERAGE;
+}
+
+// Coverage switched off on a reinstall (it was on last time): tests/coverage.mjs goes; the rule file and the
+// skills were written plain already; docs/brain/ is the app's and stays. -> a line to print, or null.
+export function coverageOff(app, prev) {
+  if (prev.coverage !== true) return null;
+  const gone = []; rmIf(app, COVERAGE, gone);
+  return `coverage is off now: ${gone.length ? `removed ${COVERAGE}; ` : ''}the rule file and durable-tests are the plain ones again, docs/brain/ stays`;
+}
+
+// The project brain must exist on every install (the agent captures requirements, open questions and findings into
+// it; with coverage on, tests/coverage.mjs reads its plan): `mxcli brain init` when docs/brain/ is missing, never over
+// one that exists. Exported for the Studio Pro extension's setup, which does not run main().
+// run(args) runs the pinned mxcli (null: none to run). -> null (there already), or { ok, line }.
+export function initBrain(app, mpr, run) {
+  if (fs.existsSync(path.join(app, 'docs', 'brain'))) return null;
+  if (!run) return { ok: false, line: `no docs/brain/ yet and no mxcli to create it; the agent runs ./mxcli brain init -p ${mpr} first` };
+  const r = run(['brain', 'init', '-p', mpr]);
+  if (r.status === 0 && fs.existsSync(path.join(app, 'docs', 'brain'))) return { ok: true, line: 'docs/brain/ created (mxcli brain init)' };
+  return { ok: false, line: `mxcli brain init failed: ${`${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').pop() || `exit ${r.status}`}; the agent runs ./mxcli brain init -p ${mpr} first` };
 }
 
 // ---- 6. upgrade: the earlier bundles' files out -----------------------------------------------------
@@ -792,7 +968,7 @@ export const replaceShim = (app, mxcliPath) => {
 
 // Ports for the smoke boot only (the agent boots the app itself later, on mxcli's defaults).
 async function bootPorts() {
-  const free = p => new Promise(res => { const srv = net.createServer(); srv.once('error', () => res(false)); srv.listen(p, '127.0.0.1', () => srv.close(() => res(true))); });
+  const free = p => portFree(p); // bind on 127.0.0.1, then connect on 127.0.0.1 and ::1 (lib/ports.mjs)
   if (await free(8080) && await free(8090) && await free(6543)) return { dflt: true };
   for (let p = 18080; p < 18980; p += 3) if (await free(p) && await free(p + 1) && await free(p + 2)) return { app: p, admin: p + 1, serve: p + 2 };
   die('no three free ports for the smoke boot', 'install without --boot');

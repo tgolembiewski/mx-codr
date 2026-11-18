@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fenceText, unfence, withMxcliSection, MXCLI_BEGIN, MXCLI_END, writeRules, copySkills, copyTestKit, copyFilm, FILM, TEST_KIT, PLAYWRIGHT, upgradeCleanup, migrateBin, stripOurs, ensureLocalMxcli, replaceShim, parseAgents } from '../overlay/install.mjs';
-import { parseRule, bodyLines, checkRule, START, END } from '../overlay/lib/rules.mjs';
+import { parseRule, bodyLines, checkRule, readTemplate, START, END } from '../overlay/lib/rules.mjs';
 import { INSTALLED_SKILLS } from '../overlay/lib/skills.mjs';
 import { readRequests, saveRequest, sha1 } from '../overlay/lib/requests.mjs';
 import { writeAtomic, readJson } from '../overlay/lib/cache.mjs';
@@ -32,12 +32,12 @@ const install = (d, agents) => { const before = new Set(walk(d)); writeRules(d, 
 const skillFiles = dir => INSTALLED_SKILLS.flatMap(s => walk(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'overlay', 'skills', s)).map(f => `${dir}/${s}/${f}`));
 const GATE = /\bgates?\b|mxgate|\.mxgate|tests\/(orient|peek|lib|gate|film\.sh)|scenario\(|# covers|rulebook|\bDONE\b/;
 
-test('Claude Code: .claude/rules/mxcodr.md and the eight skills in .claude/skills/, nothing else; AGENTS.md untouched', () => {
+test('Claude Code: .claude/rules/mxcodr.md and our skills in .claude/skills/, nothing else; AGENTS.md untouched', () => {
   const d = stubApp();
   const written = install(d, ['claude']);
   assert.deepEqual(written, ['.claude/rules/mxcodr.md', ...skillFiles('.claude/skills')].sort());
   assert.equal(get(d, 'AGENTS.md'), MXCLI_AGENTS_MD);
-  assert.ok(!exists(d, '.claude/skills/requirements-interview'), 'requirements-interview is not installed by default');
+  assert.ok(exists(d, '.claude/skills/requirements-interview/SKILL.md'), 'requirements-interview is installed always (since 2026.11.14.2)');
   assert.equal(get(d, '.claude/skills/create-page/SKILL.md'), 'mxcli own skill');
 });
 
@@ -57,7 +57,7 @@ test('Codex, opencode and Pi: one AGENTS.md block after mxcli\'s section, skills
   assert.equal(md.split(START).length, 2);
   const block = md.slice(md.indexOf(START) + START.length, md.indexOf(END));
   assert.deepEqual(checkRule(block.trimStart()), []);
-  assert.match(block, /`\.agents\/skills\/`: `durable-tests`/);
+  assert.match(block, /in `\.agents\/skills\/`, each whole[\s\S]*\n- `durable-tests`: /);
   install(d, ['codex', 'opencode', 'pi']);
   assert.equal(get(d, 'AGENTS.md'), md, 'a second install changes nothing');
   install(d, ['claude']);
@@ -71,13 +71,13 @@ test('the installed rule files parse: a non-empty body, no stray frontmatter (.m
   const md = parseRule(get(d, '.claude/rules/mxcodr.md'));
   assert.equal(md.frontmatter, null);
   assert.equal(get(d, '.claude/rules/mxcodr.md')[0], '#');
-  assert.equal(bodyLines(md.body), 22);
+  assert.equal(bodyLines(md.body), 32 + bodyLines(readTemplate('brain.md')), 'the template\'s 32 and the brain rule');
   assert.doesNotMatch(md.body, /^---$/m);
   const mdc = parseRule(get(d, '.cursor/rules/mxcodr.mdc'));
   assert.deepEqual(mdc.frontmatter, ['description', 'alwaysApply']);
-  assert.equal(bodyLines(mdc.body), 22);
+  assert.equal(bodyLines(mdc.body), 32 + bodyLines(readTemplate('brain.md')));
   assert.doesNotMatch(mdc.body, /^---$/m);
-  assert.match(mdc.body, /^# Keep your checks as tests\n/);
+  assert.match(mdc.body, /^# Read the project skill before you build its part\n[\s\S]*\n# Keep your checks as tests\n/);
 });
 
 test('skills-clean on the installed copies: no gate vocabulary in any file an agent can open', () => {
@@ -184,9 +184,9 @@ test('AGENTS.md fence: appended once, replaced in place, the rest kept; unfence 
   assert.equal(unfence(a, START, END), '# mxcli\ntext\n');
 });
 
-test('installed.json holds bundle, mxcli, db, agents, skills and requests; no ports, manifest, hook or permission', () => {
+test('installed.json holds bundle, mxcli, db, agents, skills, the coverage choice and requests; no ports, manifest, hook or permission', () => {
   const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
-  for (const k of ['bundle: BUNDLE', 'mxcli: { path', 'db,', 'agents,', 'skills: INSTALLED_SKILLS', 'testKit: kit.ours', 'requests:']) assert.ok(src.includes(k), k);
+  for (const k of ['bundle: BUNDLE', 'mxcli: { path', 'db,', 'agents,', 'skills, ...coverageRecord(cov)', 'const skills = skillsFor({ coverage: cov.on })', 'testKit: kit.ours', 'requests:']) assert.ok(src.includes(k), k);
   const inst = src.split('\n').find(l => l.includes('const inst = {'));
   assert.doesNotMatch(inst, /\bports\b|manifest|points/, 'installed.json carries no ports, manifest or points');
   for (const k of [/manifest/, /UserPromptSubmit/, /permissions\.allow\.push/, /decompose/, /settings\.json'/]) assert.doesNotMatch(src, k, `the installer no longer writes ${k}`);
@@ -238,7 +238,7 @@ test('test kit, present: the app\'s own files, specs and helpers.ts stay byte fo
   assert.equal(get(d, 'tests/helpers.ts'), 'export const mine = 1;\n');
   assert.equal(get(d, 'tests/package.json'), '{"devDependencies":{"@playwright/test":"1.55.1"}}\n', 'the app\'s own package.json stays');
   assert.equal(get(d, 'tests/orders.spec.ts'), 'the agent\'s test');
-  assert.match(lines.join('\n'), /kept the app's own tests\/mx\.ts, tests\/playwright\.config\.ts/);
+  assert.match(lines.join('\n'), /test kit: tests\/mx\.ts, tests\/playwright\.config\.ts, tests\/package\.json are yours \(not a text mx-codr shipped\), kept as they are/);
 });
 
 test('test kit: a Playwright config at the app root means no second config in tests/', () => {

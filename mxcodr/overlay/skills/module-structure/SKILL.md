@@ -1,6 +1,6 @@
 ---
 name: module-structure
-description: "Whether new functionality belongs in an existing module or a new one, and the folder structure a module starts with — processes, not document types. Changes to a Marketplace module go in a <Module>Ext module. Use before creating a module, before adding the first documents to one, before changing a Marketplace module, and when deciding where a new page or microflow goes."
+description: "Whether new functionality belongs in an existing module or a new one, and the folder structure a module starts with — processes, not document types. Nothing is added to or changed in a Marketplace module: the app's documents go in its own module, changes to a Marketplace document in a <Module>Ext copy. Use before creating a module, before adding the first documents to one, before adding to or changing a Marketplace module, and when deciding where a new page or microflow goes."
 ---
 
 # Module structure
@@ -132,11 +132,25 @@ PaymentsConnector/
 `UseMe` is the contract. If something needs to move out of `Private`, that is a
 deliberate act, and a version bump.
 
-## Changing a Marketplace module: always in `<Module>Ext`
+## Marketplace modules: never add to them, never edit them
 
-Never edit a Marketplace module itself: an update overwrites it. A change to one goes into a module of
-your own named `<Module>Ext`. How, step by step: [reference/marketplace-ext.md](reference/marketplace-ext.md)
--- read it before you change anything in a Marketplace module.
+A Marketplace module is one whose `Source` in `./mxcli -p app.mpr -c "list modules"` reads
+`Marketplace v4.3.2` (Administration, Atlas_Core, DataWidgets, WorkflowCommons, ...). Updating it from
+the Marketplace replaces the whole module: **a document you added to it is deleted, and a document you
+changed in it goes back**, without a warning (an app lost the documents it had added to
+WorkflowCommons, and its edits of snippets there, that way).
+
+- **Never create a document in one.** An app microflow, page, snippet, entity or enumeration goes in the
+  app's own module, even when it only works with that module's data (a page over
+  `Administration.Account` is `Shop.Account_Overview`; a workflow's task page is created in the module
+  that owns the workflow, not in WorkflowCommons).
+- **Use what the module offers for this**, all set from your side: its constants (set per configuration
+  with `alter settings constant`), its snippets placed on your own pages, its microflows called from your
+  after-startup microflow or your buttons, the documents in its `UseMe`/`USE_ME` folder.
+- **A Marketplace document truly has to change:** copy it into a module of your own named `<Module>Ext`,
+  change the copy, point the callers at it, and leave the original as shipped. How, step by step:
+  [reference/marketplace-ext.md](reference/marketplace-ext.md) -- read it before you touch anything in a
+  Marketplace module.
 
 ## Dependencies between modules
 
@@ -226,8 +240,8 @@ uses, and drop them. A document is unused only when three things agree: no refer
 (`list references to`, which covers calls, pages, navigation, settings, scheduled events and
 published services), its name in no Java, JavaScript, theme or test file, and a copy of the app
 still passing `./mxcli docker check` without it. A document kept on purpose (an API for later, a
-page opened only by its URL) stays; say why in its documentation comment, and in the project brain if it is a
-decision.
+page opened only by its URL) stays; say why in its documentation comment, and capture it in the project brain
+(`./mxcli brain capture`, never promoted by you) if it is a decision.
 
 ## Check it
 
@@ -244,6 +258,20 @@ and `catalog.nanoflows`). `ARCH001` — a page reading another module's entities
 `CONV008` — a module role mapped to more than one user role. `graph-report` shows
 cycles and cross-module coupling that no single rule catches.
 
+Before you call work in a module finished, and after any script that touched a Marketplace module:
+
+```bash
+node <this skill's folder>/marketplace-check.mjs -p app.mpr     # --module WorkflowCommons for one
+```
+
+It compares every Marketplace module with the package version the app records (`mxcli marketplace diff`;
+needs `./mxcli auth login`, about 5 s a module, longer the first time). `warning ... added` is a
+document the next update deletes: `move microflow Administration.ACT_X to folder 'Admin/FNC' in Shop;`
+(the same for pages, snippets, nanoflows, enumerations), then fix what pointed at it. `warning ... changed`
+is an edit the update undoes: make it in `<Module>Ext` and restore the original. A `note ... differs`
+needs nothing from you: the app has no baseline, and Mendix's own app template ships some Marketplace
+documents changed. `not checked` is not clean: say which modules and why in your report.
+
 ## Validation checklist
 
 - [ ] Every new module answers yes to domain, reuse, or integration boundary
@@ -256,5 +284,6 @@ cycles and cross-module coupling that no single rule catches.
 - [ ] A consumable module exposes `UseMe/` and hides `Private/`
 - [ ] No cyclic dependency between modules (`graph-report`, ARCH001)
 - [ ] `./mxcli lint -p app.mpr` clean for the module, CONV008 included
-- [ ] No document in a Marketplace module was changed; changes live in `<Module>Ext`
+- [ ] No document in a Marketplace module was added or changed; the app's own documents live in its own
+      modules, changed copies in `<Module>Ext` (`marketplace-check.mjs` shows no warning)
 - [ ] A Marketplace document changed before the move is back to what the Marketplace shipped

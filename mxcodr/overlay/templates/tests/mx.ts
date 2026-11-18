@@ -37,13 +37,70 @@ function mprFile(): string {
   return mprs[0];
 }
 
+// An app Studio Pro has open (set up by the mx-codr extension): `./mxcodr-live oql --json` reads Studio Pro's run the
+// same way and prints the same rows. The tool is the extension's own copy in the person's user folder, never in the
+// app; setup names it in .mxcodr/live-tool.json (ignored by git). It runs on the Node that runs these tests, with no
+// shell (also on Windows, where ./mxcodr-live is a .cmd), and without the variables ./mxcodr-live clears. The query
+// goes before --json, as its usage has it (`oql "<query>" [--json]`): a live tool older than mx-codr 1.75.2 takes the
+// word after --json as that flag's value, so `oql --json "<query>"` reads as no query there.
+const LIVE_RECORD = path.join(APP, '.mxcodr', 'live-tool.json');
+const LIVE_UNSET = ['NODE_OPTIONS', 'NODE_PATH', 'MXCODR_MXCLI', 'MXCODR_MXCLI_UNPINNED', 'MXCODR_USER_DIR', 'MXCODR_CACHE'];
+// The live tool, or undefined in an app without the extension (then ./mxcli oql). A record that names no tool on
+// this computer is an error, never ./mxcli: that cannot read Studio Pro's run and would only fail later, less clearly.
+function liveTool(): string | undefined {
+  if (!fs.existsSync(LIVE_RECORD)) return undefined;
+  let tool: unknown;
+  try { tool = JSON.parse(fs.readFileSync(LIVE_RECORD, 'utf8')).tool; } catch { tool = undefined; }
+  if (typeof tool === 'string' && path.isAbsolute(tool) && path.basename(tool) === 'mxcodr-live.mjs' && fs.existsSync(tool)) return tool;
+  throw new Error(`oql: .mxcodr/live-tool.json names no mx-codr live tool on this computer (${String(tool)}); in the mx-codr pane: ⋯ > Setup and agents`);
+}
+
+// A Playwright run outside mx-codr's box: the live tool, or ./mxcli oql.
+function direct(query: string): string {
+  const bin = fs.existsSync(path.join(APP, 'mxcli.exe')) ? './mxcli.exe' : './mxcli';
+  const live = liveTool();
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIVE_UNSET.includes(k.toUpperCase())));
+  return live
+    ? execFileSync(process.execPath, ['--no-warnings', live, '--app', APP, 'oql', query, '--json'], { cwd: APP, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    : execFileSync(bin, ['oql', '-p', mprFile(), '--json', query], { cwd: APP, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+// Inside `./mxcodr-live tests run` (and the Tests tab, films, tests affected) the tests run in mx-codr's box, which
+// reaches neither the live tool's hub nor the runtime's admin port. That run gives the box a narrow channel in three
+// variables: the query goes as a file into MXCODR_OQL_ASK (<id>.part, renamed to <id>.json) with the run's key
+// MXCODR_OQL_KEY; the run checks it (one select, no ';', size limits, a cap per run), reads this app's runtime the
+// way ./mxcodr-live oql does and writes {rows} or {error} as <id>.json into MXCODR_OQL_ANSWER, a folder the box may
+// only read. oql() waits for it with a synchronous sleep, so it stays synchronous. Undefined without the channel; a
+// channel that fails throws (never the live tool: inside the box that cannot work either).
+const CHANNEL_WAIT_MS = 60_000;
+let channelSeq = 0;
+function channelOql(query: string): string | undefined {
+  const ask = process.env.MXCODR_OQL_ASK, answer = process.env.MXCODR_OQL_ANSWER, key = process.env.MXCODR_OQL_KEY;
+  if (!ask || !answer || !key) return undefined;
+  const id = `${process.pid}-${++channelSeq}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const part = path.join(ask, `${id}.part`);
+  fs.writeFileSync(part, JSON.stringify({ key, query }), { flag: 'wx', mode: 0o600 });
+  fs.renameSync(part, path.join(ask, `${id}.json`));
+  const file = path.join(answer, `${id}.json`);
+  const nap = new Int32Array(new SharedArrayBuffer(4));
+  const until = Date.now() + CHANNEL_WAIT_MS;
+  for (let wait = 2; !fs.existsSync(file); wait = Math.min(wait * 2, 25)) {
+    if (Date.now() > until) throw new Error(`oql: the test run did not answer within ${CHANNEL_WAIT_MS / 1000} s`);
+    Atomics.wait(nap, 0, 0, wait);
+  }
+  let got: { rows?: unknown; error?: unknown };
+  try { got = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { throw new Error('oql: the test run wrote an answer that is not JSON'); }
+  if (typeof got?.error === 'string') throw new Error(`oql: ${got.error}`);
+  return JSON.stringify(got?.rows);
+}
+
 // `./mxcli oql --json` reads the running app as administrator (it sees every row) through the admin API, and
 // prints a JSON array of objects keyed by the column aliases: every value a string ("5", "4200", dates as
 // "Sun Oct 18 03:40:33 CEST 2026") except Booleans (true/false, made 'true'/'false' here); a null column is
 // left out of its object. Put every column a test needs in one query: one server read per test.
 export function oql(query: string): Record<string, string>[] {
-  const bin = fs.existsSync(path.join(APP, 'mxcli.exe')) ? './mxcli.exe' : './mxcli';
-  const out = execFileSync(bin, ['oql', '-p', mprFile(), '--json', query], { cwd: APP, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // the run's channel first (inside mx-codr's box); else the live tool (an app Studio Pro has open); else ./mxcli
+  const out = channelOql(query) ?? direct(query);
   let data: unknown; // stdout holds only the JSON; the row count goes to stderr
   try { data = JSON.parse(out); } catch { throw new Error(`oql: not JSON: ${out.slice(0, 200)}`); }
   if (!Array.isArray(data)) throw new Error(`oql: expected a JSON array of rows, got: ${out.slice(0, 200)}`);
@@ -155,41 +212,33 @@ export async function signIn(page: Page, user: string, homeMarker: string, passw
   signedOut.delete(page);
 }
 
-// Clearing cookies or closing the page or its context leaves the session alive on the server. A page the role may not open
-// shows the login form (login.html?messageCode=403#/<page>) with no window.mx while the session lives on: that one is
-// ended by POST /xas/ {action:'logout'} with the token kept at sign-in; any other page by mx.logout().
-// Without a token from signIn (a sign-in of your own, another page object) it still ends the session: mx.logout()
-// when the page has window.mx, else the logout POST with a token read for the page's cookies; it returns quietly
-// only when the page has no session cookie or this helper signed it out and no app page opened since, and
-// otherwise throws, naming the page. Call it in test.afterEach, and before a second signIn in the same test.
+// Clearing cookies or closing the page or its context leaves the session alive on the server. signOut ends it with
+// POST /xas/ {action:'logout'} and the session's CSRF token: window.mx's own when the page shows the app, else the one
+// kept at sign-in (a page the role may not open shows the login form, login.html?messageCode=403#/<page>, with no
+// window.mx while the session lives on), else one read for the page's cookies. It leaves the app for about:blank
+// first: mx.logout() ends the session but reloads the app, and an app that lets anonymous users in (project security
+// off, or a guest role) starts a new anonymous session at once (measured on Mendix 11.12: every test left one).
+// It returns quietly only when the page has no session cookie or this helper signed it out and no app page opened
+// since, and otherwise throws, naming the page. Call it in test.afterEach, and before a second signIn in the same test.
 export async function signOut(page: Page) {
   const kept = csrf.get(page);
   csrf.delete(page);
   const hasCookie = async () => (await page.request.storageState()).cookies.some(c => c.name === 'XASSESSIONID');
   if (!kept && !(await hasCookie())) return; // never signed in (or the cookie is gone): nothing this page can end
+  if (!kept && signedOut.has(page) && page.url() === 'about:blank') return; // signed out here, no app page since
   const loginForm = page.locator('#usernameInput');
   await Promise.race([
     loginForm.waitFor({ timeout: 20_000 }),
     page.waitForFunction(() => typeof (window as any).mx?.logout === 'function', undefined, { timeout: 20_000 }),
   ]).catch(() => undefined);
-  const hasMx = await page.evaluate(() => typeof (window as any).mx?.logout === 'function').catch(() => false);
-  if (!kept && !hasMx && signedOut.has(page)) return; // signed out here before, and no app page since
-  if (kept && await loginForm.isVisible()) {
-    await postLogout(page.request, kept);
-  } else if (hasMx) {
-    // logout navigates away, which can destroy the evaluation before it returns; the login form shows the result
-    await page.evaluate(() => (window as any).mx.logout()).catch((e: Error) => {
-      if (!/context was destroyed|navigat/i.test(e.message)) throw e;
-    });
-    await loginForm.waitFor({ timeout: 20_000 }).catch(() => undefined);
-  } else {
-    const token = kept ?? await readToken(page.request);
-    if (token) {
-      await postLogout(page.request, token);
-    } else {
-      throw new Error(`signOut: could not end the session of the page at ${page.url()}: no window.mx and no CSRF token to log out with`);
-    }
-  }
+  // window.mx can be there before its session is (getConfig throws "Session is not available" then)
+  const mxToken = await page.evaluate(() => {
+    try { return (window as any).mx?.session?.getConfig('csrftoken') || undefined; } catch { return undefined; }
+  }).catch(() => undefined);
+  const token = mxToken ?? kept ?? await readToken(page.request);
+  if (!token) throw new Error(`signOut: could not end the session of the page at ${page.url()}: no window.mx and no CSRF token to log out with`);
+  await page.goto('about:blank'); // the app's client stops here: nothing reloads and opens another session
+  await postLogout(page.request, token);
   signedOut.add(page);
 }
 
