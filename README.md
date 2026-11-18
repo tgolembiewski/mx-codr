@@ -6,10 +6,10 @@ mx-codr v2 is a small installer. You run it once in a Mendix app. From then on t
 works in the app reads one always-on rule file, finds eleven skills next to mxcli's own, and gets a
 starter Playwright test kit. One thing runs while the agent builds, in Claude Code only: the **skill gate**
 (two hooks in the app's `.claude/settings.local.json`) refuses a model change or a test file until the agent
-has read the project skill for it whole. `MXCODR_SKILL_GATE=0` switches it off. There is no other gate and
+has read the project skill for it whole (since 2026.11.18.6 the gate script also understands Codex, which the Studio Pro extension wires up). `MXCODR_SKILL_GATE=0` switches it off. There is no other gate and
 no other refusal.
 
-The bundle is **2026.11.18.5**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.32.0.
+The bundle is **2026.11.18.7**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.32.0.
 
 ## What you get
 

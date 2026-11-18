@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.18.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.18.7** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,44 @@ Bundle **2026.11.18.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.18.7 (2026-11-19): **a plan's requirements name the document that builds them**. The owner's Windows
+  test (Codex, AssetBench): the plan card's brain block showed "Progress cannot be tracked for this one yet." under
+  each of R1-R13, because Codex wrote every `Requirement:` line without `| anchor`, which the rule allowed ("no anchor
+  yet: leave out ` | anchor ...`"). (1) `templates/brain.md`: the anchor is the NEW page or microflow that will build
+  the requirement, though it does not exist yet (`@AssetBench.Samochod_Lista`), left out only when the requirement
+  has no document of its own. (2) One exception to "never edit an entry unasked": a requirement the agent finished
+  that has no anchor gets `./mxcli brain edit <id> -a @<its document>` (id from `brain list`). Measured with mxcli
+  0.32.0 on a scratch brain (`brain init -C`, capture, promote, `edit <id> -a @Cars.Car_Overview`): the anchor is
+  replaced, the id, title, body and place kept; not tried against a real `.mpr`. It writes the committed shard
+  without the person's approval, also with `MXCODR_PANEL=1`. The rule grows to 26 lines, 2,397 characters (size test:
+  2,300 -> 2,400). `templates/mxcodr.md` and the plan-first templates are unchanged. The extension's pane says it
+  once instead of per row (`spikes/studio-pro-ext/README.md`).
+- 2026.11.18.6 (2026-11-18): **the skill gate for Codex, and one skill per command**. CarFleet's Codex session
+  (CarFleetCodexSol, 2026-11-18 20:38:53Z) read `naming-and-captions`, `reuse-and-snippets` and `spacing-and-layout`
+  in one code-mode `exec` cell (`Promise.allSettled` over seven `exec_command` calls, each `max_output_tokens: 7500`);
+  the cell's own budget (10,000 tokens unless its first line is `// @exec: {"max_output_tokens": N}`) cut the
+  12,236-token output ("…2236 tokens truncated…"), most of `spacing-and-layout` never reached the model, and the app
+  got 26 action buttons with no spacing between them. (1) `templates/mxcodr.md`, still 38 lines: each skill whole and
+  in its own read or command, never several in one call (no combined `cat`, no `Promise.all`, no loop); Claude
+  Code: the Read tool; Codex: one `exec_command` per file with `max_output_tokens: 30000` and an `exec` script that
+  starts with `// @exec: {"max_output_tokens": 30000}`; a truncated output is read on by line ranges before
+  building; the gate sentence names Codex in the pane. (2) `lib/skill-gate.mjs` gains a Codex adapter
+  (`pre|post --agent=codex`, `--shell=powershell` on Windows). Measured with Codex 0.167.0 in a scratch folder: its
+  hooks get `tool_name` `Bash` for `exec_command` (`tool_input` `{command}` only) and `apply_patch` (`{command}`: the
+  patch), PostToolUse's `tool_response` is the output as the model sees it (Codex's truncation marks included), the
+  `exec` cell itself gets no hook but is in `transcript_path` before its commands' hooks run and its output before
+  the next cell's, and exit 2 with the reason on stderr blocks a nested command and an `apply_patch` ("Command
+  blocked by PreToolUse hook: <reason>"). A read counts when one command reads one gated SKILL.md
+  (`.agents/skills/` or `.claude/skills/`; `cat`, `nl`, `type`, `Get-Content`, or a range: `sed -n 'A,Bp'`,
+  `head`, `tail -n +K`, `Select-Object -Skip/-First`, `Get-Content -TotalCount`), its output has no truncation
+  mark and shows the range's last line, and, in a cell, once that cell's output is in the transcript with neither a
+  mark nor that line missing (a read and a write in the same cell do not count); ranges count once they cover the
+  file. The evidence, three clean command outputs in a cut cell, records nothing. Gated as for Claude Code: model
+  writes (`./mxcodr-live exec`, `mxcli exec`, `mxcli -c`) and test specs added, updated or moved to by `apply_patch`
+  (or a patch through the shell). The deny names the `.agents/skills/` files and says how to read them (one per
+  command, both 30000 knobs, line ranges after a cut). Fails open; `MXCODR_SKILL_GATE=0` switches it off. Wired
+  only by the extension (`.codex/hooks.json`, trusted with the guards); file mode installs no Codex hooks (Codex
+  would not run them untrusted). Pi and Copilot have no gate.
 - 2026.11.18.5 (2026-11-18, live mode only; file mode writes what it did): **a Codex, Pi or Copilot plan is the plan
   card**. On Windows with Plan first on, Codex wrote its plan (from 2026.11.18.3's AGENTS.md rule) as plain chat text
   and ended with "after the plan is approved in the panel I will start", while the pane showed no card: only Claude
@@ -280,6 +318,10 @@ Bundle **2026.11.18.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
     panel on Approve), and the panel's session-start brain pack replaces reading `docs/brain/` (and mxcli's
     "Project Brain" section), a module shard through `./mxcli brain brief --module <M>`. Without it the person
     approves in the chat and the requirement list is `./mxcli brain list --kind requirement`.
+  - 2026-11-19 (bundle 2026.11.18.7), owner: a plan's requirement anchor names the NEW page or microflow that will
+    build it, though it does not exist yet, left out only when the requirement has no document of its own; and the
+    one unasked edit: a finished requirement without an anchor gets `./mxcli brain edit <id> -a @<its document>` (the
+    rule: 26 lines, 2,397 characters; the size test now allows 26 lines and 2,400).
   - 2026-11-14, owner: every entry is a short title (about 8 words) with its details on the second line; plan lines
     take `| why <details>`; decisions are numbered `D<n>` like requirements (the rule: 25 lines, 2,216 characters;
     the size test now allows 26 lines and 2,300).
@@ -471,9 +513,9 @@ Bundle **2026.11.18.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
 A person installs this into a Mendix app once. From then on the coding agent that builds in the app reads
 one short rule file on every turn and finds our skills next to mxcli's. It builds with mxcli, checks its own
 work, keeps those checks as plain Playwright tests and shapes the app the way the skills describe.
-One thing runs while it builds, in Claude Code only (since 2026.11.18.2): the skill gate (`overlay/lib/skill-gate.mjs`)
-refuses a model change or a test file until the agent has read the project skill for it whole; no verdict, no
-other refusals.
+One thing runs while it builds, in Claude Code (since 2026.11.18.2) and in Codex in the Studio Pro extension (since
+2026.11.18.6): the skill gate (`overlay/lib/skill-gate.mjs`) refuses a model change or a test file until the agent
+has read the project skill for it whole; no verdict, no other refusals.
 
 ## What is in the bundle
 
@@ -514,7 +556,8 @@ other refusals.
 
 - **The rule file** (`overlay/templates/mxcodr.md`): first (since 2026.11.18.2) which project skill to read whole
   before which part, one line per skill with its trigger, before the plan and before `./mxcli syntax` (mxcli's
-  "read a section" only for its own skills), and that Claude Code's skill gate holds the agent to it; then the
+  "read a section" only for its own skills), each in its own read or command with Codex's two output limits named
+  (since 2026.11.18.6), and that the skill gate (Claude Code; Codex in the extension) holds the agent to it; then the
   7-line keep-tests rule, then how to write the suite
   on `tests/mx.ts`, prove a refusal as the wrong role without weakening the app, run the whole suite in the
   foreground, finish only after a table `requirement -> test that asserts it` (coverage on: after
@@ -728,7 +771,9 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   Server, offered by the pane's ⋯ > Check setup); the extension never makes a repository or a commit (live.26).
 - hooks (the extension's setup writes them into `.claude/settings.local.json`; of these, file mode installs only the
   skill gate): the skill gate (since bundle 2026.11.18.2, `overlay/lib/skill-gate.mjs` run from the runtime through
-  `translator/bin/guard.sh skill-gate pre|post`, two entries of their own, a file-mode copy in the app removed), and in
+  `translator/bin/guard.sh skill-gate pre|post`, two entries of their own, a file-mode copy in the app removed; since
+  2026.11.18.6 also for Codex in `.codex/hooks.json`, `guard.sh skill-gate pre|post --agent=codex`, on Windows
+  `translator/bin/skill-gate.cmd`), and in
   one `PreToolUse` entry on `Bash|PowerShell` the git guard (`translator/bin/git-guard.mjs`: since live.30 an
   allowlist of read-only git, everything else is the person's in Studio Pro's Version Control) and, since LIVE 15, the sed guard (`translator/bin/sed-guard.mjs`):
   on macOS a GNU-style `sed -i 's/…/…/' file` is refused before it runs (BSD sed takes the word after `-i` as the

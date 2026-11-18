@@ -1,9 +1,9 @@
 # Read the project skill before you build its part
 
 Before you write the plan and before `./mxcli syntax`, read the project skill for each part you will touch,
-in `.claude/skills/` (beside mxcli's), each whole: the Read tool with no offset or limit, one file per read,
-never `head`, `cut` or a combined `cat`. mxcli's "read a skill's section, not the file" holds only for
-mxcli's own skills in `.ai-context/skills/`.
+in `.claude/skills/` (beside mxcli's), each whole and each in its own read or command: never several files in one call
+(no combined `cat`, no `Promise.all`, no loop), never `head` or `cut`; Claude Code: the Read tool, no offset or limit.
+Codex: one `exec_command` per file with `max_output_tokens: 30000`, and an `exec` script starts with `// @exec: {"max_output_tokens": 30000}`.
 - `module-structure`: before the first module, folder, move or new document of any kind
 - `naming-and-captions`: before naming anything: documents, variables, widgets `<Page>_<What><Type>`, captions
 - `app-security`: before sign-in, module or user roles, grants, access rules, demo users, project security
@@ -12,8 +12,8 @@ mxcli's own skills in `.ai-context/skills/`.
 - `java-action-docs`: before any Java action (its documentation)
 - `durable-tests`: before you write or edit a test in `tests/` (what deserves a test)
 
-In Claude Code a skill gate holds you to this list: a model change or a test file that needs a skill not
-yet read whole in this session is refused, naming the files to read.
+If an output says it was truncated, read the rest by line ranges before you build. mxcli's "read a skill's section, not the file" holds only for mxcli's own skills in `.ai-context/skills/`.
+In Claude Code, and in Codex in Studio Pro's mx-codr pane, a skill gate holds you to this list: a model change or a test file that needs a skill not yet read whole in this session is refused, naming the files to read.
 
 # Keep your checks as tests
 
