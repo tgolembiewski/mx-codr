@@ -399,11 +399,21 @@ test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGEN
   assert.match(t, /Small changes \(a caption, one\sfield, a bug fix\) go straight ahead/);
   assert.match(t, /task\slist first \(Task list in mx-codr's live rules\)/);
   assert.doesNotMatch(t, /EnterPlanMode|ExitPlanMode|TaskCreate|TodoWrite/);
+  // bundle 2026.11.18.5 (owner, Windows, Codex): the plan wrapped in two marker lines of its own, which the pane's
+  // bridges turn into the plan card; nothing after the closing line, no approval asked in words
+  const lines = t.split('\n');
+  assert.ok(lines.includes('<!-- mxcodr:plan -->') && lines.includes('<!-- mxcodr:plan-end -->'), 'both marker lines, each on its own');
+  assert.ok(lines.indexOf('<!-- mxcodr:plan -->') < lines.indexOf('<!-- mxcodr:plan-end -->'));
+  assert.match(t, /Write nothing after the closing line/);
+  assert.match(t, /Requirement and Decision lines/);
+  assert.doesNotMatch(t, /mxcodr-plan:(start|end)/, 'never the AGENTS.md block markers inside the block');
   // the extension's source is not in the public repository: compare the markers only where it is
   const permsUrl = new URL('../../spikes/studio-pro-ext/translator/src/permissions.mjs', import.meta.url);
   if (fs.existsSync(permsUrl)) {
     const perms = fs.readFileSync(permsUrl, 'utf8');
     assert.ok(perms.includes(`PLAN_START = "${PLAN_START}", PLAN_END = "${PLAN_END}"`), 'the same markers as the extension writes');
+    const cfg = fs.readFileSync(new URL('../../spikes/studio-pro-ext/translator/src/codex-config.mjs', import.meta.url), 'utf8');
+    assert.ok(cfg.includes('PLAN_OPEN = "<!-- mxcodr:plan -->", PLAN_CLOSE = "<!-- mxcodr:plan-end -->"'), 'the same plan markers as the bridges read');
   }
   const f = path.join(tmp(), 'AGENTS.md');
   fs.writeFileSync(f, `${MXCLI_BEGIN} -->\nmxcli\n${MXCLI_END}\n\n${PLAN_START}\n${t.trim()}\n${PLAN_END}\n`);

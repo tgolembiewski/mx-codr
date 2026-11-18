@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.18.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.18.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,16 @@ Bundle **2026.11.18.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.18.5 (2026-11-18, live mode only; file mode writes what it did): **a Codex, Pi or Copilot plan is the plan
+  card**. On Windows with Plan first on, Codex wrote its plan (from 2026.11.18.3's AGENTS.md rule) as plain chat text
+  and ended with "after the plan is approved in the panel I will start", while the pane showed no card: only Claude
+  Code's ExitPlanMode, or the pane's Plan button, made one. `templates/plan-first-agents.md` now has the agent wrap the
+  plan in two lines of their own, `<!-- mxcodr:plan -->` and `<!-- mxcodr:plan-end -->` (a title heading, the steps,
+  the Requirement and Decision lines inside; not in a code block) and write nothing after it. The extension's bridges
+  turn a final message with them into the same ExitPlanMode card in any mode (Approve and build, Keep planning, the
+  brain entries saved on Approve), and the pane leaves the two lines out of the text it shows. Tests:
+  `live.test.mjs` (the markers, the same strings as the bridges'; fails on 2026.11.18.4), the extension's
+  `codex.test.mjs`, `pi.test.mjs`, `copilot.test.mjs` and the pane's `chat.test.ts`.
 - 2026.11.18.4 (2026-11-18, live mode only; file mode writes what it did): **the open app is the only target**. On a
   colleague's machine Codex, given a requirements prompt saying "Use Mendix Studio Pro 11.15.0 ... build a working
   app", created a new Mendix project instead of building in the app open in Studio Pro (cause unconfirmed: likely a
@@ -712,7 +722,8 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   task of three or more steps and after an approved plan (live.33; `templates/plan-first.md` is the pane's switchable
   "Plan first for bigger requests" rule, written as `.claude/rules/mxcodr-plan.md`; since 2026.11.18.3
   `templates/plan-first-agents.md`, the same rule without Claude Code's tool names, goes into AGENTS.md between
-  `<!-- mxcodr-plan:start/end -->` for Codex, Pi and Copilot), only the person commits, in Studio Pro (Version
+  `<!-- mxcodr-plan:start/end -->` for Codex, Pi and Copilot; since 2026.11.18.5 their plan is wrapped in
+  `<!-- mxcodr:plan -->` / `<!-- mxcodr:plan-end -->`, which the pane shows as the plan card), only the person commits, in Studio Pro (Version
   Control > Commit), and nobody runs `git init`: version control is Studio Pro's (Upload to Version Control
   Server, offered by the pane's ⋯ > Check setup); the extension never makes a repository or a commit (live.26).
 - hooks (the extension's setup writes them into `.claude/settings.local.json`; of these, file mode installs only the
