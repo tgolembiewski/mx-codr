@@ -1,3 +1,20 @@
+# Read the project skill before you build its part
+
+Before you write the plan and before `./mxcli syntax`, read the project skill for each part you will touch,
+in `.claude/skills/` (beside mxcli's), each whole: the Read tool with no offset or limit, one file per read,
+never `head`, `cut` or a combined `cat`. mxcli's "read a skill's section, not the file" holds only for
+mxcli's own skills in `.ai-context/skills/`.
+- `module-structure`: before the first module, folder, move or new document of any kind
+- `naming-and-captions`: before naming anything: documents, variables, widgets `<Page>_<What><Type>`, captions
+- `app-security`: before sign-in, module or user roles, grants, access rules, demo users, project security
+- `spacing-and-layout`: before any page, snippet, layout or navigation (menu, Back, signed-in user, icons)
+- `files-and-images`: before a file or image entity, an upload or an image widget
+- `java-action-docs`: before any Java action (its documentation)
+- `durable-tests`: before you write or edit a test in `tests/` (what deserves a test)
+
+In Claude Code a skill gate holds you to this list: a model change or a test file that needs a skill not
+yet read whole in this session is refused, naming the files to read.
+
 # Keep your checks as tests
 
 Every check you make of the running app — a browser flow per role, a refusal, data isolation, a
@@ -18,8 +35,4 @@ to silence a check; fix the leaking test. Stop the app with
 `./mxcli run stop`, and any other process only by the exact PID you started, never by a name pattern
 (`pkill`, `killall`): that also kills the person's own browsers and test runs.
 
-Before building a part, read its project skill in `.claude/skills/` (beside mxcli's): `durable-tests`
-what deserves a test; `app-security` sign-in, roles, row isolation; `spacing-and-layout` menu, Back,
-signed-in user, icons, spacing; `naming-and-captions` variables, captions, widgets `<Page>_<What><Type>`;
-`module-structure` modules and folders; `files-and-images` uploads; `java-action-docs` every Java action's documentation. Read each of these skills whole, one file per read, never through `head`, `cut` or a combined `cat`; of mxcli's own skills in `.ai-context/skills/` read only the section you need.
 Never add a document to a Marketplace module (`list modules`: Source `Marketplace v...`) or change one in it: its next update deletes the addition and undoes the change; the app's documents go in its own module, a changed copy in `<Module>Ext`. Marketplace widgets only from publisher Mendix or Mendix Labs. Once `docs/app-docs.html` exists, update it with the `app-docs` skill at the end of every turn that changed the model, before you report.

@@ -77,7 +77,7 @@ test('main(): the flags read, asked after the agents and before the theme, recor
   assert.match(src, /writeRules\(app, agents, \{ coverage: cov\.on \}\)/);
   assert.match(src, /copySkills\(app, agents, undefined, \{ coverage: cov\.on \}\)/);
   assert.match(src, /skills, \.\.\.coverageRecord\(cov\), testKit/);
-  assert.match(src, /ui\.plan\(14 \+ \(newApp \? 1 : 0\) \+ \(cov\.on \? 1 : 0\)/);
+  assert.match(src, /ui\.plan\(15 \+ \(newApp \? 1 : 0\) \+ \(cov\.on \? 1 : 0\)/);
   // the brain is created on every install, in its own step before this one (test/brain.test.mjs)
   assert.match(src, /if \(cov\.on\) \{\n\s*ui\.begin\('installing the coverage check'\);\n\s*ui\.done\('coverage', `1 \$\{ui\.i\.arrow\} \$\{copyCoverage\(app\)\}/);
   assert.match(src, /\} else \{\n\s*const off = coverageOff\(app, prev\);/);

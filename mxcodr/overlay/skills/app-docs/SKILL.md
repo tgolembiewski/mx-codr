@@ -152,8 +152,10 @@ the database or the brain; anything you did not read.
 - **Update**: `node <this skill's folder>/fingerprint.mjs -p <app>.mpr --check docs/app-docs.html` names the parts
   that differ. For each, gather only that part again (step 3 for that module, 4 for `app`, 5 for `brain`) and
   rewrite the sections with that `data-src`, plus the lines in How it is built, Things to know and Where to start
-  that mention what changed. Then the new meta and hashes. Never rewrite an unchanged section. `"mxcli": true` (another
-  mxcli version): write everything again. A passage with an open or answered comment (section 7) stays word for word
+  that mention what changed. Then the new meta and hashes. Never rewrite an unchanged section. `"current": true`
+  with `"mxcli": true` (another mxcli version, the same saved model): only the new meta and hashes, no text. Parts
+  `["model"]` (the model changed and the page was written with another mxcli, so the parts cannot be told): write
+  everything again. A passage with an open or answered comment (section 7) stays word for word
   unless the part it was written from changed; then rewrite it and answer the comment with what changed.
 
 ## 7. Comments

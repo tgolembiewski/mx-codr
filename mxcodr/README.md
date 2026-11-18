@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.17.15** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.18.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,57 @@ Bundle **2026.11.17.15** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.3
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.18.3 (2026-11-18, live mode only; file mode writes what it did): **Plan first for Codex, Pi and Copilot**.
+  Measured in a Codex session from the pane (CarFleetCodexSol, Plan first on): the rule reached only Claude Code
+  (`.claude/rules/mxcodr-plan.md`, naming EnterPlanMode/ExitPlanMode); Codex wrote the model within a minute, no plan.
+  New `templates/plan-first-agents.md`: the same rule in words any agent can follow (present the plan as your message,
+  end the turn, change nothing until the person approves). The extension writes it into the app's AGENTS.md between
+  `<!-- mxcodr-plan:start/end -->` while the pane's switch is on. `install.mjs` exports `PLAN_START`/`PLAN_END`, and
+  `isScaffoldLeftover` reads an AGENTS.md whose only text besides mxcli's section and our block is that block as
+  generated. Same release: Codex on preset Trust may run the app and the tests (the extension's Codex rules,
+  `spikes/studio-pro-ext/README.md`, "Codex: Plan first and Trust").
+- 2026.11.18.2 (2026-11-18): **the skill gate** and the project skills first in the rule file. Measured in CarFleet's
+  session (live mode, 2026-11-18): the rule "before building a part, read its project skill" sat mid-file and was
+  ignored: `app-security` read before planning, `naming-and-captions` only after the domain model and security were
+  executed, `spacing-and-layout` before pages, `module-structure` never (no folders until the person asked),
+  `durable-tests` never although the agent wrote `tests/*.spec.ts`. Two causes besides the vague trigger: mxcli's own
+  `CLAUDE.md` section says "read a skill's section, not the file" and "`./mxcli syntax` before any skill".
+  Now (1) `templates/mxcodr.md` opens with `# Read the project skill before you build its part`: one line per
+  skill with its concrete trigger, read whole before the plan and before `./mxcli syntax`, mxcli's "section" advice
+  limited to mxcli's own skills in `.ai-context/skills/`; the keep-tests rule follows it unchanged (`checkRule` now
+  wants the skills section, then the 7 keep-tests lines; 38 template lines, 32 in the body). `lib/skilloff.mjs` drops a
+  switched-off skill's line, the section when none is left. (2) `lib/skill-gate.mjs`, Claude Code hooks in
+  `.claude/settings.local.json` (`mxcli init` overwrites `settings.json`, not this file): PostToolUse on
+  `Read|Skill` records a gated skill read whole (no limit, or one that covers the file; the Skill tool loading it) in
+  `.mxcodr/state/skills-read-<session>/<name>` (one empty file per skill, so parallel Reads all count; a
+  read in another folder does not); PreToolUse on `Bash|PowerShell|Write|Edit|MultiEdit` refuses (exit 2,
+  the SKILL.md paths to read on stderr) `./mxcodr-live exec`, `mxcli exec` and `mxcli -c` whose MDL needs a skill not
+  read yet in this session, and a write of `tests/**/*.spec.ts` before `durable-tests`. The MDL is the script file
+  the command names (else the command's own text, a heredoc), comments and quoted strings left out: a new module,
+  folder, move or document -> `module-structure` + `naming-and-captions`; roles, grants, access, demo users, project
+  security -> `app-security`; pages, snippets, layouts, navigation -> `spacing-and-layout` + `naming-and-captions`;
+  `System.FileDocument`/`System.Image`, upload and image widgets -> `files-and-images`; a Java action ->
+  `java-action-docs`. Only skills the app has in `.claude/skills/` are asked for (a switched-off one is not); check,
+  query, show and describe never are. It fails open (any error, bad input, a missing script, no Node, a state folder it cannot write), and
+  `MXCODR_SKILL_GATE=0` in Claude Code's environment switches it off. File mode copies it to `.mxcodr/skill-gate.mjs`
+  (`node "$CLAUDE_PROJECT_DIR/.mxcodr/skill-gate.mjs" pre|post`, a new installer step); live mode runs the runtime's
+  copy through `guard.sh skill-gate pre|post` and removes a file-mode copy. Cursor, Codex, opencode and Pi get the
+  rule text, not the gate. The installer writes nothing into `CLAUDE.md` outside mxcli's markers, so no line there.
+- 2026.11.18.1 (2026-11-18): `app-docs/fingerprint.mjs` format 2, after the owner was asked to update the docs almost
+  every time he opened the Docs tab with nothing changed in the app. Measured on a large real app (Windows, mxcli 0.32): 4 of
+  the 5 stale reports in two days named only `app`, 3 of them with no model save in between; swapping only
+  `modules/MxCodr.mxmodule` (1.82.74 -> 1.82.72) on a copy flipped `app`: mx-codr's own add-on modules carry the
+  package version into `show modules`. mxcli 0.31 -> 0.32 changed 3 of 6 module hashes on unchanged models (DESCRIBE's
+  wording), and DESCRIBE names pluggable widgets from the app's widget definitions (mxcli's `.mxcli/widgets` cache).
+  Now: `model`, the bytes of the `.mpr` and `mprcontents/` (0.1-0.3 s on that app's 2069 units), is the witness: unchanged
+  -> current whatever DESCRIBE says (another mxcli included: the agent writes only the new meta); changed under the
+  same mxcli -> the parts that differ (layout only: none); changed under another mxcli -> parts `["model"]`, written
+  again. `app` leaves out Type `Add-on` modules and the module `Version` column (1.0.0 on every app module);
+  `brain` is `docs/brain/plan/` only (the requirements the page cites; decisions captured elsewhere change nothing).
+  `stamp(html, fp)` writes a fingerprint into the meta, each section's `data-hash` and the footer (the extension's
+  Mark as current). A page written before format 2 (no witness) is compared on its module parts and on its brain as
+  it was then (all of `docs/brain/`), never on `app`, which held the add-on versions and cannot be computed again: no
+  bar on first open after the update (a large real app's real page, checked on a copy in the Windows VM: current).
 - 2026.11.17.15 (2026-11-17): `live.md`, CE4899 (an empty default-language text, `Empty caption. [German,
   Switzerland]`), CW0263 or a request for another language: the agent translates through `./mxcodr-live translate`
   (`status`, `todo`, its translations into the file the todo names, `apply`, then `problems`); `copy --from` only when
@@ -401,7 +452,9 @@ Bundle **2026.11.17.15** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.3
 A person installs this into a Mendix app once. From then on the coding agent that builds in the app reads
 one short rule file on every turn and finds our skills next to mxcli's. It builds with mxcli, checks its own
 work, keeps those checks as plain Playwright tests and shapes the app the way the skills describe.
-**Nothing runs behind the agent's back**: no hooks, no refusals, no verdict, no settings edits.
+One thing runs while it builds, in Claude Code only (since 2026.11.18.2): the skill gate (`overlay/lib/skill-gate.mjs`)
+refuses a model change or a test file until the agent has read the project skill for it whole; no verdict, no
+other refusals.
 
 ## What is in the bundle
 
@@ -412,14 +465,16 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
                                    question and choice), requests.mjs, cache.mjs, ports.mjs (is a port
                                    free: the --boot smoke boot's port check),
                                    theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs),
+                                   skill-gate.mjs (Claude Code's skill gate; copied into the app as
+                                   .mxcodr/skill-gate.mjs, its hooks in .claude/settings.local.json),
                                    ui.mjs (what the installer prints: v1's banner, bar, marks, summary)
     overlay/themes/                catalog.json, per theme <name>.css (tokens) and <name>.skin.scss (frame),
                                    logos/<name>/, the preview page and its screenshots
-    overlay/templates/mxcodr.md    the always-on rule file, 25 lines
+    overlay/templates/mxcodr.md    the always-on rule file, 38 lines
     overlay/templates/brain.md     the brain rule, 23 lines, appended to every shape of the rule text
     overlay/templates/live.md      live mode only (the Studio Pro extension): .claude/rules/mxcodr-live.md
     overlay/lib/live.mjs           live mode only: the edits of the rule file and the skills
-    overlay/templates/keep-tests.md its first 7 lines, byte for byte the sk2 rule
+    overlay/templates/keep-tests.md its 7 lines after the skills section, byte for byte the sk2 rule
     overlay/templates/tests/       the starter test kit
     overlay/lib/kit-shipped.json   sha256 of every kit version shipped (an unedited one is replaced)
     tools/kit-shipped.mjs          writes kit-shipped.json from git history; rerun after a kit change
@@ -438,16 +493,19 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
 | Codex (`codex`), Pi (`pi`) | a block in `AGENTS.md` between `<!-- mxcodr:start -->` and `<!-- mxcodr:end -->`, after mxcli's section | `.agents/skills/<name>/` |
 | opencode (`opencode`) | the same `AGENTS.md` block | `.opencode/skills/<name>/` (beside mxcli's) |
 
-- **The rule file** (`overlay/templates/mxcodr.md`): the 7-line keep-tests rule, then how to write the suite
+- **The rule file** (`overlay/templates/mxcodr.md`): first (since 2026.11.18.2) which project skill to read whole
+  before which part, one line per skill with its trigger, before the plan and before `./mxcli syntax` (mxcli's
+  "read a section" only for its own skills), and that Claude Code's skill gate holds the agent to it; then the
+  7-line keep-tests rule, then how to write the suite
   on `tests/mx.ts`, prove a refusal as the wrong role without weakening the app, run the whole suite in the
   foreground, finish only after a table `requirement -> test that asserts it` (coverage on: after
   `node tests/coverage.mjs` shows `0 missing`) and one green `--shuffle` run
   with `sessions left: 0` (never silencing the kit's checks), and stop processes only with `./mxcli run stop` or
-  their own PID; last, one paragraph naming the skills by trigger word. Then, after one empty line, the brain
+  their own PID; last, the Marketplace and app-docs line. Then, after one empty line, the brain
   rule (`overlay/templates/brain.md`, see *Since 2026.11.14.1*). The `.mdc` and the `AGENTS.md` block
   are made from it in `overlay/lib/rules.mjs`. The installer checks every file it writes: first byte `#`, no
-  frontmatter (the `.mdc`: only Cursor's own), no body line equal to `---`, the first 7 body lines equal to
-  the keep-tests rule. The `AGENTS.md` block is written only for Codex, opencode or Pi.
+  frontmatter (the `.mdc`: only Cursor's own), no body line equal to `---`, the skills section followed by the 7 lines of
+  the keep-tests rule (or those 7 lines first, when every skill in that section is switched off). The `AGENTS.md` block is written only for Codex, opencode or Pi.
 - **The skills** (`overlay/skills/`, the list in `overlay/lib/skills.mjs`):
   - `durable-tests`: what deserves a test, on the kit, one worker, the whole suite shuffled at the end;
     `reference/mendix-dom.md`, how Mendix renders for tests
@@ -471,8 +529,9 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
     page (each module's data model as a drawing, how it is built, things to know, where to start, requirements) from
     `template.html` beside the skill; only on request (the extension's Docs tab, or the person's words), then updated
     at the end of every turn that changed the model (the rule file's last sentence, dropped when the skill is switched
-    off). `fingerprint.mjs` beside it hashes the model per module without layout lines, plus the app settings and
-    `docs/brain/`; the agent writes it into the page's meta and the Docs tab computes it again (live mode:
+    off). `fingerprint.mjs` beside it hashes the model per module without layout lines, plus the app settings, the module
+    list without add-ons and the requirements (`docs/brain/plan/`), with the model's own files as the witness (format
+    2: unchanged files -> current, whatever mxcli version); the agent writes it into the page's meta and the Docs tab computes it again (live mode:
     `./mxcodr-live docs fingerprint|check`, the same file). Every Mendix name is an `a.mx` link the tab opens in Studio
     Pro. The template's `@media print` rules make the extension's PDF (light theme, a section per page, the drawing
     whole). The skill's section Comments: the person's comments in `docs/app-docs.comments.json`, fixed or answered.
@@ -560,7 +619,9 @@ in step 2, no theme question without a terminal or with `--yes`. On Windows, run
    `mxcli brain init` when `docs/brain/` is missing (every install), with coverage on also `tests/coverage.mjs`, then
    `mxcli init --sync-skills .`, so mxcli's own skills and its sections of `CLAUDE.md`/`AGENTS.md` match the
    pinned binary (after our files: it fills the mxcli markers step 6 may have written). Then
-   `.mxcodr/theme.mjs` and `.mxcodr/themes/`.
+   `.mxcodr/theme.mjs` and `.mxcodr/themes/`. With Claude Code among the agents, the skill gate:
+   `.mxcodr/skill-gate.mjs` and its two hooks in `.claude/settings.local.json` (earlier ones replaced, the person's
+   settings kept; without Claude Code both go; a settings file that is not JSON is left alone and said).
 7. **`--request <file>`**: the request saved word for word as `docs/requests/NN.md`.
 8. **`--boot`**: `mxcli run --local --detach` (Mendix's default ports when free, else three free ones from
    18080; free: a bind on 127.0.0.1 works and nothing answers a connect on 127.0.0.1 or ::1), `mxcli run wait --ready`, `mxcli run stop`.
@@ -640,11 +701,15 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   (`./mxcodr-live tests film <file>[:line]`, only when the person asks; Watch film in the Tests tab), microflow
   tests with `./mxcodr-live test` on a copy, never `mxcli init`, a task list (Claude Code's TaskCreate/TaskUpdate) for any
   task of three or more steps and after an approved plan (live.33; `templates/plan-first.md` is the pane's switchable
-  "Plan first for bigger requests" rule, written as `.claude/rules/mxcodr-plan.md`), only the person commits, in Studio Pro (Version
+  "Plan first for bigger requests" rule, written as `.claude/rules/mxcodr-plan.md`; since 2026.11.18.3
+  `templates/plan-first-agents.md`, the same rule without Claude Code's tool names, goes into AGENTS.md between
+  `<!-- mxcodr-plan:start/end -->` for Codex, Pi and Copilot), only the person commits, in Studio Pro (Version
   Control > Commit), and nobody runs `git init`: version control is Studio Pro's (Upload to Version Control
   Server, offered by the pane's ⋯ > Check setup); the extension never makes a repository or a commit (live.26).
-- hooks, live mode only (the extension's setup writes them into `.claude/settings.local.json`, one `PreToolUse`
-  entry on `Bash`; file mode installs no hook): the git guard (`translator/bin/git-guard.mjs`: since live.30 an
+- hooks (the extension's setup writes them into `.claude/settings.local.json`; of these, file mode installs only the
+  skill gate): the skill gate (since bundle 2026.11.18.2, `overlay/lib/skill-gate.mjs` run from the runtime through
+  `translator/bin/guard.sh skill-gate pre|post`, two entries of their own, a file-mode copy in the app removed), and in
+  one `PreToolUse` entry on `Bash|PowerShell` the git guard (`translator/bin/git-guard.mjs`: since live.30 an
   allowlist of read-only git, everything else is the person's in Studio Pro's Version Control) and, since LIVE 15, the sed guard (`translator/bin/sed-guard.mjs`):
   on macOS a GNU-style `sed -i 's/…/…/' file` is refused before it runs (BSD sed takes the word after `-i` as the
   backup suffix and fails with "invalid command code"), with "macOS sed needs a backup suffix: use the Edit tool,
@@ -654,7 +719,8 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
 
 - skills switched off in the extension's Rules tab (`overlay/lib/skilloff.mjs`, the `skillsOff` option of
   `ruleText`, `writeRules` and `copySkills`; the extension only): their folder is `.mxcodr/skills-off/<name>/`, the
-  rule file's paragraph naming the skills leaves them out (re-wrapped; the whole paragraph goes when none is left),
+  rule file's first section naming the skills loses their lines (the whole section goes when none is left), the
+  skill gate stops asking for them (they are not in `.claude/skills/`),
   the live rule file's films bullet goes with `film-tests`. With none switched off (file mode, always) every output
   is byte for byte what it was;
 

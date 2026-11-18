@@ -3,21 +3,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { readTemplate, ruleText, mdcText, parseRule, bodyLines, checkRule, SKILLS_DIR, DONE_SENTENCE, withCoverageDone, BRAIN_RULE } from '../overlay/lib/rules.mjs';
 import { skillsFor } from '../overlay/lib/skills.mjs';
+import { SKILLS_HEADING } from '../overlay/lib/skilloff.mjs';
 
 const read = p => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
 const rule = readTemplate('mxcodr.md');
-// every shape of the rule text ends on the brain rule (templates/brain.md, test/brain.test.mjs): 25 + 1 + its lines
+// every shape of the rule text ends on the brain rule (templates/brain.md, test/brain.test.mjs): 38 + 1 + its lines
 const brain = readTemplate(BRAIN_RULE);
 const installed = rule + '\n' + brain;
-const LINES = installed.split('\n').length - 1, BODY = 22 + bodyLines(brain);
+const LINES = installed.split('\n').length - 1, BODY = 32 + bodyLines(brain);
 
-test('the template opens with sk2\'s keep-tests rule byte for byte (the measured file) and is 25 lines', () => {
+test('the template opens with the project-skills section (bundle 2026.11.18.2), then sk2\'s keep-tests rule byte for byte (the measured file); 38 lines', () => {
   assert.equal(read('../overlay/templates/keep-tests.md'), read('./fixtures/keep-tests.md'));
-  assert.ok(rule.startsWith(read('./fixtures/keep-tests.md')));
-  assert.equal(rule.split('\n').length - 1, 25);
+  assert.ok(rule.startsWith(SKILLS_HEADING));
+  assert.ok(rule.startsWith(read('./fixtures/keep-tests.md'), rule.indexOf('\n# ') + 1), 'keep-tests follows the skills section');
+  assert.equal(rule.split('\n').length - 1, 38);
 });
 
-test('.claude/rules/mxcodr.md: first byte #, no line equals ---, no frontmatter, a 22-line body plus the brain rule', () => {
+test('.claude/rules/mxcodr.md: first byte #, no line equals ---, no frontmatter, a 32-line body plus the brain rule', () => {
   const t = ruleText(SKILLS_DIR.claude);
   assert.equal(t, installed, 'Claude Code gets the template unchanged, then the brain rule');
   assert.equal(t[0], '#');
@@ -28,18 +30,18 @@ test('.claude/rules/mxcodr.md: first byte #, no line equals ---, no frontmatter,
   assert.deepEqual(checkRule(t), []);
 });
 
-test('.cursor/rules/mxcodr.mdc: frontmatter [description, alwaysApply], the same 22-line body, the Cursor skills folder', () => {
+test('.cursor/rules/mxcodr.mdc: frontmatter [description, alwaysApply], the same 32-line body, the Cursor skills folder', () => {
   const t = mdcText();
   const p = parseRule(t);
   assert.deepEqual(p.frontmatter, ['description', 'alwaysApply']);
   assert.equal(bodyLines(p.body), BODY);
-  assert.match(p.body, /`\.cursor\/skills\/`: `durable-tests`/);
+  assert.match(p.body, /in `\.cursor\/skills\/`, each whole[\s\S]*\n- `durable-tests`: /);
   assert.doesNotMatch(p.body, /\.claude\/skills|beside mxcli/);
   assert.deepEqual(checkRule(t, { mdc: true }), []);
 });
 
 test('the AGENTS.md text: .agents/skills without the parenthetical; opencode keeps it', () => {
-  assert.match(ruleText(SKILLS_DIR.codex), /`\.agents\/skills\/`: `durable-tests`/);
+  assert.match(ruleText(SKILLS_DIR.codex), /in `\.agents\/skills\/`, each whole/);
   assert.match(ruleText(SKILLS_DIR.opencode), /`\.opencode\/skills\/` \(beside mxcli's\)/);
 });
 

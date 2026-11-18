@@ -57,7 +57,7 @@ test('Codex, opencode and Pi: one AGENTS.md block after mxcli\'s section, skills
   assert.equal(md.split(START).length, 2);
   const block = md.slice(md.indexOf(START) + START.length, md.indexOf(END));
   assert.deepEqual(checkRule(block.trimStart()), []);
-  assert.match(block, /`\.agents\/skills\/`: `durable-tests`/);
+  assert.match(block, /in `\.agents\/skills\/`, each whole[\s\S]*\n- `durable-tests`: /);
   install(d, ['codex', 'opencode', 'pi']);
   assert.equal(get(d, 'AGENTS.md'), md, 'a second install changes nothing');
   install(d, ['claude']);
@@ -71,13 +71,13 @@ test('the installed rule files parse: a non-empty body, no stray frontmatter (.m
   const md = parseRule(get(d, '.claude/rules/mxcodr.md'));
   assert.equal(md.frontmatter, null);
   assert.equal(get(d, '.claude/rules/mxcodr.md')[0], '#');
-  assert.equal(bodyLines(md.body), 22 + bodyLines(readTemplate('brain.md')), 'the template\'s 22 and the brain rule');
+  assert.equal(bodyLines(md.body), 32 + bodyLines(readTemplate('brain.md')), 'the template\'s 32 and the brain rule');
   assert.doesNotMatch(md.body, /^---$/m);
   const mdc = parseRule(get(d, '.cursor/rules/mxcodr.mdc'));
   assert.deepEqual(mdc.frontmatter, ['description', 'alwaysApply']);
-  assert.equal(bodyLines(mdc.body), 22 + bodyLines(readTemplate('brain.md')));
+  assert.equal(bodyLines(mdc.body), 32 + bodyLines(readTemplate('brain.md')));
   assert.doesNotMatch(mdc.body, /^---$/m);
-  assert.match(mdc.body, /^# Keep your checks as tests\n/);
+  assert.match(mdc.body, /^# Read the project skill before you build its part\n[\s\S]*\n# Keep your checks as tests\n/);
 });
 
 test('skills-clean on the installed copies: no gate vocabulary in any file an agent can open', () => {

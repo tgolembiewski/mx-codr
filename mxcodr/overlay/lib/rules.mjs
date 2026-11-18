@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { liveRuleText, liveKeepTests } from './live.mjs';
-import { ruleWithoutSkills } from './skilloff.mjs';
+import { ruleWithoutSkills, SKILLS_HEADING } from './skilloff.mjs';
 
 const templates = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 export const readTemplate = name => fs.readFileSync(path.join(templates, name), 'utf8');
@@ -80,8 +80,12 @@ export function checkRule(text, { mdc = false, keepTests = readTemplate('keep-te
   }
   if (body.split('\n').some(l => l.trim() === '---')) errs.push('a line in the body equals ---');
   if (bodyLines(body) < 10) errs.push(`the body has ${bodyLines(body)} lines`);
-  const first7 = body.split('\n').slice(0, 7).join('\n') + '\n';
-  // live mode (lib/live.mjs) writes the rule with its last sentence pointing at `./mxcodr-live tests affected`
-  if (first7 !== keepTests && first7 !== liveKeepTests(keepTests)) errs.push('the first 7 lines of the body are not the keep-tests rule');
+  // bundle 2026.11.18.2: the body opens with the project-skills section (lib/skilloff.mjs drops it when every skill
+  // in it is switched off), then the keep-tests rule, its 7 lines whole; live mode (lib/live.mjs) writes the latter
+  // with its last sentence pointing at `./mxcodr-live tests affected`
+  const keep = [keepTests, liveKeepTests(keepTests)];
+  const at = body.startsWith(SKILLS_HEADING) ? body.indexOf('\n# ') + 1 : 0;
+  if (!at && body.startsWith(SKILLS_HEADING)) errs.push('the project-skills section is not followed by the keep-tests rule');
+  else if (!keep.some(k => body.startsWith(k, at))) errs.push(`the keep-tests rule (7 lines) does not ${at ? 'follow the project-skills section' : 'open the body'}`);
   return errs;
 }

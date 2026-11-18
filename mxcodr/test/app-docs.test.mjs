@@ -34,9 +34,9 @@ test('app-docs is installed always, with its template and fingerprint, into ever
   }
 });
 
-test('the rule sentence: in every shape of the rule text (file, coverage, live, every agent), still 25 lines; gone when app-docs is off', () => {
+test('the rule sentence: in every shape of the rule text (file, coverage, live, every agent), still 38 lines; gone when app-docs is off', () => {
   const rule = readTemplate('mxcodr.md');
-  assert.equal(rule.split('\n').length - 1, 25);
+  assert.equal(rule.split('\n').length - 1, 38);
   assert.ok(rule.trimEnd().endsWith(DOCS_SENTENCE.trim()), 'the last line of templates/mxcodr.md');
   for (const dir of new Set(Object.values(SKILLS_DIR)))
     for (const opts of [{}, { coverage: true }, { live: true }, { live: true, skillsOff: ['film-tests'] }]) {
@@ -129,6 +129,7 @@ test('fingerprint: a layout-only change (boxes moved, annotation moved) keeps ev
   assert.equal(moved.overall, a.overall);
   const crlf = fingerprint({ mpr, run: fakeModel({ Shop: fakeModel()(['describe', 'module', 'Shop']).replace(/\n/g, '\r\n') }) });
   assert.equal(crlf.overall, a.overall, 'Windows line ends change nothing');
+  put(d, 'mprcontents/ab/cd/abcd.mxunit', 'the model saved with a change'); // the witness (format 2): a saved model
   const attr = fingerprint({ mpr, run: fakeModel({ Shop: '@position(100, 200)\ncreate persistent entity Shop.Order (\n  Number: Integer,\n  Total: Decimal\n);\n' }) });
   assert.notEqual(attr.parts['module:Shop'], a.parts['module:Shop']);
   assert.equal(attr.parts['module:Admin'], a.parts['module:Admin']);
@@ -148,7 +149,7 @@ test('fingerprint: the brain part follows docs/brain/ (paths with /, the same on
   const mpr = path.join(d, 'App.mpr');
   const a = fingerprint({ mpr, run: fakeModel() });
   assert.notEqual(a.parts.brain, 'none');
-  assert.equal(a.parts.brain, brainHash(path.join(d, 'docs', 'brain')));
+  assert.equal(a.parts.brain, brainHash(path.join(d, 'docs', 'brain', 'plan')), 'the requirements the page cites');
   put(d, 'docs/brain/plan/01-orders.md', '## R1 Orders\n## R2 Invoices\n');
   const b = fingerprint({ mpr, run: fakeModel() });
   assert.deepEqual(compare(a, b).parts, ['brain']);
@@ -161,7 +162,7 @@ test('fingerprint: the brain part follows docs/brain/ (paths with /, the same on
   assert.deepEqual(compare(null, a), { current: false, parts: ['all'], mxcli: false });
   // a module added or removed is a part that differs
   const { 'module:Admin': _, ...fewer } = a.parts;
-  assert.deepEqual(compare({ ...a, parts: fewer, overall: 'x' }, a).parts, ['module:Admin']);
+  assert.deepEqual(compare({ ...a, parts: fewer, overall: 'x', model: '0'.repeat(16) }, a).parts, ['module:Admin']);
 });
 
 test('fingerprint: the app\'s own mxcli (mxcli.exe on Windows), else the PATH one', () => {

@@ -24,7 +24,7 @@ test('brain always: main() runs initBrain on every install, outside the coverage
   const covBlock = /if \(cov\.on\) \{[\s\S]*?\n {2}\} else \{/.exec(src)[0];
   assert.doesNotMatch(covBlock, /initBrain/, 'the coverage step no longer creates the brain');
   assert.ok(src.indexOf("ui.begin('creating the project brain')") < src.indexOf('if (cov.on) {'));
-  assert.match(src, /ui\.plan\(14 \+ \(newApp \? 1 : 0\) \+ \(cov\.on \? 1 : 0\)/);
+  assert.match(src, /ui\.plan\(15 \+ \(newApp \? 1 : 0\) \+ \(cov\.on \? 1 : 0\)/);
   assert.match(src, /summary\(\{[^\n]*\bbrain\b[^\n]*\}\);/, 'the summary is told what happened to docs/brain/');
 });
 

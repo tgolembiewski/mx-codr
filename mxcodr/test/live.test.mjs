@@ -165,7 +165,7 @@ test('live films: the rule file and the film-tests skill name ./mxcodr-live test
 });
 
 // The Rules tab (Studio Pro extension): skills switched off leave the rule texts; none switched off changes nothing.
-test('skillsOff: the paragraph naming the skills loses them, the format check passes, [] is byte for byte the same', async () => {
+test('skillsOff: the section naming the skills loses their lines, the format check passes, [] is byte for byte the same', async () => {
   const { ruleWithoutSkills, liveRuleWithoutSkills } = await import('../overlay/lib/skilloff.mjs');
   for (const live of [false, true]) for (const coverage of [false, true]) {
     const base = ruleText('.claude/skills', undefined, { live, coverage });
@@ -173,12 +173,12 @@ test('skillsOff: the paragraph naming the skills loses them, the format check pa
     const t = ruleText('.claude/skills', undefined, { live, coverage, skillsOff: ['app-security', 'files-and-images', 'film-tests', 'not-ours'] });
     assert.deepEqual(checkRule(t), []);
     assert.doesNotMatch(t, /`app-security`|`files-and-images`/);
-    assert.match(t, /`durable-tests`\nwhat deserves a test; `spacing-and-layout` menu, Back, signed-in user, icons, spacing;/);
-    assert.match(t, /`module-structure` modules and\s+folders; `java-action-docs` every Java action's\s+documentation\. Read each of these skills whole/);
+    assert.match(t, /\n- `naming-and-captions`: [^\n]*\n- `spacing-and-layout`: [^\n]*\n- `java-action-docs`: /, 'the lines around them stay, in order');
+    assert.match(t, /^# Read the project skill before you build its part\n[\s\S]*`\.ai-context\/skills\/`/);
     const none = ruleText('.claude/skills', undefined, { live, coverage, skillsOff: ['durable-tests', 'app-security', 'spacing-and-layout', 'naming-and-captions', 'module-structure', 'files-and-images', 'java-action-docs', 'requirements-interview'] });
     assert.deepEqual(checkRule(none), []);
-    assert.doesNotMatch(none, /Before building a part/);
-    assert.match(none, /\nOf mxcli's own skills in `\.ai-context\/skills\/` read only the section you need\.\n/);
+    assert.doesNotMatch(none, /# Read the project skill|skill gate/, 'no skill left: the section goes');
+    assert.match(none, /^# Keep your checks as tests\n/);
     if (coverage) assert.doesNotMatch(none, /requirements-interview/);
   }
   const live = readTemplate('live.md');
@@ -377,4 +377,26 @@ for (const coverage of [false, true]) {
 test('1.75.11 live rule file: script files are written with the Write or Edit tool, never by shell redirection (that asks every time)', () => {
   const t = fs.readFileSync(new URL('../overlay/templates/live.md', import.meta.url), 'utf8');
   assert.match(t, /Create or change files \(`mdlsource\/\*\.mdl`, tests\) with the Write or Edit tool, never with shell redirection,\n  `printf`, `echo >` or heredocs: those ask the person every time\. Write creates the folder too \(no `mkdir`\)\./);
+});
+
+// bundle 2026.11.18.3 (CarFleetCodexSol, Codex): Plan first for the agents that read AGENTS.md, in their words; the
+// extension writes it between its own markers, and an AGENTS.md with nothing else of the person's stays generated
+test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGENTS.md block counts as generated', async () => {
+  const { isScaffoldLeftover, PLAN_START, PLAN_END, MXCLI_BEGIN, MXCLI_END } = await import('../overlay/install.mjs');
+  const t = fs.readFileSync(new URL('../overlay/templates/plan-first-agents.md', import.meta.url), 'utf8');
+  assert.match(t, /present the plan as your message[\s\S]*end your turn there\. Change nothing until the person approves it\./);
+  assert.match(t, /Small changes \(a caption, one\sfield, a bug fix\) go straight ahead/);
+  assert.match(t, /task\slist first \(Task list in mx-codr's live rules\)/);
+  assert.doesNotMatch(t, /EnterPlanMode|ExitPlanMode|TaskCreate|TodoWrite/);
+  // the extension's source is not in the public repository: compare the markers only where it is
+  const permsUrl = new URL('../../spikes/studio-pro-ext/translator/src/permissions.mjs', import.meta.url);
+  if (fs.existsSync(permsUrl)) {
+    const perms = fs.readFileSync(permsUrl, 'utf8');
+    assert.ok(perms.includes(`PLAN_START = "${PLAN_START}", PLAN_END = "${PLAN_END}"`), 'the same markers as the extension writes');
+  }
+  const f = path.join(tmp(), 'AGENTS.md');
+  fs.writeFileSync(f, `${MXCLI_BEGIN} -->\nmxcli\n${MXCLI_END}\n\n${PLAN_START}\n${t.trim()}\n${PLAN_END}\n`);
+  assert.equal(isScaffoldLeftover('AGENTS.md', f, null), true);
+  fs.appendFileSync(f, '\nMine.\n');
+  assert.equal(isScaffoldLeftover('AGENTS.md', f, null), false, 'text of the person\'s own still counts');
 });

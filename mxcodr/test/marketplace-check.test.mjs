@@ -157,9 +157,9 @@ test('the script is installed with module-structure for every agent, file and li
   }
 });
 
-test('the texts: the rule (every shape, still 25 lines), live.md, module-structure and its reference, reuse-and-snippets', () => {
+test('the texts: the rule (every shape, still 38 lines), live.md, module-structure and its reference, reuse-and-snippets', () => {
   const SENTENCE = 'Never add a document to a Marketplace module (`list modules`: Source `Marketplace v...`) or change one in it';
-  assert.equal(readTemplate('mxcodr.md').split('\n').length - 1, 25);
+  assert.equal(readTemplate('mxcodr.md').split('\n').length - 1, 38);
   for (const dir of new Set(Object.values(SKILLS_DIR)))
     for (const opts of [{}, { coverage: true }, { live: true }, { live: true, skillsOff: ['module-structure'] }]) {
       const t = ruleText(dir, undefined, opts);

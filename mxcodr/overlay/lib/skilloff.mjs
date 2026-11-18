@@ -11,40 +11,27 @@ export const switchable = () => [...INSTALLED_SKILLS, ...OPTIONAL_SKILLS];
 export const SKILLS_OFF_DIR = '.mxcodr/skills-off';
 export const offList = list => [...new Set((Array.isArray(list) ? list : []).filter(s => switchable().includes(s)))];
 
-// templates/mxcodr.md's paragraph naming each skill and what it is for: "...read its project skill in <dir>: `a`
-// what; `b` what; ... `f` what. Read each of these skills whole, ...; of mxcli's own skills ... you need."
-const LIST = /Before building a part, read its project skill in (`[^`]+`(?: \(beside mxcli's\))?): ([\s\S]*?)\. Read each of these skills whole, one file per read, never through `head`, `cut` or a combined `cat`; of mxcli's/;
-
-// Re-wraps one paragraph's text at `width` columns.
-const wrap = (text, width = 104) => {
-  const out = []; let line = '';
-  for (const w of text.split(/\s+/).filter(Boolean)) {
-    if (line && line.length + 1 + w.length > width) { out.push(line); line = w; } else line = line ? `${line} ${w}` : w;
-  }
-  if (line) out.push(line);
-  return out.join('\n');
-};
+// templates/mxcodr.md's first section (bundle 2026.11.18.2): its heading, then one list line per skill,
+// "- `name`: before ...". A switched-off skill's line goes; with none left the whole section goes (up to the next heading).
+export const SKILLS_HEADING = '# Read the project skill before you build its part\n';
+const ITEM = /^- `([a-z]+(?:-[a-z]+)*)`: .*\n/gm;
 
 // templates/mxcodr.md's sentence pointing at app-docs (the end-of-turn update of docs/app-docs.html)
 export const DOCS_SENTENCE = ' Once `docs/app-docs.html` exists, update it with the `app-docs` skill at the end of every turn that changed the model, before you report.';
 
-/** The always-on rule text without the switched-off skills: their items leave the paragraph naming the skills (the
- * paragraph goes when none is left, keeping what it says about mxcli's own skills); the coverage done sentence's
- * "record them first, skill `requirements-interview`" goes with that skill. */
+/** The always-on rule text without the switched-off skills: their lines leave the section naming the skills (the
+ * section goes when none is left); the coverage done sentence's "record them first, skill `requirements-interview`"
+ * goes with that skill, the app-docs sentence with app-docs. */
 export function ruleWithoutSkills(text, off = []) {
   off = offList(off);
   if (!off.length) return text;
-  const m = LIST.exec(text);
-  if (!m) throw new Error('templates/mxcodr.md no longer has the paragraph naming the project skills ("Before building a part, ...")');
-  const items = m[2].replace(/\s+/g, ' ').split('; ').filter(it => !off.includes((/^`([^`]+)`/.exec(it) ?? [])[1]));
-  const start = text.lastIndexOf('\n', m.index) + 1;
-  const tail = text.slice(m.index + m[0].length); // " own skills in ..." up to the end
-  const end = m.index + m[0].length + tail.indexOf('\n');
-  const rest = text.slice(m.index + m[0].length, end); // the rest of that last line
-  const para = items.length
-    ? `Before building a part, read its project skill in ${m[1]}: ${items.join('; ')}. Read each of these skills whole, one file per read, never through \`head\`, \`cut\` or a combined \`cat\`; of mxcli's${rest}`
-    : `Of mxcli's${rest}`;
-  let out = text.slice(0, start) + wrap(para) + text.slice(end);
+  const at = text.indexOf(SKILLS_HEADING);
+  if (at < 0) throw new Error('templates/mxcodr.md no longer has the section naming the project skills ("# Read the project skill ...")');
+  const next = text.indexOf('\n# ', at + SKILLS_HEADING.length);
+  const sectionEnd = next < 0 ? text.length : next + 1;
+  const section = text.slice(at, sectionEnd);
+  const kept = section.replace(ITEM, (line, name) => (off.includes(name) ? '' : line));
+  let out = text.slice(0, at) + ([...kept.matchAll(ITEM)].length ? kept : '') + text.slice(sectionEnd);
   if (off.includes('requirements-interview')) out = out.replace('; record them first, skill `requirements-interview`)', ')');
   if (off.includes('app-docs')) out = out.replace(DOCS_SENTENCE, '');
   return out;

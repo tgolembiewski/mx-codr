@@ -1,7 +1,8 @@
 // The mx-codr installer (harness v2, skills only). install.sh runs it from the bundle:
 //   node overlay/install.mjs <app folder> [--db hsqldb|postgres] [--agent claude,cursor,codex,opencode,pi] [--remove-agent <name>] [--coverage | --no-coverage] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]
 // A folder with no .mpr first gets a new Mendix app (mxcli new; MX_VERSION, APP_NAME), unless --no-app.
-// It installs nothing that runs while the agent builds: the pinned mxcli, MxBuild and the runtime cached,
+// It installs one thing that runs while the agent builds, Claude Code's skill gate (lib/skill-gate.mjs: hooks in
+// .claude/settings.local.json that refuse a model write or a test file until its project skill was read), and: the pinned mxcli, MxBuild and the runtime cached,
 // the database chosen, mxcli's own skills refreshed, one always-on rule file per agent (asked on a terminal,
 // --agent adds one to the last install's, --remove-agent takes one out), our skills beside
 // mxcli's, a starter test kit in tests/ (absent files, and files unedited since an earlier install), tests/film.mjs (always), the app's look when one is chosen (theme/ only),
@@ -29,6 +30,7 @@ import { portFree } from './lib/ports.mjs';
 import { liveSkills, LIVE_RULE_FILE, liveKitText, liveFilmText } from './lib/live.mjs';
 import { liveRuleWithoutSkills, offList, SKILLS_OFF_DIR } from './lib/skilloff.mjs';
 import { decideAgents, askAgents, agentsNote, agentNames, agentStartLines, AGENT_INFO } from './lib/agents.mjs';
+import { withGateHooks, withoutGateHooks } from './lib/skill-gate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ui = makeUi();
@@ -91,7 +93,7 @@ async function main() {
   const { agents } = picked;
 
   // the bar's steps, counted up front (v1: a plan one short pushed the bar past 100%)
-  ui.plan(14 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
+  ui.plan(15 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
   const warnings = [];
   const warn = s => { ui.note(s); warnings.push(s); };
   const lastLine = r => `${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
@@ -154,6 +156,11 @@ async function main() {
   const skills = skillsFor({ coverage: cov.on });
   const skillDirs = copySkills(app, agents, undefined, { coverage: cov.on }).map(l => l.replace(/^\d+ skills -> /, ''));
   ui.done('skills', `${skills.length} ${ui.i.arrow} ${skillDirs.length > 1 ? `each of ${skillDirs.join(' ')}` : skillDirs[0]}`);
+  ui.begin('installing the skill gate');
+  let gate = null, gateErr = null;
+  try { gate = installSkillGate(app, agents); } catch (e) { gateErr = e.message; }
+  ui.done('skill gate', gateErr ? 'not installed' : gate ? `${ui.i.arrow} ${gate}` : 'none (Claude Code not chosen)');
+  if (gateErr) warn(`skill gate: ${gateErr}`);
   ui.begin('installing the test kit');
   const kit = copyTestKit(app, Array.isArray(prev.testKit) ? prev.testKit : []);
   const changed = [...kit.written, ...kit.updated];
@@ -272,7 +279,9 @@ export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skil
   ui.line('     just wrote are invisible to the session that ran it. Measured: a session that installed');
   ui.line('     and then built without restarting read twelve SKILL.md files by hand -- 216k characters,');
   ui.line('     36 commands, 6.5 minutes -- before its first real command. After a restart: 8 commands.');
-  ui.line('     The agent reads the rule file by itself; nothing runs while it builds: no hooks, no gate.');
+  ui.line('     The agent reads the rule file by itself. One thing runs while it builds, in Claude Code only: the skill');
+  ui.line('     gate refuses a model write or a test file until the project skill for it was read whole');
+  ui.line(`     (${c.bold}MXCODR_SKILL_GATE=0${c.reset} in the environment Claude Code starts in switches it off).`);
   if (agents.includes('cursor')) ui.line(`     Cursor reads ${c.bold}.cursor/rules/mxcodr.mdc${c.reset} (alwaysApply); restart an open session to pick it up.`);
   if (agents.some(a => ['codex', 'opencode', 'pi'].includes(a))) ui.line(`     Codex, opencode and Pi read our block in ${c.bold}AGENTS.md${c.reset}, after mxcli's section.`);
   ui.line(`     Another agent: ${c.bold}bash mxcodr/install.sh --agent <name>${c.reset} adds it (${Object.keys(AGENT_INFO).join(', ')}); --remove-agent <name> takes one out.`);
@@ -449,7 +458,7 @@ export function isScaffoldLeftover(rel, theirs, fresh) {
   const text = f => { try { return fs.readFileSync(f, 'utf8'); } catch { return null; } };
   if (rel === 'CLAUDE.md' || rel === 'AGENTS.md') {
     const t = text(theirs);
-    return t !== null && t.includes(MXCLI_BEGIN) && !unfence(unfence(t, MXCLI_BEGIN, MXCLI_END), START, END).trim();
+    return t !== null && t.includes(MXCLI_BEGIN) && !unfence(unfence(unfence(t, MXCLI_BEGIN, MXCLI_END), START, END), PLAN_START, PLAN_END).trim();
   }
   if (rel === '.gitignore') {
     const t = text(theirs), n = text(fresh);
@@ -572,6 +581,10 @@ export function writeRules(app, agents, { coverage = false, live = false, skills
   return out;
 }
 
+// The extension's "Plan first" block in AGENTS.md (translator/src/permissions.mjs, PLAN_START/PLAN_END; bundle
+// 2026.11.18.3): generated like our block, so an AGENTS.md with nothing else of the person's still counts as mxcli's.
+export const PLAN_START = '<!-- mxcodr-plan:start -->', PLAN_END = '<!-- mxcodr-plan:end -->';
+
 // mxcli's section of AGENTS.md: `mxcli init` replaces what lies between these markers and keeps the rest;
 // `mxcli init --sync-skills` fills an empty pair. Put first, before any text the file already had.
 export const MXCLI_BEGIN = '<!-- mxcli:begin', MXCLI_END = '<!-- mxcli:end -->';
@@ -628,6 +641,29 @@ export function copySkills(app, agents, src = path.join(here, 'skills'), { cover
     out.push(`${skills.length} skills -> ${d}/`);
   }
   return out;
+}
+
+// ---- 5a. the skill gate (Claude Code only) -------------------------------------------------------------------
+
+export const SKILL_GATE = `${FOOTPRINT}/skill-gate.mjs`;
+
+/** Claude Code's skill gate (lib/skill-gate.mjs): the script copied to .mxcodr/skill-gate.mjs and its two hooks in
+ * .claude/settings.local.json (mxcli init overwrites settings.json, never this file), in place of earlier ones; the
+ * person's own settings stay. Without Claude Code among the agents both go. -> what it wrote, or null. */
+export function installSkillGate(app, agents, src = path.join(here, 'lib', 'skill-gate.mjs')) {
+  const f = path.join(app, '.claude', 'settings.local.json');
+  let cfg = null;
+  if (fs.existsSync(f)) { try { cfg = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { throw new Error(`${f} is not valid JSON; fix it, then install again`); } }
+  if (!agents.includes('claude')) {
+    fs.rmSync(path.join(app, SKILL_GATE), { force: true });
+    if (cfg) { const before = JSON.stringify(cfg); withoutGateHooks(cfg); if (JSON.stringify(cfg) !== before) fs.writeFileSync(f, JSON.stringify(cfg, null, 2) + '\n'); }
+    return null;
+  }
+  fs.mkdirSync(path.join(app, FOOTPRINT), { recursive: true });
+  fs.copyFileSync(src, path.join(app, SKILL_GATE));
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, JSON.stringify(withGateHooks(cfg ?? {}), null, 2) + '\n');
+  return `${SKILL_GATE} (hooks in .claude/settings.local.json)`;
 }
 
 // ---- 5b. the starter test kit -------------------------------------------------------------------
