@@ -75,7 +75,7 @@ output is lost. macOS has no `timeout` command; set the tool's own timeout inste
 | `tests/mx.ts` export | What it does, and the Mendix fact behind it |
 |---|---|
 | `signIn(page, user, homeMarker, password?)` | Signs in on `/login.html` and waits 20 s for `homeMarker` (something only that role's home shows) or "Sign in failed."; a failure names the sessions alive on the server. Keeps the CSRF token for `signOut`. |
-| `signOut(page)` | Ends the session on the server, also from a refused page (login form shown, no `window.mx`, session alive) and without a token from `signIn`; throws, naming the page, when it cannot. Call it in `test.afterEach`; a second `signIn` on the same page signs out first. |
+| `signOut(page)` | Ends the session on the server (it leaves the app for `about:blank` first: `mx.logout()` reloads the app, and an app that lets anonymous users in starts a new session at once), also from a refused page (login form shown, no `window.mx`, session alive) and without a token from `signIn`; throws, naming the page, when it cannot. Call it in `test.afterEach`; a second `signIn` on the same page signs out first. |
 | `test`, `expect` | `@playwright/test`'s own, plus an automatic check after each test: a session the test left alive fails that test, naming it and the session's user. |
 | `sessionsLeft()` | Sessions alive on the server (`System.Session`); `mx.teardown.ts` prints `sessions left: N` after every run and fails the run when N > 0. |
 | `oql(query)` | One `./mxcli oql --json` read of the running app as administrator: an array of row objects keyed by alias, every value a string (Booleans `'true'`/`'false'`); needs the app running. Put every column a test needs in one query. |

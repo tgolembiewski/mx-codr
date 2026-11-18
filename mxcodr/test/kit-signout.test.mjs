@@ -41,9 +41,16 @@ async function loadKit() {
 const kit = skip ? null : await loadKit();
 
 // A page that shows the app (window.mx) or the login form, with the session cookie and the server answers given.
-function fakePage({ app = true, login = !app, cookie = true, sessionToken, url = 'http://127.0.0.1:8080/p/x' } = {}) {
-  const s = { calls: [], waits: [], login, home: app, cookie };
-  const appWindow = () => ({ mx: { logout: () => { s.calls.push('mx.logout'); s.win = {}; s.login = true; s.cookie = false; }, session: { getConfig: () => 'T-signin' } } });
+// guest: the app lets anonymous users in (project security off, or a guest role), so mx.logout() ends the session
+// and the app it reloads at once starts a new anonymous one (measured on Mendix 11.12.1); s.alive counts the
+// page's sessions on the server.
+function fakePage({ app = true, login = !app, cookie = true, sessionToken, url = 'http://127.0.0.1:8080/p/x', guest = false } = {}) {
+  const s = { calls: [], waits: [], login, home: app, cookie, alive: cookie ? 1 : 0 };
+  const appWindow = () => ({ mx: { logout: () => {
+    s.calls.push('mx.logout'); s.alive--;
+    if (guest) { s.win = appWindow(); s.alive++; return; } // the reloaded app: a new anonymous session
+    s.win = {}; s.login = true; s.cookie = false;
+  }, session: { getConfig: () => 'T-signin' } } });
   s.win = app ? appWindow() : {};
   const visible = sel => (sel === '#usernameInput' ? s.login : sel === '.home' ? s.home : false);
   const loc = sel => ({
@@ -52,19 +59,21 @@ function fakePage({ app = true, login = !app, cookie = true, sessionToken, url =
     waitFor: async () => { s.waits.push(sel); if (!visible(sel)) throw new Error(`timeout: ${sel}`); },
     isVisible: async () => visible(sel),
   });
+  let at = url;
   const page = {
-    calls: s.calls, waits: s.waits,
-    showApp() { s.win = appWindow(); s.login = false; s.home = true; s.cookie = true; },
+    calls: s.calls, waits: s.waits, alive: () => s.alive,
+    showApp() { s.win = appWindow(); s.login = false; s.home = true; if (!s.cookie) s.alive++; s.cookie = true; },
     locator: loc, getByText: () => loc('failed'),
-    goto: async () => {},
-    url: () => url,
+    // leaving for about:blank stops the app's client: nothing of it runs or reloads there
+    goto: async u => { if (u === 'about:blank') { s.calls.push('goto about:blank'); s.win = {}; s.login = false; s.home = false; } at = u; },
+    url: () => at,
     waitForFunction: async fn => { s.waits.push('mx'); globalThis.window = s.win; if (!fn()) throw new Error('timeout'); },
     evaluate: async (fn, arg) => { globalThis.window = s.win; return fn(arg); },
     request: {
       storageState: async () => ({ cookies: s.cookie ? [{ name: 'XASSESSIONID', value: 'x' }] : [] }),
       post: async (u, o) => {
         s.calls.push(`POST ${u} ${o.data.action}${o.headers['x-csrf-token'] ? ' ' + o.headers['x-csrf-token'] : ''}`);
-        if (o.data.action === 'logout') { assert.deepEqual(o.data.params, {}, 'logout needs params, else 560'); s.cookie = false; }
+        if (o.data.action === 'logout') { assert.deepEqual(o.data.params, {}, 'logout needs params, else 560'); if (o.headers['x-csrf-token'] && s.cookie) s.alive--; s.cookie = false; }
         return { json: async () => (o.data.action === 'get_session_data' && sessionToken ? { csrftoken: sessionToken } : {}) };
       },
     },
@@ -72,11 +81,26 @@ function fakePage({ app = true, login = !app, cookie = true, sessionToken, url =
   return page;
 }
 
-test('normal case: signed in on an app page, signOut calls mx.logout() and no POST', { skip }, async () => {
+test('guest app (security off): signOut ends the anonymous session and leaves none behind', { skip }, async () => {
+  const page = fakePage({ guest: true }); // the spec opened an app page without signing in
+  await kit.signOut(page);
+  assert.equal(page.alive(), 0, 'no session left on the server (mx.logout() alone left the reloaded app\'s new one)');
+  assert.ok(!page.calls.includes('mx.logout'), 'the app is not logged out in place: its reload starts a new anonymous session');
+});
+
+test('guest app, signed in: signOut ends the session and the app does not start an anonymous one', { skip }, async () => {
+  const page = fakePage({ guest: true });
+  await kit.signIn(page, 'u', '.home', 'p');
+  await kit.signOut(page);
+  assert.equal(page.alive(), 0);
+});
+
+test('normal case: signed in on an app page, signOut leaves the app and POSTs logout with the session\'s token', { skip }, async () => {
   const page = fakePage();
   await kit.signIn(page, 'u', '.home', 'p');
   await kit.signOut(page);
-  assert.deepEqual(page.calls, ['mx.logout']);
+  assert.deepEqual(page.calls, ['goto about:blank', 'POST /xas/ logout T-signin']);
+  assert.equal(page.alive(), 0);
 });
 
 test('refused page: the login form with no window.mx, signOut POSTs logout with the token kept at signIn', { skip }, async () => {
@@ -87,19 +111,19 @@ test('refused page: the login form with no window.mx, signOut POSTs logout with 
   const login = fakePage({ app: false });
   p.locator = login.locator; p.evaluate = login.evaluate; p.waitForFunction = login.waitForFunction;
   await kit.signOut(p);
-  assert.deepEqual(p.calls, ['POST /xas/ logout T-signin']);
+  assert.deepEqual(p.calls, ['goto about:blank', 'POST /xas/ logout T-signin']);
 });
 
-test('no token from signIn but an app page: mx.logout()', { skip }, async () => {
+test('no token from signIn but an app page: the logout POST with window.mx\'s token', { skip }, async () => {
   const page = fakePage();
   await kit.signOut(page);
-  assert.deepEqual(page.calls, ['mx.logout']);
+  assert.deepEqual(page.calls, ['goto about:blank', 'POST /xas/ logout T-signin']);
 });
 
 test('no token, no window.mx, a session cookie: the token is read for the cookie and logout POSTed with it', { skip }, async () => {
   const page = fakePage({ app: false, sessionToken: 'T-read' });
   await kit.signOut(page);
-  assert.deepEqual(page.calls, ['POST /xas/ get_session_data', 'POST /xas/ logout T-read']);
+  assert.deepEqual(page.calls, ['POST /xas/ get_session_data', 'goto about:blank', 'POST /xas/ logout T-read']);
 });
 
 test('no token, no window.mx, a session cookie and no token to read: it throws, naming the page', { skip }, async () => {
@@ -154,7 +178,7 @@ test('signOut twice: the second finds nothing to end; a second signIn ends the f
   page.showApp();
   await kit.signIn(page, 'u', '.home', 'p');
   await kit.signIn(page, 'v', '.home', 'p');
-  assert.deepEqual(page.calls, ['mx.logout'], 'the first session is ended before the second signIn');
+  assert.deepEqual(page.calls, ['goto about:blank', 'POST /xas/ logout T-signin'], 'the first session is ended before the second signIn');
 });
 
 test('apiContext is a plain Basic-auth context: Basic auth creates no session (measured), nothing to end', { skip }, async () => {

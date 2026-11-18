@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS } from '../overlay/lib/skills.mjs';
+import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS, durableTestsForCoverage } from '../overlay/lib/skills.mjs';
 
 const dir = fileURLToPath(new URL('../overlay/skills/', import.meta.url));
 const files = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) e.isDirectory() ? files(path.join(d, e.name), out) : out.push(path.join(d, e.name)); return out; };
@@ -58,4 +58,33 @@ test('every SKILL.md has frontmatter name (= its folder) and description, and a 
 test('the rule file names only skills the bundle installs', () => {
   const rule = fs.readFileSync(new URL('../overlay/templates/mxcodr.md', import.meta.url), 'utf8');
   for (const m of rule.matchAll(/`([a-z]+(?:-[a-z]+)+)`/g)) assert.ok(INSTALLED_SKILLS.includes(m[1]), m[1]);
+});
+
+test('durable-tests with coverage on: step 1 replaced, nothing else; skills-clean holds; the plain file is untouched by the swap', () => {
+  const f = path.join(dir, 'durable-tests', 'SKILL.md');
+  const plain = fs.readFileSync(f, 'utf8');
+  const cov = durableTestsForCoverage(plain);
+  const step = fs.readFileSync(new URL('../overlay/templates/coverage-durable-tests.md', import.meta.url), 'utf8');
+  assert.ok(cov.includes(step));
+  assert.doesNotMatch(cov, /Print a table `requirement -> test/);
+  assert.equal(cov.replace(step, ''), plain.replace(/^1\. \*\*Close the suite against the request\.\*\*[\s\S]*?\(allowed and refused\)\.\n/m, ''));
+  cov.split('\n').forEach((line, i) => {
+    assert.doesNotMatch(line, GATE_WORDS, `coverage durable-tests:${i + 1}`);
+    assert.doesNotMatch(line, VERDICT, `coverage durable-tests:${i + 1}`);
+    assert.doesNotMatch(line, CODE, `coverage durable-tests:${i + 1}`);
+  });
+  assert.ok(cov.trimEnd().split('\n').length <= 300);
+  assert.throws(() => durableTestsForCoverage('# no step 1\n'), /no longer has step 1/);
+});
+
+test('requirements-interview: numbered captures, promoted by the agent itself in the same turn, slices by area', () => {
+  const t = fs.readFileSync(path.join(dir, 'requirements-interview', 'SKILL.md'), 'utf8');
+  assert.match(t, /Promote them yourself in the same turn; nobody will\./);
+  assert.match(t, /brain capture "R12 /);
+  assert.match(t, /--slice 01-invoices/);
+  assert.match(t, /continues after the highest number already in `docs\/brain\/plan\/`/);
+  assert.match(t, /\(dropped: <the reason>\)/);
+  assert.match(t, /`\.\/mxcli brain promote <id> -p <app>\.mpr && \.\/mxcli brain promote <id>/, 'promote takes one id: chained');
+  assert.doesNotMatch(t, /brain promote <id> <id>/);
+  assert.match(t, /node tests\/coverage\.mjs/);
 });

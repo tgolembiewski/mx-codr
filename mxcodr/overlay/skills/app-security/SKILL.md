@@ -28,14 +28,17 @@ alter app security ( SecurityLevel: production, StrictMode: true, EnableDemoUser
 - **Lint for what a role cannot read.** `./mxcli lint -p App.mpr` reports it before a test or a build
   does; fix every SEC010 (a list renders empty for the role), SEC011 (a data source XPath crosses an
   association the role may not read: the page opens to an error dialog, while `mx check` and the build
-  stay clean) and SEC012 (a page the role can reach shows a member it may not read: CE2729).
+  stay clean), SEC012 (a page the role can reach shows a member it may not read: CE2729) and SEC013
+  (the level is Off, or Prototype with XPath on access rules, so the runtime ignores rules you wrote: a new app
+  ships Off; the `alter app security` line above fixes it).
 - **Strict mode on.** Without it a user can read and change data through the browser in ways no page
   offers. One exception: in an app with an offline profile on Mendix before 11.12.5, strict mode
   breaks every client commit of a synced object; there leave it off and say so in your report.
 - The setting is a requirement like any other, so keep a check of it: read it back with
   `./mxcli -p App.mpr -c "show project security"` and assert the level and strict mode, or prove it
   in the browser (a forged request for a field the role may not read comes back empty or refused).
-- An app with no users at all (a public kiosk, a pure API) is the one case for leaving security off.
+- An app with no users at all (a public kiosk, a pure API) is the one case for leaving security off
+  (lint SEC013 then stays; say why in your report).
 
 ## Roles and demo users
 

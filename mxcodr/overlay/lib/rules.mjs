@@ -1,4 +1,5 @@
-// The always-on rule file, one text (templates/mxcodr.md) in three shapes:
+// The always-on rule file, one text (templates/mxcodr.md; with coverage on, its done sentence from
+// templates/coverage-done.md) in three shapes:
 //   Claude Code  .claude/rules/mxcodr.md   the template as it is
 //   Cursor       .cursor/rules/mxcodr.mdc  four frontmatter lines (alwaysApply) + the text
 //   Codex, opencode, Pi  a block in AGENTS.md, between <!-- mxcodr:start --> and <!-- mxcodr:end -->
@@ -7,6 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { liveRuleText, liveKeepTests } from './live.mjs';
+import { ruleWithoutSkills } from './skilloff.mjs';
 
 const templates = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 export const readTemplate = name => fs.readFileSync(path.join(templates, name), 'utf8');
@@ -19,14 +22,28 @@ const MXCLI_WRITES = new Set(['.claude/skills', '.opencode/skills']);
 export const START = '<!-- mxcodr:start -->', END = '<!-- mxcodr:end -->';
 export const MDC_HEAD = '---\ndescription: Project rules for building this Mendix app\nalwaysApply: true\n---\n';
 
-// The rule text with `dir` (e.g. '.cursor/skills') as the skills folder.
-export function ruleText(dir, text = readTemplate('mxcodr.md')) {
+// The done sentence, and its coverage variant (templates/coverage-done.md): with coverage on, the agent is done
+// when tests/coverage.mjs shows 0 missing instead of after a table it prints itself. Same number of lines, so the
+// file stays 25 lines and differs only in this sentence.
+export const DONE_SENTENCE = /\*\*You are done only\s+when\*\*[\s\S]*?`sessions left: 0`\./;
+export function withCoverageDone(text) {
+  if (!DONE_SENTENCE.test(text)) throw new Error('templates/mxcodr.md no longer has the sentence **You are done only when** ... `sessions left: 0`.');
+  return text.replace(DONE_SENTENCE, readTemplate('coverage-done.md').trimEnd());
+}
+
+// The rule text with `dir` (e.g. '.cursor/skills') as the skills folder; coverage: the coverage done sentence;
+// live: the Studio Pro extension's live mode (lib/live.mjs), never set by the file-mode installer.
+// skillsOff: skills switched off in the Studio Pro extension's Rules tab (lib/skilloff.mjs); [] changes nothing.
+export function ruleText(dir, text = readTemplate('mxcodr.md'), { coverage = false, live = false, skillsOff = [] } = {}) {
   const from = '`.claude/skills/` (beside mxcli\'s)';
   if (!text.includes(from)) throw new Error('templates/mxcodr.md no longer names `.claude/skills/` (beside mxcli\'s)');
+  if (coverage) text = withCoverageDone(text);
+  if (live) text = liveRuleText(text);
+  text = ruleWithoutSkills(text, skillsOff);
   return text.replace(from, MXCLI_WRITES.has(dir) ? `\`${dir}/\` (beside mxcli's)` : `\`${dir}/\``);
 }
 
-export const mdcText = (text = readTemplate('mxcodr.md')) => MDC_HEAD + ruleText(SKILLS_DIR.cursor, text);
+export const mdcText = (text = readTemplate('mxcodr.md'), opts = {}) => MDC_HEAD + ruleText(SKILLS_DIR.cursor, text, opts);
 
 // The AGENTS.md block: opencode's own folder when opencode is the only AGENTS.md reader, else .agents/skills.
 export function agentsBlockDir(agents) {
@@ -58,6 +75,7 @@ export function checkRule(text, { mdc = false, keepTests = readTemplate('keep-te
   if (body.split('\n').some(l => l.trim() === '---')) errs.push('a line in the body equals ---');
   if (bodyLines(body) < 10) errs.push(`the body has ${bodyLines(body)} lines`);
   const first7 = body.split('\n').slice(0, 7).join('\n') + '\n';
-  if (first7 !== keepTests) errs.push('the first 7 lines of the body are not the keep-tests rule');
+  // live mode (lib/live.mjs) writes the rule with its last sentence pointing at `./mxcodr-live tests affected`
+  if (first7 !== keepTests && first7 !== liveKeepTests(keepTests)) errs.push('the first 7 lines of the body are not the keep-tests rule');
   return errs;
 }

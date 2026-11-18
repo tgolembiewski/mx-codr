@@ -43,10 +43,7 @@ No lint rule sees activity captions (CONV012 is decisions only). Read the flow b
 "describe microflow Module.Flow"`) and check, line by line: **every statement has an `@caption` line
 directly above it** -- except `return`, `raise error`, the structure (`begin`, `end ...`, `else`, `when`)
 and loops, which take an `@annotation`. One statement without, or with a caption that is the default
-(`Commit $Line`), and the flow is not done: add the caption and read it again. Two more things `./mxcli check`
-passes and the build fails with CE0117: a `{1}` in `show message`, `log` or `validation feedback` that is not a
-String (`with ({1} = toString($LineCount))`, not `$LineCount`), and `count(...)` inside an expression (count
-in its own step, `$LineCount = count $Lines;`, then use the variable). Before, only the `if` had one
+(`Commit $Line`), and the flow is not done: add the caption and read it again. Before, only the `if` had one
 (the canvas showed *Retrieve OrderLine*, *Show message*, *Commit Order*); after:
 
 ```mdl
@@ -61,6 +58,9 @@ in its own step, `$LineCount = count $Lines;`, then use the variable). Before, o
   @caption 'Accept the order'
   commit $Order;
 ```
+
+One more thing `./mxcli check` passes and the build fails with CE0117: a `{1}` in `show message`, `log` or `validation feedback` that is not a String (`with ({1} = toString($LineCount))`, not `$LineCount`).
+`check` refuses the other CE0117 causes, so write them right first: `count` in its own step (`$LineCount = count $Lines;`), an `if` operand in parentheses (`'Total: ' + (if $Paid then 'paid' else 'open')`), and no OQL in an expression: `startsWith`/`endsWith`/`contains` for `like`, `$N >= 1 and $N <= 5` for `between`, `$N = 1 or $N = 2` for `in (...)`, `$S = empty` for `is null`.
 
 ## Variable names
 

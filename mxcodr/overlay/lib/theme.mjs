@@ -58,8 +58,9 @@ export function decideTheme({ flag, prev = {}, tty = false, yes = false, active 
 }
 
 // The frame goes after the scaffold's own block; an earlier frame (from its marker to the end) is replaced.
-export function writeFrame(name, app) {
-  const skin = path.join(THEMES_DIR, `${name}.skin.scss`), partial = partialOf(app, name);
+// skin: another frame file than the catalog's (the Look tab's custom theme).
+export function writeFrame(name, app, skin = path.join(THEMES_DIR, `${name}.skin.scss`)) {
+  const partial = partialOf(app, name);
   if (!fs.existsSync(skin) || !fs.existsSync(partial)) return false;
   const text = fs.readFileSync(partial, 'utf8');
   const start = text.search(/^\/\/ -+\n\/\/ mx-codr frame for /m);
@@ -83,7 +84,7 @@ export function copyLogo(name, app) {
 // Applies the decision. run(args) runs mxcli in the app -> {status, stdout, stderr}.
 // -> {ok, theme (what installed.json records), line (what to print, or '')}. Never throws for mxcli.
 export function applyTheme({ app, mpr, choice, run }) {
-  const { name, how } = choice;
+  const { name, how, variant = 'light' } = choice;
   if (!name) return { ok: true, theme: AS_IS, line: '' };
   const fail = r => (r.stderr || r.stdout || '').trim().split('\n').pop();
   const again = ['kept', 'found'].includes(how);
@@ -104,10 +105,84 @@ export function applyTheme({ app, mpr, choice, run }) {
     if (c.status !== 0) return failed(`mxcli theme create: ${fail(c)}`);
   }
   if (!writeFrame(name, app)) return failed('its frame has no scaffold to go into');
-  const a = run(['theme', 'apply', name, '-p', mpr, '--variant', 'light']);
+  const a = run(['theme', 'apply', name, '-p', mpr, '--variant', variant]);
   if (a.status !== 0) return failed(`mxcli theme apply: ${fail(a)}`);
   if (!again) copyLogo(name, app); // a reinstall keeps whatever logo the app carries now
   return { ok: true, theme: name, line: said(again ? 'kept, frame refreshed' : 'applied (theme/ only)') };
+}
+
+// ---- the custom theme (the Studio Pro pane's Look tab, live.36) -----------------------------------------
+// Knobs, each only a value in mxcli's own token set (`mxcli theme show signal`) or a frame's Atlas variables;
+// no CSS of ours. The brand colour's tones are derived as the catalog's themes were (tests/skills/build-themes.py,
+// in git history): hover 22% towards black, the dark palette's brand 45% towards white, selected rows a tint.
+// Fonts: what the signal base vendors (IBM Plex Sans), Atlas's own (Open Sans), or the computer's UI font; any
+// other font would need its files (no CDN). Light/dark: `mxcli theme apply --variant light|dark|auto`.
+export const KNOBS = {
+  radius: { sharp: ['0px', '2px'], slight: ['4px', '8px'], round: ['10px', '16px'] },
+  font: {
+    plex: { title: 'IBM Plex Sans', value: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif' },
+    open: { title: 'Open Sans (Atlas)', value: '"Open Sans", sans-serif' },
+    system: { title: "The computer's own", value: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+  },
+  variant: ['light', 'dark', 'auto'],
+};
+export const CUSTOM = 'custom';
+
+const hex6 = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h ?? '').trim()); if (!m) throw new Error(`brand colour ${h}: a #rrggbb colour`); return m[1].toLowerCase(); };
+const mix = (a, b, t) => '#' + [0, 2, 4].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('');
+const rgba = (h, alpha) => `rgba(${[0, 2, 4].map(i => parseInt(h.replace('#', '').slice(i, i + 2), 16)).join(', ')}, ${alpha})`;
+const lum = h => { const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255); return 0.299 * r + 0.587 * g + 0.114 * b; };
+const tokenMap = text => new Map([...text.matchAll(/--mxt-([a-z-]+):\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
+
+/** The tokens file for `mxcli theme create custom --from`: the base theme's palette (one of the catalog's own) with
+ * the brand colour and its tones, the radius and the font. */
+export function customTokens({ base = 'navy', brand, radius = 'slight', font = 'plex' }) {
+  const file = path.join(THEMES_DIR, `${base}.css`);
+  if (base === 'atlas' || !fs.existsSync(file)) throw new Error(`base ${base}: one of ${catalog().filter(t => t.name !== 'atlas').map(t => t.name).join(', ')}`);
+  const b = hex6(brand), text = fs.readFileSync(file, 'utf8'), at = text.indexOf('@media (prefers-color-scheme: dark)');
+  const light = tokenMap(text.slice(0, at)), dark = tokenMap(text.slice(at));
+  const [r, rLg] = KNOBS.radius[radius] ?? KNOBS.radius.slight, f = (KNOBS.font[font] ?? KNOBS.font.plex).value;
+  const rail = mix(b, '000000', 0.45), railLine = mix(b, '000000', 0.2), bright = mix(b, 'ffffff', 0.45);
+  const shared = { rail, 'rail-line': railLine, radius: r, 'radius-lg': rLg, font: f, 'font-heading': 'var(--mxt-font)' };
+  const l = { brand: '#' + b, 'brand-hover': mix(b, '000000', 0.22), 'brand-ink': lum(b) > 0.6 ? '#14202e' : '#ffffff',
+    'surface-hover': mix(b, 'ffffff', 0.94), 'surface-selected': mix(b, 'ffffff', 0.88), 'tint-info': rgba(b, '0.12'), 'tone-info': '#' + b,
+    'focus-halo': `0 0 0 3px ${rgba(b, '0.18')}`, ...shared };
+  const d = { brand: bright, 'brand-hover': mix(b, 'ffffff', 0.6), 'brand-ink': '#0b1018', 'surface-selected': mix(b, '161d27', 0.55),
+    'tint-info': rgba(bright, '0.16'), 'tone-info': bright, 'focus-halo': `0 0 0 3px ${rgba(bright, '0.22')}`, ...shared };
+  for (const [k, v] of Object.entries(l)) light.set(k, v);
+  for (const [k, v] of Object.entries(d)) dark.set(k, v);
+  const block = (m, pad) => [...m].map(([k, v]) => `${pad}--mxt-${k}: ${v};`).join('\n');
+  return `/* custom -- the Look tab's theme: ${base} with brand #${b}, ${radius} corners, ${font}.\n * Tokens for \`mxcli theme create custom --from custom.css --base signal\` (written by mx-codr). */\n`
+    + `:root {\n${block(light, '  ')}\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n${block(dark, '    ')}\n  }\n}\n`;
+}
+
+/** The custom theme's frame: the base theme's own, its top bar and active menu item in the brand's tones. */
+export function customSkin({ base = 'navy', brand }) {
+  const b = hex6(brand);
+  return fs.readFileSync(path.join(THEMES_DIR, `${base}.skin.scss`), 'utf8')
+    .replace(new RegExp(`\\b${base}\\b`, 'g'), CUSTOM)
+    .replace(/(--navtopbar-bg:\s*)#[0-9a-f]{6}/i, `$1${mix(b, '000000', 0.3)}`)
+    .replace(/(--navsidebar-bg-active:\s*)#[0-9a-f]{6}/i, `$1${mix(b, '000000', 0.2)}`)
+    .replace(/(--navsidebar-bg-hover:\s*)#[0-9a-f]{6}/i, `$1${mix(b, '000000', 0.2)}`);
+}
+
+/** Makes (or remakes) the theme "custom" from the knobs and applies it. dir: where its tokens and frame are kept
+ * (the app's .mxcodr/look/). -> {ok, theme, line}, like applyTheme. Never throws for mxcli. */
+export function makeCustom({ app, mpr, run, dir, knobs }) {
+  const variant = KNOBS.variant.includes(knobs.variant) ? knobs.variant : 'light';
+  fs.mkdirSync(dir, { recursive: true });
+  const tokens = path.join(dir, `${CUSTOM}.css`), skin = path.join(dir, `${CUSTOM}.skin.scss`);
+  fs.writeFileSync(tokens, customTokens(knobs));
+  fs.writeFileSync(skin, customSkin(knobs));
+  const fail = r => (r.stderr || r.stdout || '').trim().split('\n').pop();
+  const exists = fs.existsSync(path.join(app, 'theme', 'mxcli-themes', CUSTOM));
+  const c = run(['theme', 'create', CUSTOM, '-p', mpr, '--from', tokens, '--base', 'signal', ...(exists ? ['--force'] : [])]);
+  if (c.status !== 0) return { ok: false, theme: CUSTOM, line: `your look could not be made (mxcli theme create: ${fail(c)})` };
+  if (!writeFrame(CUSTOM, app, skin)) return { ok: false, theme: CUSTOM, line: 'your look could not be made (its frame has no scaffold to go into)' };
+  const a = run(['theme', 'apply', CUSTOM, '-p', mpr, '--variant', variant]);
+  if (a.status !== 0) return { ok: false, theme: CUSTOM, line: `your look could not be applied (mxcli theme apply: ${fail(a)})` };
+  copyLogo(knobs.base, app);
+  return { ok: true, theme: CUSTOM, line: `your look applied (theme/ only): ${knobs.base} with ${knobs.brand}, ${knobs.radius} corners, ${KNOBS.font[knobs.font]?.title ?? knobs.font}, ${variant}` };
 }
 
 // ---- the list and the question ------------------------------------------------------------------

@@ -184,9 +184,9 @@ test('AGENTS.md fence: appended once, replaced in place, the rest kept; unfence 
   assert.equal(unfence(a, START, END), '# mxcli\ntext\n');
 });
 
-test('installed.json holds bundle, mxcli, db, agents, skills and requests; no ports, manifest, hook or permission', () => {
+test('installed.json holds bundle, mxcli, db, agents, skills, the coverage choice and requests; no ports, manifest, hook or permission', () => {
   const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
-  for (const k of ['bundle: BUNDLE', 'mxcli: { path', 'db,', 'agents,', 'skills: INSTALLED_SKILLS', 'testKit: kit.ours', 'requests:']) assert.ok(src.includes(k), k);
+  for (const k of ['bundle: BUNDLE', 'mxcli: { path', 'db,', 'agents,', 'skills, ...coverageRecord(cov)', 'const skills = skillsFor({ coverage: cov.on })', 'testKit: kit.ours', 'requests:']) assert.ok(src.includes(k), k);
   const inst = src.split('\n').find(l => l.includes('const inst = {'));
   assert.doesNotMatch(inst, /\bports\b|manifest|points/, 'installed.json carries no ports, manifest or points');
   for (const k of [/manifest/, /UserPromptSubmit/, /permissions\.allow\.push/, /decompose/, /settings\.json'/]) assert.doesNotMatch(src, k, `the installer no longer writes ${k}`);
@@ -238,7 +238,7 @@ test('test kit, present: the app\'s own files, specs and helpers.ts stay byte fo
   assert.equal(get(d, 'tests/helpers.ts'), 'export const mine = 1;\n');
   assert.equal(get(d, 'tests/package.json'), '{"devDependencies":{"@playwright/test":"1.55.1"}}\n', 'the app\'s own package.json stays');
   assert.equal(get(d, 'tests/orders.spec.ts'), 'the agent\'s test');
-  assert.match(lines.join('\n'), /kept the app's own tests\/mx\.ts, tests\/playwright\.config\.ts/);
+  assert.match(lines.join('\n'), /test kit: tests\/mx\.ts, tests\/playwright\.config\.ts, tests\/package\.json are yours \(not a text mx-codr shipped\), kept as they are/);
 });
 
 test('test kit: a Playwright config at the app root means no second config in tests/', () => {
