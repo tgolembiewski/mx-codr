@@ -64,7 +64,13 @@ test('the brain rule: the contract\'s points, short (read every session by every
   const b = brain();
   // the plan line, exactly (contract 2)
   assert.ok(b.includes('`Requirement: R<n> <title> | slice <NN-name> | anchor @Module.Document | why <details>`'));
-  assert.match(b, /no anchor yet: leave out\n` \| anchor \.\.\.`/);
+  // owner, 2026-11-19 (a Codex plan left out every anchor, 13 rows saying progress cannot be tracked): the plan's
+  // anchor names the NEW page or microflow that will build it; left out only when the requirement has none of its own
+  assert.doesNotMatch(b, /no anchor yet: leave out/);
+  assert.match(b, /\| why <details>` \(anchor: the NEW page or\nmicroflow that builds it, even before it exists; left out only if it has none\); per business-rule assumption one line\n/);
+  // and the one edit the agent makes unasked: a finished requirement without an anchor gets the document that builds it
+  // (mxcli 0.32 `brain edit <id> -a`: replaces the anchors, keeps id, text and place; measured on a scratch brain)
+  assert.match(b, /unless asked in the chat\.\nExcept: a requirement you finished with no anchor gets `\.\/mxcli brain edit <id> -a @<its document>` \(id: `brain list`\)\.\n/);
   // capture with --json; three triggers; the open question captured before asking; at most 3 findings a turn
   assert.match(b, /`\.\/mxcli brain capture "<text>" \.\.\. --json`/);
   assert.match(b, /^1\. A request for a feature that is not in the requirement list/m);
@@ -102,9 +108,10 @@ test('the brain rule: the contract\'s points, short (read every session by every
   assert.match(b, /`\.\/mxcli brain brief --module <M>`/);
   assert.match(b, /\*\*Without it\*\*, promote only what the person approved in the chat/);
   // small: lines and characters (about 4 characters a token)
-  // owner, 2026-11-14: raised from 24 lines / 2,000 characters for the title + details form and the D numbers
+  // owner, 2026-11-14: raised from 24 lines / 2,000 characters for the title + details form and the D numbers;
+  // 2026-11-19: 2,300 -> 2,400 characters for the plan anchor's wording and the brain edit exception (owner's request)
   assert.ok(b.split('\n').length - 1 <= 26, `${b.split('\n').length - 1} lines`);
-  assert.ok(b.length <= 2300, `${b.length} characters`);
+  assert.ok(b.length <= 2400, `${b.length} characters`);
   assert.doesNotMatch(b, /^---$/m);
 });
 

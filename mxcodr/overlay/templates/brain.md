@@ -14,10 +14,11 @@ required or decided, the details and the reason on the second line.
    error, a broken Marketplace version): capture `"D<n> <title>\n<why>" -a @...` (the person decides by that why;
    n after the highest D, queue too). At most 3 per turn.
 Never promote your own findings, write a status into a requirement, or edit or drop an entry unless asked in the chat.
+Except: a requirement you finished with no anchor gets `./mxcli brain edit <id> -a @<its document>` (id: `brain list`).
 **With `MXCODR_PANEL=1`** set, the person approves in mx-codr's panel: promote nothing else. A
 plan captures nothing: per new requirement one line
-`Requirement: R<n> <title> | slice <NN-name> | anchor @Module.Document | why <details>` (no anchor yet: leave out
-` | anchor ...`); per business-rule assumption one line
+`Requirement: R<n> <title> | slice <NN-name> | anchor @Module.Document | why <details>` (anchor: the NEW page or
+microflow that builds it, even before it exists; left out only if it has none); per business-rule assumption one line
 `Decision: D<n> <title> | anchor @Module.Document | why <details>` (anchor and why optional, approved with the plan); open
 choices: trigger 2. The pack names the next free R, D and slice numbers.
 The brain pack at session start is your brain reading and the requirement list (no pack: `./mxcli

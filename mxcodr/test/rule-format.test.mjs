@@ -45,6 +45,16 @@ test('the AGENTS.md text: .agents/skills without the parenthetical; opencode kee
   assert.match(ruleText(SKILLS_DIR.opencode), /`\.opencode\/skills\/` \(beside mxcli's\)/);
 });
 
+test('bundle 2026.11.18.6: every shape says one skill per read or command, Codex\'s two output limits, line ranges after a cut, and the gate in Codex', () => {
+  // CarFleetCodexSol (2026-11-18): three skills in one exec cell with Promise.allSettled, the cell's output cut at 10,000 tokens
+  for (const [what, t] of [['Claude Code', ruleText(SKILLS_DIR.claude)], ['AGENTS.md', ruleText(SKILLS_DIR.codex)], ['Cursor', mdcText()], ['live', ruleText(SKILLS_DIR.codex, undefined, { live: true })]]) {
+    assert.match(t, /each whole and each in its own read or command: never several files in one call\n\(no combined `cat`, no `Promise\.all`, no loop\)/, what);
+    assert.ok(t.includes('Codex: one `exec_command` per file with `max_output_tokens: 30000`, and an `exec` script starts with `// @exec: {"max_output_tokens": 30000}`.'), what);
+    assert.ok(t.includes('If an output says it was truncated, read the rest by line ranges before you build.'), what);
+    assert.match(t, /In Claude Code, and in Codex in Studio Pro's mx-codr pane, a skill gate holds you to this list/, what);
+  }
+});
+
 test('sk1\'s shape (the text wrapped in --- lines) parses to an empty body and fails the check', () => {
   const sk1 = `---\n${rule}---\n`;
   const p = parseRule(sk1);
