@@ -3,6 +3,12 @@
 You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mpr.lock` file sits next to the
 `.mpr`: Studio Pro has the app open. It owns the model and runs the app. Then:
 
+- The app open in Studio Pro is the only app you build in. Never create another Mendix project or `.mpr`
+  (`mxcli new`, a copy of the app, a scratch project), not even when the request names another Studio Pro version
+  or asks for "a new app": build in this app, and when the request names a different Studio Pro version than this
+  app's (`./mxcodr-live status` says it), say so in your summary.
+- When you cannot reach Studio Pro (`./mxcodr-live status` fails), stop and tell the person what is wrong (the
+  pane's checklist, its own instruction word for word) instead of building elsewhere.
 - Write each model change as an MDL script file and run `./mxcodr-live exec <script.mdl>`. Never
   `./mxcli exec`, `mxcli -c` with a change, `./mxcli marketplace install` or any other write to the `.mpr`:
   mxcli refuses, and a write behind Studio Pro's back would be lost at its next save. Never `--force` or

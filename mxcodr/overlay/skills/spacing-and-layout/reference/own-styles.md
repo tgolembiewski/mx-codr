@@ -2,7 +2,7 @@
 
 The look of the app (the theme, or in Studio Pro the person's Look tab: colour, corners, font, light or dark)
 reaches only what reads the theme's variables. A rule of your own with a fixed value beats Atlas's rule as soon
-as its selector is more specific, so no later look changes it. Measured on a Mastermind app:
+as its selector is more specific, so no later look changes it. Measured on a test app:
 `.region-content .btn { border-radius: 8px }` kept every button at 8px through round corners and then the stock
 corners, with two restarts in between.
 
