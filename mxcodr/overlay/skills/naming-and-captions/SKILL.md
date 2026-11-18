@@ -179,8 +179,8 @@ must show no CONV012; every `if` you wrote has a caption.
 
 A Mendix loop has no caption property, so `@caption` on a `loop` is dropped and
 `mxcli check` warns that it is — but a loop does take an `@annotation`, a note as if drawn in Studio Pro
-(the worked example below has one). A **`while` loop is the same**, and quieter: `@caption` on it passes
-`check` and `exec` with no warning and is simply gone from `describe`:
+(the worked example below has one). A **`while` loop is the same**: `check` warns about `@caption` on it too,
+and the caption is gone from `describe`:
 
 ```mdl
 @annotation 'Fill the chart one month at a time, oldest first'

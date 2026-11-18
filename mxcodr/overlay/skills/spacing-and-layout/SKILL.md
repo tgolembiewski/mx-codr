@@ -1,12 +1,12 @@
 ---
 name: spacing-and-layout
-description: "A finished-looking screen: Atlas Spacing instead of CSS, everything inside one layout grid, one layout for every page, a real navigation menu per role with icons and Log out last, Users and My account, a Back button top left on a page another page opens, who is signed in top right, an icon on every button, grids that filter themselves, long text in a text area, totals as tiles, stacked lists in tabs. Use before writing or altering any page, snippet, layout or menu."
+description: "A finished-looking screen: Atlas Spacing instead of CSS (own SCSS only from theme variables), everything inside one layout grid, one layout for every page, a real navigation menu per role with icons and Log out last, Users and My account, a Back button top left on a page another page opens, who is signed in top right, an icon on every button, grids that filter themselves, long text in a text area, totals as tiles, stacked lists in tabs. Use before writing or altering any page, snippet, layout or menu."
 ---
 
 # Spacing and layout
 
 A screen can pass `mx check`, lint and every test and still look broken. Widget syntax is in mxcli's
-`create-page` and `alter-page`; colour, type and branding in `atlas-design`.
+`create-page` and `alter-page`; colour, type and branding in `atlas-design`; own SCSS in [reference/own-styles.md](reference/own-styles.md).
 
 ## Spacing between widgets
 

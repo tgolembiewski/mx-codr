@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fenceText, unfence, withMxcliSection, MXCLI_BEGIN, MXCLI_END, writeRules, copySkills, copyTestKit, copyFilm, FILM, TEST_KIT, PLAYWRIGHT, upgradeCleanup, migrateBin, stripOurs, ensureLocalMxcli, replaceShim, parseAgents } from '../overlay/install.mjs';
-import { parseRule, bodyLines, checkRule, START, END } from '../overlay/lib/rules.mjs';
+import { parseRule, bodyLines, checkRule, readTemplate, START, END } from '../overlay/lib/rules.mjs';
 import { INSTALLED_SKILLS } from '../overlay/lib/skills.mjs';
 import { readRequests, saveRequest, sha1 } from '../overlay/lib/requests.mjs';
 import { writeAtomic, readJson } from '../overlay/lib/cache.mjs';
@@ -32,12 +32,12 @@ const install = (d, agents) => { const before = new Set(walk(d)); writeRules(d, 
 const skillFiles = dir => INSTALLED_SKILLS.flatMap(s => walk(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'overlay', 'skills', s)).map(f => `${dir}/${s}/${f}`));
 const GATE = /\bgates?\b|mxgate|\.mxgate|tests\/(orient|peek|lib|gate|film\.sh)|scenario\(|# covers|rulebook|\bDONE\b/;
 
-test('Claude Code: .claude/rules/mxcodr.md and the eight skills in .claude/skills/, nothing else; AGENTS.md untouched', () => {
+test('Claude Code: .claude/rules/mxcodr.md and our skills in .claude/skills/, nothing else; AGENTS.md untouched', () => {
   const d = stubApp();
   const written = install(d, ['claude']);
   assert.deepEqual(written, ['.claude/rules/mxcodr.md', ...skillFiles('.claude/skills')].sort());
   assert.equal(get(d, 'AGENTS.md'), MXCLI_AGENTS_MD);
-  assert.ok(!exists(d, '.claude/skills/requirements-interview'), 'requirements-interview is not installed by default');
+  assert.ok(exists(d, '.claude/skills/requirements-interview/SKILL.md'), 'requirements-interview is installed always (since 2026.11.14.2)');
   assert.equal(get(d, '.claude/skills/create-page/SKILL.md'), 'mxcli own skill');
 });
 
@@ -71,11 +71,11 @@ test('the installed rule files parse: a non-empty body, no stray frontmatter (.m
   const md = parseRule(get(d, '.claude/rules/mxcodr.md'));
   assert.equal(md.frontmatter, null);
   assert.equal(get(d, '.claude/rules/mxcodr.md')[0], '#');
-  assert.equal(bodyLines(md.body), 22);
+  assert.equal(bodyLines(md.body), 22 + bodyLines(readTemplate('brain.md')), 'the template\'s 22 and the brain rule');
   assert.doesNotMatch(md.body, /^---$/m);
   const mdc = parseRule(get(d, '.cursor/rules/mxcodr.mdc'));
   assert.deepEqual(mdc.frontmatter, ['description', 'alwaysApply']);
-  assert.equal(bodyLines(mdc.body), 22);
+  assert.equal(bodyLines(mdc.body), 22 + bodyLines(readTemplate('brain.md')));
   assert.doesNotMatch(mdc.body, /^---$/m);
   assert.match(mdc.body, /^# Keep your checks as tests\n/);
 });

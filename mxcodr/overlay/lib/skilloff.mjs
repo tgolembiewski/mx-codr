@@ -25,6 +25,9 @@ const wrap = (text, width = 104) => {
   return out.join('\n');
 };
 
+// templates/mxcodr.md's sentence pointing at app-docs (the end-of-turn update of docs/app-docs.html)
+export const DOCS_SENTENCE = ' Once `docs/app-docs.html` exists, update it with the `app-docs` skill at the end of every turn that changed the model, before you report.';
+
 /** The always-on rule text without the switched-off skills: their items leave the paragraph naming the skills (the
  * paragraph goes when none is left, keeping what it says about mxcli's own skills); the coverage done sentence's
  * "record them first, skill `requirements-interview`" goes with that skill. */
@@ -43,6 +46,7 @@ export function ruleWithoutSkills(text, off = []) {
     : `Of mxcli's${rest}`;
   let out = text.slice(0, start) + wrap(para) + text.slice(end);
   if (off.includes('requirements-interview')) out = out.replace('; record them first, skill `requirements-interview`)', ')');
+  if (off.includes('app-docs')) out = out.replace(DOCS_SENTENCE, '');
   return out;
 }
 

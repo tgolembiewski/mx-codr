@@ -22,4 +22,4 @@ Before building a part, read its project skill in `.claude/skills/` (beside mxcl
 what deserves a test; `app-security` sign-in, roles, row isolation; `spacing-and-layout` menu, Back,
 signed-in user, icons, spacing; `naming-and-captions` variables, captions, widgets `<Page>_<What><Type>`;
 `module-structure` modules and folders; `files-and-images` uploads; `java-action-docs` every Java action's documentation. Read each of these skills whole, one file per read, never through `head`, `cut` or a combined `cat`; of mxcli's own skills in `.ai-context/skills/` read only the section you need.
-Marketplace widgets only from publisher Mendix or Mendix Labs.
+Marketplace widgets only from publisher Mendix or Mendix Labs. Once `docs/app-docs.html` exists, update it with the `app-docs` skill at the end of every turn that changed the model, before you report.

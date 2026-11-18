@@ -25,6 +25,7 @@ import { INSTALLED_SKILLS, OPTIONAL_SKILLS, RETIRED_SKILLS, skillsFor, durableTe
 import { decideCoverage, askCoverage, coverageRecord } from './lib/coverage.mjs';
 import { decideTheme, activeFrameTheme, applyTheme, askTheme, installThemeTool } from './lib/theme.mjs';
 import { makeUi } from './lib/ui.mjs';
+import { portFree } from './lib/ports.mjs';
 import { liveSkills, LIVE_RULE_FILE, liveKitText, liveFilmText } from './lib/live.mjs';
 import { liveRuleWithoutSkills, offList, SKILLS_OFF_DIR } from './lib/skilloff.mjs';
 import { decideAgents, askAgents, agentsNote, agentNames, agentStartLines, AGENT_INFO } from './lib/agents.mjs';
@@ -90,7 +91,7 @@ async function main() {
   const { agents } = picked;
 
   // the bar's steps, counted up front (v1: a plan one short pushed the bar past 100%)
-  ui.plan(13 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
+  ui.plan(14 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
   const warnings = [];
   const warn = s => { ui.note(s); warnings.push(s); };
   const lastLine = r => `${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
@@ -161,11 +162,15 @@ async function main() {
   for (const line of kit.lines) if (!line.startsWith('test kit -> ') && !(!changed.length && line.startsWith('test kit: kept '))) ui.note(line);
   ui.begin('installing the film recorder');
   ui.done('film recorder', `1 ${ui.i.arrow} ${copyFilm(app)} (written on every install; the film-tests skill says how to use it)`);
+  // the project brain on every install (owner contract 2026-11-14): the agent captures requirements, open questions
+  // and findings into it with or without coverage; docs/brain/ is the app's and is never overwritten or removed
+  ui.begin('creating the project brain');
+  const brain = initBrain(app, mpr, args => run(mxcli, args));
+  ui.done('project brain', brain === null ? 'docs/brain/ kept as it was (the app\'s, never overwritten)' : brain.ok ? 'docs/brain/ created (mxcli brain init)' : 'docs/brain/ not created');
+  if (brain && !brain.ok) warn(brain.line);
   if (cov.on) {
     ui.begin('installing the coverage check');
-    const brain = initBrain(app, mpr, args => run(mxcli, args));
-    ui.done('coverage', `1 ${ui.i.arrow} ${copyCoverage(app)} (written on every install; requirements in ${PLAN_DIR}/${brain?.ok ? ', docs/brain/ created by mxcli brain init' : ''})`);
-    if (brain && !brain.ok) warn(brain.line);
+    ui.done('coverage', `1 ${ui.i.arrow} ${copyCoverage(app)} (written on every install; requirements in ${PLAN_DIR}/)`);
   } else {
     const off = coverageOff(app, prev);
     if (off) ui.note(off);
@@ -209,13 +214,14 @@ async function main() {
     if (w.status !== 0) die(`the app is not ready: ${lastLine(w)}`, 'see .mxcli/run.log');
     ui.done('smoke boot', `the app boots (${(st.stdout || '').trim().split('\n').pop()}); stopped again`);
   }
-  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked, coverage: cov.on });
+  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked, coverage: cov.on, brain });
 }
 
 // ---- the summary: what landed, what to do now (v1's summary.sh, with v2's content) --------------------
 
 // out: the ui to print with (the tests pass their own)
-export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, kit, theme, db, dbName, request, warnings, agents, picked = { added: [], removed: [] }, coverage = false }, out = ui) {
+// brain: what initBrain returned (null: docs/brain/ was there already; undefined: not said, no row)
+export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skillDirs, kit, theme, db, dbName, request, warnings, agents, picked = { added: [], removed: [] }, coverage = false, brain }, out = ui) {
   const ui = out;
   const { c, i } = ui;
   const note = s => `${c.grey}${s}${c.reset}`;
@@ -234,6 +240,7 @@ export function summary({ app, mpr, newApp, mxcli, downloaded, ruleTargets, skil
   if (kit.written.length || upd) ui.row('test kit', kit.written.length + upd, `tests/  ${note(`(${upd ? `${upd} unedited from an earlier install updated; ` : ''}a file you edit is never overwritten)`)}`);
   else ui.row('test kit', 0, `tests/ already had them, nothing overwritten${kit.edited?.length ? `  ${note(`(${kit.edited.join(', ')} yours: the kit's fixes not in it)`)}` : ''}`);
   ui.row('film', 1, `tests/film.mjs  ${note('(node tests/film.mjs --list)')}`);
+  if (brain !== undefined) ui.row('brain', brain && !brain.ok ? 0 : 1, brain && !brain.ok ? 'docs/brain/ not created  ' + note('(the agent runs ./mxcli brain init first)') : `docs/brain/  ${note(`(${brain ? 'created by mxcli brain init' : 'kept as it was'}; the app's, never overwritten)`)}`);
   if (coverage) ui.row('coverage', 'on', `${PLAN_DIR} + ${COVERAGE}  ${note('(a test per numbered requirement; 0 missing before done)')}`);
   ui.row('theme', theme && theme !== 'as-is' ? 1 : 0, `${theme && theme !== 'as-is' ? theme : 'as mxcli new made it'}  ${note('(node .mxcodr/theme.mjs changes it)')}`);
   ui.row('database', 1, `${db === 'postgres' ? `postgres, ${dbName}` : 'hsqldb'}  ${note('(MxBuild and the runtime cached)')}`);
@@ -760,13 +767,15 @@ export function coverageOff(app, prev) {
   return `coverage is off now: ${gone.length ? `removed ${COVERAGE}; ` : ''}the rule file and durable-tests are the plain ones again, docs/brain/ stays`;
 }
 
-// The requirements live in the project brain, so it must exist: `mxcli brain init` when docs/brain/ is missing.
+// The project brain must exist on every install (the agent captures requirements, open questions and findings into
+// it; with coverage on, tests/coverage.mjs reads its plan): `mxcli brain init` when docs/brain/ is missing, never over
+// one that exists. Exported for the Studio Pro extension's setup, which does not run main().
 // run(args) runs the pinned mxcli (null: none to run). -> null (there already), or { ok, line }.
 export function initBrain(app, mpr, run) {
   if (fs.existsSync(path.join(app, 'docs', 'brain'))) return null;
   if (!run) return { ok: false, line: `no docs/brain/ yet and no mxcli to create it; the agent runs ./mxcli brain init -p ${mpr} first` };
   const r = run(['brain', 'init', '-p', mpr]);
-  if (r.status === 0 && fs.existsSync(path.join(app, 'docs', 'brain'))) return { ok: true, line: `docs/brain/ created (mxcli brain init): the requirements go to ${PLAN_DIR}/` };
+  if (r.status === 0 && fs.existsSync(path.join(app, 'docs', 'brain'))) return { ok: true, line: 'docs/brain/ created (mxcli brain init)' };
   return { ok: false, line: `mxcli brain init failed: ${`${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').pop() || `exit ${r.status}`}; the agent runs ./mxcli brain init -p ${mpr} first` };
 }
 
@@ -923,7 +932,7 @@ export const replaceShim = (app, mxcliPath) => {
 
 // Ports for the smoke boot only (the agent boots the app itself later, on mxcli's defaults).
 async function bootPorts() {
-  const free = p => new Promise(res => { const srv = net.createServer(); srv.once('error', () => res(false)); srv.listen(p, '127.0.0.1', () => srv.close(() => res(true))); });
+  const free = p => portFree(p); // bind on 127.0.0.1, then connect on 127.0.0.1 and ::1 (lib/ports.mjs)
   if (await free(8080) && await free(8090) && await free(6543)) return { dflt: true };
   for (let p = 18080; p < 18980; p += 3) if (await free(p) && await free(p + 1) && await free(p + 2)) return { app: p, admin: p + 1, serve: p + 2 };
   die('no three free ports for the smoke boot', 'install without --boot');

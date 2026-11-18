@@ -93,6 +93,10 @@ test('an empty ledger is not "0 missing": no plan, or only hand-written headings
   assert.equal(none.ok, false);
   assert.equal(none.empty, true);
   assert.match(format(none), /^no numbered requirement in docs\/brain\/plan\/: record them first \(skill requirements-interview\)/);
+  // the hint: promote after the person agreed in the chat; in mx-codr's panel (MXCODR_PANEL=1) the person saves them
+  assert.match(format(none, { panel: false }), /--json`, then `\.\/mxcli brain promote <id> -p <app>\.mpr`/);
+  assert.match(format(none, { panel: true }), /--json`, then the person saves them in mx-codr's panel \(they count from then on; never promote them yourself\)/);
+  assert.doesNotMatch(format(none, { panel: true }), /brain promote/);
   const hand = entriesFrom('# Slice: 01-x\n\n## R1 Typed by hand\n\nno mxcli line\n', '01-x');
   const r = coverage(hand, tests);
   assert.equal(r.ok, false);

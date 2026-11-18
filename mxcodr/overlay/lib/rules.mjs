@@ -1,5 +1,5 @@
 // The always-on rule file, one text (templates/mxcodr.md; with coverage on, its done sentence from
-// templates/coverage-done.md) in three shapes:
+// templates/coverage-done.md; then the brain rule, templates/brain.md) in three shapes:
 //   Claude Code  .claude/rules/mxcodr.md   the template as it is
 //   Cursor       .cursor/rules/mxcodr.mdc  four frontmatter lines (alwaysApply) + the text
 //   Codex, opencode, Pi  a block in AGENTS.md, between <!-- mxcodr:start --> and <!-- mxcodr:end -->
@@ -24,12 +24,18 @@ export const MDC_HEAD = '---\ndescription: Project rules for building this Mendi
 
 // The done sentence, and its coverage variant (templates/coverage-done.md): with coverage on, the agent is done
 // when tests/coverage.mjs shows 0 missing instead of after a table it prints itself. Same number of lines, so the
-// file stays 25 lines and differs only in this sentence.
+// template part stays 25 lines and differs only in this sentence.
 export const DONE_SENTENCE = /\*\*You are done only\s+when\*\*[\s\S]*?`sessions left: 0`\./;
 export function withCoverageDone(text) {
   if (!DONE_SENTENCE.test(text)) throw new Error('templates/mxcodr.md no longer has the sentence **You are done only when** ... `sessions left: 0`.');
   return text.replace(DONE_SENTENCE, readTemplate('coverage-done.md').trimEnd());
 }
+
+// The brain rule (templates/brain.md): when the agent captures into the project brain, what it never does, and the
+// MXCODR_PANEL=1 switch (the Studio Pro extension's panel approves; without it the person approves in the chat).
+// Appended to every shape of the rule text, after the edits above, so the live edits and the skills paragraph
+// (lib/live.mjs, lib/skilloff.mjs) never see it. It is read every session by every agent: keep it short.
+export const BRAIN_RULE = 'brain.md';
 
 // The rule text with `dir` (e.g. '.cursor/skills') as the skills folder; coverage: the coverage done sentence;
 // live: the Studio Pro extension's live mode (lib/live.mjs), never set by the file-mode installer.
@@ -40,7 +46,7 @@ export function ruleText(dir, text = readTemplate('mxcodr.md'), { coverage = fal
   if (coverage) text = withCoverageDone(text);
   if (live) text = liveRuleText(text);
   text = ruleWithoutSkills(text, skillsOff);
-  return text.replace(from, MXCLI_WRITES.has(dir) ? `\`${dir}/\` (beside mxcli's)` : `\`${dir}/\``);
+  return text.replace(from, MXCLI_WRITES.has(dir) ? `\`${dir}/\` (beside mxcli's)` : `\`${dir}/\``) + '\n' + readTemplate(BRAIN_RULE);
 }
 
 export const mdcText = (text = readTemplate('mxcodr.md'), opts = {}) => MDC_HEAD + ruleText(SKILLS_DIR.cursor, text, opts);

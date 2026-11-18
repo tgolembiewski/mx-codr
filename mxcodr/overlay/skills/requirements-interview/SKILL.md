@@ -1,6 +1,6 @@
 ---
 name: requirements-interview
-description: "Ask the person what the app must do before building it: roles, data, journeys, channels, outside systems, security, what counts as done; at most two rounds. When nobody can answer (the request says so, or an unattended run), take your recommended answers as assumptions, write them down and build on. Use before the first feature of a new app, and before a change that adds a role, a module or a channel."
+description: "Ask the person what the app must do before building it: roles, data, journeys, channels, outside systems, security, what counts as done; at most two rounds. When nobody can answer (the request says so, or an unattended run), take your recommended answers as assumptions, write them down and build on. Use before the first feature of a new app, and before a change that adds a role, a module or a channel. Not for a fix, a small change or a question about the app."
 ---
 
 # Ask before you build
@@ -73,56 +73,62 @@ over after the second round becomes an assumption with its recommended answer.
   where it will be built -- the anchor names the page, microflow or attribute that will build it, never
   a bare module, and it may not exist yet (that reads as "not built yet"):
   ```
-  ./mxcli brain capture "R12 A customer can see only their own invoices; checked when demo_customer opens Invoices and sees no other customer's row" --slice 01-invoices -a @Invoicing.Invoice_Overview -p <app>.mpr
+  ./mxcli brain capture "R12 A customer can see only their own invoices; checked when demo_customer opens Invoices and sees no other customer's row" --slice 01-invoices -a @Invoicing.Invoice_Overview -p <app>.mpr --json
   ```
   The sentence: "R<n> <role> can <what>; checked when <what is visible>". Group the requirements in
   one slice per area of the app (`01-invoices`, `02-customers`), not one per layer (security, data
   model, pages).
 - **Numbers are global and never reused.** R1, R2 ... in the order of the request; a later request
-  (`docs/requests/02.md`) continues after the highest number already in `docs/brain/plan/`, never
-  from R1. A requirement the person drops keeps its number: add `(dropped: <the reason>)` to the end
+  (`docs/requests/02.md`) continues after the highest number already in `docs/brain/plan/` and in the queue
+  (`./mxcli brain staged`), never from R1. A requirement the person drops keeps its number: add `(dropped: <the reason>)` to the end
   of its heading in `docs/brain/plan/` and leave the line under the heading as it is.
 - **Every number, limit and place the request names is its own requirement** ("one Employee, one
   Manager, two customers"; "a filter bar above the table"): what is not recorded is lost to the
   next session.
 - **An assumption is only what the person did not decide** -- a question left over after the
   second round, one they left to you, and every answer when nobody can answer -- captured as an
-  open question: `./mxcli brain capture "Assumed: one currency, EUR" --open -p <app>.mpr`. An answer
+  open question: `./mxcli brain capture "Assumed: one currency, EUR" --open -p <app>.mpr --json`. An answer
   the person gave or accepted ("all as recommended" included) is a requirement, never `--open`.
 - **A feature that needs a key, an account or an outside service is built, not deferred**: build
   it to work with a stand-in when the key is missing (a template text for an AI draft, a mock for
   a service), read the key from a constant left empty, and record the key as an open question.
 - **Capture a slice in one command:** chain its captures with `&&`, not one tool call each.
 
-Then show the person the list -- each requirement as its sentence, grouped by slice -- and ask:
-"Do you agree?" Do this even after "all as recommended": they agreed to answers, not to the
-requirements you wrote from them. Captures wait in mxcli's queue (`./mxcli brain staged`) and count
-for nothing until they are promoted: when the person agrees, promote them (`./mxcli brain promote`
-takes one id at a time, chained with `&&`).
+Then show the person the list -- each requirement as its sentence, grouped by slice. Captures wait in
+mxcli's queue (`./mxcli brain staged`) and count for nothing until they are promoted:
+
+- **With `MXCODR_PANEL=1`** in your environment, the person approves them in mx-codr's panel: the
+  card shown when your turn ends lists them, checked, and saving it is their agreement. Say that they
+  will be there, and do not promote them yourself, even when the person agrees in the chat.
+- **Without it**, ask: "Do you agree?" Do this even after "all as recommended": they agreed to
+  answers, not to the requirements you wrote from them. Only when the person agrees in the chat, promote them
+  (`./mxcli brain promote` takes one id at a time, chained with `&&`).
 
 **When nobody can answer**, do this in the same turn, without stopping:
 
 1. Number every requirement, R1 onwards in the order of the request, or after the highest number
-   already in `docs/brain/plan/`.
+   already in `docs/brain/plan/` and in the queue.
 2. Capture them, one slice per area, each anchored forward at the document that will build it,
    chained with `&&` (one tool call per slice, not per requirement).
 3. **Promote them yourself in the same turn; nobody will.** mxcli's `project-brain` skill says a
    person promotes; in an unattended run there is no person, and a requirement left in the queue
    counts for nothing. `./mxcli brain staged -p <app>.mpr` lists the ids, and promote takes one id at
    a time: `./mxcli brain promote <id> -p <app>.mpr && ./mxcli brain promote <id> -p <app>.mpr && ...`
-4. Run `node tests/coverage.mjs`: it lists every one of them as missing, since no test cites them
-   yet. That list is what you build and test against. A requirement it does not list was not
-   promoted, or its heading lost its number.
+4. With coverage on (the app has `tests/coverage.mjs`), run `node tests/coverage.mjs`: it lists every
+   one of them as missing, since no test cites them yet. That list is what you build and test against.
+   A requirement it does not list was not promoted, or its heading lost its number.
 
 **Never resolve an open question yourself** (`./mxcli brain resolve`): it is the person's answer.
-When they give it, run `./mxcli brain resolve <id> "<their answer>"` with their words.
+With the panel they may answer in its card, which saves it. When they answer in the chat: resolve works
+only on a promoted entry, so run `./mxcli brain promote <id>`, then
+`./mxcli brain resolve <id> "<their exact words>"`.
 
 ## 4. Then build
 
 Build the slices one area at a time. Every requirement gets a test that checks its "checked when"
 (skill `durable-tests`), its number in the test's title (`test('[R12] a customer sees only their own
 invoices', ...)`), so a red test says which requirement it is. `./mxcli brain plan -p <app>.mpr`
-counts what is built against what was asked, and `node tests/coverage.mjs` what is tested. In the
-final report, list the assumptions still open for the person to settle.
+counts what is built against what was asked, and, with coverage on, `node tests/coverage.mjs` what is
+tested. In the final report, list the assumptions still open for the person to settle.
 
 The question format comes from Matt Pocock's `grilling` skill (github.com/mattpocock/skills, MIT).

@@ -103,6 +103,12 @@ export const SKILL_EDITS = {
   'spacing-and-layout/SKILL.md': [
     ['`./mxcli check` and `./mxcli exec` it (`choose-edit-mode`', '`./mxcodr-live check` and `./mxcodr-live exec` it (`choose-edit-mode`'],
   ],
+  // the fingerprint through ./mxcodr-live (Standard allows it; a `node ...` line asks every time): the same
+  // fingerprint.mjs, run by the extension on the saved model, as the panel's Docs tab computes it
+  'app-docs/SKILL.md': [
+    ['6. `node <this skill\'s folder>/fingerprint.mjs -p <app>.mpr`: the hashes', '6. `./mxcodr-live docs fingerprint`: the hashes'],
+    ['`node <this skill\'s folder>/fingerprint.mjs -p <app>.mpr --check docs/app-docs.html` names the parts', '`./mxcodr-live docs check` names the parts'],
+  ],
 };
 
 // A trace of every test: `./mxcodr-live tests affected` maps each test to the pages, microflows and entities it

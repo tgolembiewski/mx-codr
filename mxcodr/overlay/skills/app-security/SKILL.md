@@ -78,7 +78,7 @@ your rule on that link.
 - **The link crosses modules, so delete it with `on delete set null`.** A restrict rule on that link
   stops the runtime at startup.
 - **Constrain the rule on the link, with full names and the token quoted.** `CurrentUser()` and
-  `$currentUser` pass `mxcli check` and fail the build with CE0161.
+  `$currentUser` fail the build with CE0161; `mxcli check` refuses `$currentUser` but passes `CurrentUser()`.
 
 ```sql
 mdl 1;

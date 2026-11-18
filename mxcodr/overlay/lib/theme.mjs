@@ -118,7 +118,8 @@ export function applyTheme({ app, mpr, choice, run }) {
 // Fonts: what the signal base vendors (IBM Plex Sans), Atlas's own (Open Sans), or the computer's UI font; any
 // other font would need its files (no CDN). Light/dark: `mxcli theme apply --variant light|dark|auto`.
 export const KNOBS = {
-  radius: { sharp: ['0px', '2px'], slight: ['4px', '8px'], round: ['10px', '16px'] },
+  // slight is what the catalog's themes ship (mxcli's signal base: 4px, 6px), so a stock theme and its knobs agree
+  radius: { sharp: ['0px', '2px'], slight: ['4px', '6px'], round: ['10px', '16px'] },
   font: {
     plex: { title: 'IBM Plex Sans', value: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif' },
     open: { title: 'Open Sans (Atlas)', value: '"Open Sans", sans-serif' },

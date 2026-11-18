@@ -116,10 +116,12 @@ export function coverage(entries, tests) {
 }
 const where = t => `${t.file}:${t.line} ${t.title}`;
 
-// The report a person or an agent reads; the last line is the count.
-export function format(r) {
+// The report a person or an agent reads; the last line is the count. panel: the agent runs in mx-codr's panel
+// (MXCODR_PANEL=1), where the person promotes the captured requirements, never the agent (the brain rule).
+export function format(r, { panel = process.env.MXCODR_PANEL === '1' } = {}) {
   const out = [];
-  const req = '`./mxcli brain capture "R<n> <text>" --slice 01-<area> -a @Module.Document -p <app>.mpr`, then `./mxcli brain promote <id> -p <app>.mpr`';
+  const req = '`./mxcli brain capture "R<n> <text>" --slice 01-<area> -a @Module.Document -p <app>.mpr --json`, then '
+    + (panel ? "the person saves them in mx-codr's panel (they count from then on; never promote them yourself)" : '`./mxcli brain promote <id> -p <app>.mpr`');
   if (r.empty) {
     out.push(`no numbered requirement in ${PLAN_DIR}/: record them first (skill requirements-interview): ${req}`);
     if (r.byHand.length) out.push(`  ${r.byHand.length} heading(s) there were written by hand and are not counted; mxcli writes them on promote`);

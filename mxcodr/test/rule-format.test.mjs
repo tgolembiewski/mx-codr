@@ -1,11 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { readTemplate, ruleText, mdcText, parseRule, bodyLines, checkRule, SKILLS_DIR, DONE_SENTENCE, withCoverageDone } from '../overlay/lib/rules.mjs';
+import { readTemplate, ruleText, mdcText, parseRule, bodyLines, checkRule, SKILLS_DIR, DONE_SENTENCE, withCoverageDone, BRAIN_RULE } from '../overlay/lib/rules.mjs';
 import { skillsFor } from '../overlay/lib/skills.mjs';
 
 const read = p => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
 const rule = readTemplate('mxcodr.md');
+// every shape of the rule text ends on the brain rule (templates/brain.md, test/brain.test.mjs): 25 + 1 + its lines
+const brain = readTemplate(BRAIN_RULE);
+const installed = rule + '\n' + brain;
+const LINES = installed.split('\n').length - 1, BODY = 22 + bodyLines(brain);
 
 test('the template opens with sk2\'s keep-tests rule byte for byte (the measured file) and is 25 lines', () => {
   assert.equal(read('../overlay/templates/keep-tests.md'), read('./fixtures/keep-tests.md'));
@@ -13,14 +17,14 @@ test('the template opens with sk2\'s keep-tests rule byte for byte (the measured
   assert.equal(rule.split('\n').length - 1, 25);
 });
 
-test('.claude/rules/mxcodr.md: first byte #, no line equals ---, no frontmatter, a 22-line body', () => {
+test('.claude/rules/mxcodr.md: first byte #, no line equals ---, no frontmatter, a 22-line body plus the brain rule', () => {
   const t = ruleText(SKILLS_DIR.claude);
-  assert.equal(t, rule, 'Claude Code gets the template unchanged');
+  assert.equal(t, installed, 'Claude Code gets the template unchanged, then the brain rule');
   assert.equal(t[0], '#');
   assert.equal(t.split('\n').filter(l => l === '---').length, 0);
   const p = parseRule(t);
   assert.equal(p.frontmatter, null);
-  assert.equal(bodyLines(p.body), 22);
+  assert.equal(bodyLines(p.body), BODY);
   assert.deepEqual(checkRule(t), []);
 });
 
@@ -28,7 +32,7 @@ test('.cursor/rules/mxcodr.mdc: frontmatter [description, alwaysApply], the same
   const t = mdcText();
   const p = parseRule(t);
   assert.deepEqual(p.frontmatter, ['description', 'alwaysApply']);
-  assert.equal(bodyLines(p.body), 22);
+  assert.equal(bodyLines(p.body), BODY);
   assert.match(p.body, /`\.cursor\/skills\/`: `durable-tests`/);
   assert.doesNotMatch(p.body, /\.claude\/skills|beside mxcli/);
   assert.deepEqual(checkRule(t, { mdc: true }), []);
@@ -47,11 +51,11 @@ test('sk1\'s shape (the text wrapped in --- lines) parses to an empty body and f
   assert.ok(checkRule('---\nname: x\n---\n' + rule).length > 0, 'a file that starts with --- fails');
 });
 
-test('the coverage variant: 25 lines, a 22-line body, the same text except the done sentence; no option is the template', () => {
+test('the coverage variant: as many lines, the same body length, the same text except the done sentence; no option is the template', () => {
   const plain = ruleText(SKILLS_DIR.claude), cov = ruleText(SKILLS_DIR.claude, undefined, { coverage: true });
-  assert.equal(ruleText(SKILLS_DIR.claude, undefined, { coverage: false }), rule);
-  assert.equal(cov.split('\n').length - 1, 25);
-  assert.equal(bodyLines(parseRule(cov).body), 22);
+  assert.equal(ruleText(SKILLS_DIR.claude, undefined, { coverage: false }), installed);
+  assert.equal(cov.split('\n').length - 1, LINES);
+  assert.equal(bodyLines(parseRule(cov).body), BODY);
   assert.deepEqual(checkRule(cov), []);
   assert.equal((rule.match(new RegExp(DONE_SENTENCE.source, 'g')) || []).length, 1, 'the template has the done sentence once');
   const done = readTemplate('coverage-done.md').trimEnd();
@@ -63,7 +67,7 @@ test('the coverage variant: 25 lines, a 22-line body, the same text except the d
   assert.notEqual(cov, plain);
   for (const t of [mdcText(undefined, { coverage: true }), ruleText(SKILLS_DIR.codex, undefined, { coverage: true })]) {
     assert.ok(t.includes(done));
-    assert.equal(bodyLines(parseRule(t).body), 22);
+    assert.equal(bodyLines(parseRule(t).body), BODY);
   }
   assert.throws(() => withCoverageDone('# no such sentence\n'), /no longer has the sentence/);
 });

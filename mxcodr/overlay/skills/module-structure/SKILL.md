@@ -226,8 +226,8 @@ uses, and drop them. A document is unused only when three things agree: no refer
 (`list references to`, which covers calls, pages, navigation, settings, scheduled events and
 published services), its name in no Java, JavaScript, theme or test file, and a copy of the app
 still passing `./mxcli docker check` without it. A document kept on purpose (an API for later, a
-page opened only by its URL) stays; say why in its documentation comment, and in the project brain if it is a
-decision.
+page opened only by its URL) stays; say why in its documentation comment, and capture it in the project brain
+(`./mxcli brain capture`, never promoted by you) if it is a decision.
 
 ## Check it
 

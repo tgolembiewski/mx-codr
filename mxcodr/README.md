@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.11.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.31.0** (`PIN`). The design is
+Bundle **2026.11.16.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,117 @@ Bundle **2026.11.11.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.31
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.16.3 (2026-11-16): `durable-tests` (Setup) asks for the requirement's tag in a test's title: a browser
+  test that checks a numbered requirement carries `[R<n>]` (`test('[R3] a player can ask for a hint', ...)`), several
+  as `[R3][R4]`, a `test.describe` tag for every test inside, a microflow test the same in its `@test` title; no
+  numbered requirement, no tag; an existing test is tagged when next changed for a requirement, never a mass retag;
+  a `--grep` by the words after the tag (Playwright reads it as a regular expression: `[R3] a hint` matches nothing).
+  The text matches the Studio Pro extension's reader (`translator/src/tests-list.mjs`, `TAG` in `tests-state.mjs`:
+  `[R<n>]` anywhere in the title or a describe title, matched exactly against the number the requirement's title
+  starts with, so `[R03]` never links to R3), which shows the test and its last result under the requirement in the
+  Brain tab. `requirements-interview` and, with coverage on, `templates/coverage-durable-tests.md` already said the
+  same in their own steps; unchanged. File and live mode. No check added: file mode runs nothing while the agent builds; in live mode
+  `translator/src/affected.mjs` (new and changed spec files, entries with `tags`) is where a warning would go, not built.
+  `spikes/studio-pro-ext/translator/test/brain.test.mjs` runs the installed skill's examples through that reader.
+- 2026.11.16.2 (2026-11-16): `--boot`'s port check no longer calls a busy port free. It bound 127.0.0.1 only, and
+  on macOS that bind succeeds while `python -m http.server` listens on `*:<port>` (IPv6 dual-stack): measured with
+  python on `*:18765`, the old check said free, the new one busy (and free again once python stopped). The probe is
+  now `overlay/lib/ports.mjs`, the same logic as the Studio Pro extension's microflow test runs
+  (`translator/src/test-ports.mjs`): a bind on 127.0.0.1 first and closed, then a connect on 127.0.0.1 and ::1 (800 ms
+  each, at once); busy when the bind fails or a connect answers. No bind on the wildcard address (the Windows firewall
+  dialog). Ports, order and fallback unchanged (8080/8090/6543, else three from 18080). `mxcodr/test/ports.test.mjs`
+  proves it with real listeners on 127.0.0.1 and on the wildcard address. Nothing else an install writes changes.
+  Not measured: Windows.
+- 2026.11.16.1 (2026-11-16): pinned to mxcli **0.32.0** (`PIN`, and the six `PIN_SHA256` digests: GitHub's asset
+  digests, each checked against the downloaded asset). Measured 2026-11-16 with the darwin-arm64 binary on copies of
+  two existing apps: `init .` writes the same `CLAUDE.md`, `AGENTS.md`, `settings.json` and `.gitignore`, and six new
+  skills (`genai-runtime`, `report-architecture`, `report-performance`, `report-security`, `report-tests`,
+  `report-traceability`; no clash with ours); `init --sync-skills` refreshes the skills and the one changed lint rule
+  (`cross_module_data.star`, ARCH001) but, as on 0.30 -> 0.31, not `.claude/commands/*.md` nor the `TAG` default in
+  `.claude/bootstrap-mxcli.sh`. The bundle's 37 MDL blocks check exactly as on 0.31 (without a project); its
+  access-rule and `[%CurrentUser%]` forms pass `check -p --references` on 0.32's new token checks (MDL-TOKEN01,
+  the access-rule token checks), and `'XL'` spacing is still accepted by `check` (only unknown design properties and
+  options of non-spacing properties became errors). The skills' catalog queries run (on the larger app: the folder queries and the snippet-users query give the same
+  rows, the `SUB_` call query 408 flows instead of 395: 0.32 records more calls, as QUAL004's drop shows); the two over
+  `catalog.refs` in `reuse-and-snippets` no longer answer `[]` when the `.mpr` is spelled differently from the run
+  that built the catalog (0.31 rebuilt a narrower one for a relative vs an absolute path; 0.32 matches the file). One text changed:
+  `app-security` says `check` now refuses `$currentUser` in an access rule (MDL-XPATH04; the skill names no code) and still passes
+  `CurrentUser()`; `naming-and-captions` no longer says `@caption` on a `while` passes `check` without a warning
+  (MDL042 warns, on 0.31 as on 0.32). Lint: new MPR014/MPR015 (agents without a selected model, consumed MCP services without an
+  endpoint), fewer ARCH001, CONV013 and QUAL004 findings (4646 -> 4585 on the larger app). Not measured: a Windows install.
+- 2026.11.15.3 (2026-11-15, owner decision: warn only, never block): the styling rule. Atlas first (classes,
+  design properties); own SCSS only where that is not enough, with colours, corners, fonts, spacing and shadows from
+  theme variables; one file per module with a reason per rule. One sentence in the live rule
+  (`overlay/templates/live.md`), the details in `spacing-and-layout`'s new `reference/own-styles.md` (the variables
+  to use, the allowed fixed values: circles and pills, colours that carry meaning marked `/* mxcodr: keep */`,
+  icons). The extension (live.82) counts fixed values: `./mxcodr-live styles`, the turn card, the Look tab.
+- 2026.11.15.2 (2026-11-15): the live rule (`overlay/templates/live.md`) says corners and fonts go through Atlas's
+  variables (`var(--btn-border-radius)`, `var(--border-radius-default)`, `var(--font-family-base)`), as colours
+  already did: an app rule `.region-content .btn { border-radius: 8px }` kept the Look tab's corners off every
+  button (owner report, MxCodrTMasterMind). The `slight` corners knob is 4px/6px, what the stock themes ship
+  (`overlay/lib/theme.mjs`, `KNOBS`; was 4px/8px).
+- 2026.11.15.1 (2026-11-15): the `app-docs` skill (installed always since 2026-11-15) with template v4, whose
+  data-model drawing uses Studio Pro's domain-model colours and notation (see `app-docs` below); the bump makes an
+  existing install take the new skill files.
+- Since 2026.11.14.2 (2026-11-14, owner decision): **`requirements-interview` is installed always**, on every
+  install with coverage on or off, and in the extension's live setup (it is in `INSTALLED_SKILLS`, which
+  `copySkills` and the extension's setup read; `OPTIONAL_SKILLS` is empty). Coverage stays a separate option: it
+  still swaps the rule file's done sentence and `durable-tests`' first finishing step and writes
+  `tests/coverage.mjs`. The skill's text no longer depends on coverage: running `node tests/coverage.mjs` is said
+  to be "with coverage on (the app has `tests/coverage.mjs`)"; an `[R12]` in a test title is harmless without it.
+  Its description triggers on a bigger new request only (the first feature of a new app, a change that adds a
+  role, a module or a channel; "Not for a fix, a small change or a question about the app"). The rule file's
+  skill paragraph does not name it (the description finds it). Tests: `test/brain.test.mjs` (installed for
+  every agent with coverage off and in live mode; the description and the coverage-only lines), and the
+  coverage-install, install and skills-clean tests follow. No change in `spikes/studio-pro-ext/` is needed: its
+  setup copies `INSTALLED_SKILLS` and the pane already labels the skill "Requirements interview".
+- Since 2026.11.14.1 (2026-11-14): **the project brain, person and agent together**, the harness side of the
+  owner-approved contract of 2026-11-14 (the Studio Pro extension implements the panel side in
+  `spikes/studio-pro-ext/`).
+  - **brain always**: the installer runs `mxcli brain init -p <app>.mpr` on every install when `docs/brain/` is
+    missing, in its own step (`creating the project brain`; the bar has one step more), not only with coverage on.
+    `docs/brain/` is still the app's: never overwritten or removed. The summary has a `brain` row (created, kept
+    as it was, or not created with a note). `initBrain` stays exported for the extension's setup, which does not
+    run `main()`.
+  - **The brain rule** (`overlay/templates/brain.md`, 23 lines, 1,894 characters, about 500 tokens), appended
+    after one empty line to every shape of the rule text in `ruleText` (after the coverage, live and
+    switched-off-skills edits, which never see it): `.claude/rules/mxcodr.md`, the `.mdc`, the `AGENTS.md` block
+    (Codex, opencode, Pi), and so Copilot's read of `.claude/rules/` and the extension's live setup. The agent only
+    proposes, with `./mxcli brain capture ... --json`, on three triggers: a feature not in the requirement list (a
+    numbered requirement `R<n>` in its slice, anchored forward, never at a bare module); a business-rule answer it
+    cannot go on without (captured `--open` before asking; a chat answer is `promote`, then `resolve` with the
+    person's exact words, since mxcli resolves only a committed entry); corrected twice on the same thing or a
+    choice between real alternatives (a finding, at most 3 a turn). Never: promote its own findings, write a status
+    into a requirement, edit or drop an entry unasked. With `MXCODR_PANEL=1` (set by the extension for every agent
+    it starts) the person approves in the panel, a plan names each new requirement as one line
+    `Requirement: R<n> <one sentence> | slice <NN-name> | anchor @Module.Document` (captured and promoted by the
+    panel on Approve), and the panel's session-start brain pack replaces reading `docs/brain/` (and mxcli's
+    "Project Brain" section), a module shard through `./mxcli brain brief --module <M>`. Without it the person
+    approves in the chat and the requirement list is `./mxcli brain list --kind requirement`.
+  - 2026-11-14, owner: every entry is a short title (about 8 words) with its details on the second line; plan lines
+    take `| why <details>`; decisions are numbered `D<n>` like requirements (the rule: 25 lines, 2,216 characters;
+    the size test now allows 26 lines and 2,300).
+  - 2026-11-14, after the owner's third test: a requirement is one short sentence naming the outcome (no details), and
+    in plan mode a business-rule answer goes into the plan's lines without `--open` (the rule: 23 lines, 1,985 characters).
+  - 2026-11-14, after the owner's second test: a new slice takes the next free number (never reused), and a
+    finding's second line is the why the panel shows the person to decide by (the rule: 24 lines, 1,977 characters).
+  - 2026-11-14, after a real plan: the brain rule (now 23 lines, 1,995 characters) says a requirement's anchor is a NEW
+    document or attribute the work creates, never an existing one, and a plan puts each business-rule assumption on
+    a line `Decision: <one sentence> | anchor @Module.Document` (anchor optional), which the panel saves on Approve.
+  - **`requirements-interview`**: with `MXCODR_PANEL=1` it captures the numbered requirements and does not promote
+    them (the panel's end-of-turn card lists them checked; saving it is the person's agreement); without it, as
+    before, it asks "Do you agree?" and promotes after the person agrees in the chat. Unattended (nobody can
+    answer) it still promotes them itself in the same turn. Numbers continue after the highest in
+    `docs/brain/plan/` and in the queue; captures carry `--json`. Open questions: never resolved by the agent; a
+    chat answer is promote, then resolve with the person's exact words (the old text resolved directly, which
+    fails on a queued entry).
+  - `tests/coverage.mjs`'s hint for an empty ledger says, with `MXCODR_PANEL=1`, that the person saves the
+    captured requirements in the panel instead of `./mxcli brain promote`; `module-structure` says to capture a
+    decision about a kept document, never promoted by the agent.
+  - Tests: `test/brain.test.mjs` (brain always, the rule in every agent's text and its contract points and size,
+    the interview's panel and no-panel wording), a panel case in `test/coverage.test.mjs`; the rule-format,
+    install and coverage-install tests count the brain rule. File mode no longer writes the template byte for byte
+    as the rule file: it writes the template, an empty line, then `brain.md`.
 - Since 2026.11.11.2 (mx-codr 1.75.15): the pane's ⋯ item Check setup is called Setup and agents; `live.md` (where the
   agent points the person for version control) and the kit's `mx.ts` (its `oql()` error) name it so. Nothing else
   changed; the bundle number moves so that set-up apps are offered the new text.
@@ -185,12 +296,14 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
     overlay/install.mjs            the installer
     overlay/lib/                   mx.mjs (PIN, BUNDLE), rules.mjs (rule file text and its format check),
                                    skills.mjs (which skills are installed), coverage.mjs (the coverage
-                                   question and choice), requests.mjs, cache.mjs,
+                                   question and choice), requests.mjs, cache.mjs, ports.mjs (is a port
+                                   free: the --boot smoke boot's port check),
                                    theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs),
                                    ui.mjs (what the installer prints: v1's banner, bar, marks, summary)
     overlay/themes/                catalog.json, per theme <name>.css (tokens) and <name>.skin.scss (frame),
                                    logos/<name>/, the preview page and its screenshots
     overlay/templates/mxcodr.md    the always-on rule file, 25 lines
+    overlay/templates/brain.md     the brain rule, 23 lines, appended to every shape of the rule text
     overlay/templates/live.md      live mode only (the Studio Pro extension): .claude/rules/mxcodr-live.md
     overlay/lib/live.mjs           live mode only: the edits of the rule file and the skills
     overlay/templates/keep-tests.md its first 7 lines, byte for byte the sk2 rule
@@ -217,7 +330,8 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   foreground, finish only after a table `requirement -> test that asserts it` (coverage on: after
   `node tests/coverage.mjs` shows `0 missing`) and one green `--shuffle` run
   with `sessions left: 0` (never silencing the kit's checks), and stop processes only with `./mxcli run stop` or
-  their own PID; last, one paragraph naming the skills by trigger word. The `.mdc` and the `AGENTS.md` block
+  their own PID; last, one paragraph naming the skills by trigger word. Then, after one empty line, the brain
+  rule (`overlay/templates/brain.md`, see *Since 2026.11.14.1*). The `.mdc` and the `AGENTS.md` block
   are made from it in `overlay/lib/rules.mjs`. The installer checks every file it writes: first byte `#`, no
   frontmatter (the `.mdc`: only Cursor's own), no body line equal to `---`, the first 7 body lines equal to
   the keep-tests rule. The `AGENTS.md` block is written only for Codex, opencode or Pi.
@@ -236,16 +350,29 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
     value's name, side effects, failures) and in its javasource file (steps in the user code, javadoc on helpers);
     cases in `test/skill-cases/java-action-docs.mjs` (discovery, effect, negative; a real Claude Code turn each)
   - `film-tests`: lists the tests and films the one the person picks (or all), only when asked
-
-  `requirements-interview` (ask before building; with coverage, numbered requirements captured and promoted
-  into `docs/brain/plan/`) is installed **only with coverage on** (`skillsFor` in `overlay/lib/skills.mjs`).
-- **Coverage on** (`overlay/lib/coverage.mjs`) changes three texts and adds one file, nothing else: the rule
+  - `requirements-interview`: ask before a bigger new request, then numbered requirements captured into
+    `docs/brain/plan/`, promoted by the person in mx-codr's panel with `MXCODR_PANEL=1`, else by the agent after
+    the person agreed in the chat (installed always since 2026.11.14.2; before, only with coverage on).
+  - `app-docs` (installed always since 2026-11-15): the app's documentation, `docs/app-docs.html`, one self-contained
+    page (each module's data model as a drawing, how it is built, things to know, where to start, requirements) from
+    `template.html` beside the skill; only on request (the extension's Docs tab, or the person's words), then updated
+    at the end of every turn that changed the model (the rule file's last sentence, dropped when the skill is switched
+    off). `fingerprint.mjs` beside it hashes the model per module without layout lines, plus the app settings and
+    `docs/brain/`; the agent writes it into the page's meta and the Docs tab computes it again (live mode:
+    `./mxcodr-live docs fingerprint|check`, the same file). Every Mendix name is an `a.mx` link the tab opens in Studio
+    Pro. The template's `@media print` rules make the extension's PDF (light theme, a section per page, the drawing
+    whole). The skill's section Comments: the person's comments in `docs/app-docs.comments.json`, fixed or answered.
+    The drawing (template v4) uses Studio Pro's domain-model colours (`--dm-*` tokens, light and dark): indigo
+    entities, amber temporary ones, the blue generalization tag, `Name (Type)` attribute lines, circled 1 / * ends and
+    association names in red-bordered boxes.
+    Tests: `test/app-docs.test.mjs`; cases in `test/skill-cases/app-docs.mjs` (by hand, a real app copy).
+- **Coverage on** (`overlay/lib/coverage.mjs`) changes two texts and adds one file, nothing else: the rule
   file's done sentence (lines 13-16) is `overlay/templates/coverage-done.md`, same line count, so it stays 25
   lines; `durable-tests`' first finishing step is `overlay/templates/coverage-durable-tests.md` (the `[R12]` title
   convention and `node tests/coverage.mjs` instead of a printed table, so the agent never reads two definitions
-  of done); `requirements-interview` is installed; and `tests/coverage.mjs` (`overlay/templates/coverage.mjs`) is
-  written on every install, like the film recorder. When `docs/brain/` is missing the installer runs `mxcli
-  brain init`. Switched off on a reinstall: `tests/coverage.mjs` goes, the plain texts come back, `docs/brain/`
+  of done); and `tests/coverage.mjs` (`overlay/templates/coverage.mjs`) is
+  written on every install, like the film recorder. (`mxcli brain init` when `docs/brain/` is missing runs on
+  every install since 2026.11.14.1, with coverage on or off.) Switched off on a reinstall: `tests/coverage.mjs` goes, the plain texts come back, `docs/brain/`
   stays. The choice is recorded in `installed.json` (`coverage`) once made, asked or by flag, and kept on a
   reinstall unless a flag changes it; an install that defaulted to off records nothing.
 - **The starter test kit** (`overlay/templates/tests/`): `tests/mx.ts` (sign-in and sign-out that never leak
@@ -270,7 +397,7 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
   change the look later), `bin/mxcli` when mxcli had to be downloaded, and `install.log` (the paths a new app
   replaced or kept, when it found any).
 
-All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.31.0 rewrites
+All of these survive `./mxcli init --all-tools` and `./mxcli init --sync-skills` (mxcli 0.32.0 rewrites
 `settings.json`, `.cursorrules`, `opencode.json` and the inside of its own markers, none of which we touch).
 `mxcli init` regenerates an `AGENTS.md` without its markers whole, so when the file is absent or has none the
 installer writes mxcli's empty markers first and our block after them; `--sync-skills` then fills the section.
@@ -294,7 +421,7 @@ in step 2, no theme question without a terminal or with `--yes`. On Windows, run
    `%LOCALAPPDATA%\Programs\Mendix`); none: it stops and lists what is installed, and never installs one.
    There `mxcli new` skips its first build, and a per-user Studio Pro (which mxcli cannot see) creates the app with
    its own `mx.exe create-project`, then `mxcli init`. `--no-app` stops here instead, writing nothing.
-1. **mxcli**: a found mxcli 0.31.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
+1. **mxcli**: a found mxcli 0.32.0 (the recorded one, PATH, the app's `./mxcli`), else a download into
    `.mxcodr/bin/`. `./mxcli` becomes that binary when it is an earlier bundle's shim, a link to nowhere, or a
    binary that does not run here (`mxcli new` on macOS can leave a Linux one); someone else's wrapper stays.
 2. **Database**: `--db`, else the last install's, else postgres when port 5432 answers, else hsqldb.
@@ -315,14 +442,14 @@ in step 2, no theme question without a terminal or with `--yes`. On Windows, run
    `.codex/hooks.json` and `.cursor/hooks.json`. The app's tests, `docs/requests/` and `docs/brain/` are
    never touched.
 6. **Rule file and skills** per agent, as in the table; every skill of ours is first removed from every skills
-   folder (the retired `test-first-delivery` included). Then the starter test kit and `tests/film.mjs` (with
-   coverage on also `tests/coverage.mjs`, and `mxcli brain init` when `docs/brain/` is missing), then
+   folder (the retired `test-first-delivery` included). Then the starter test kit and `tests/film.mjs`,
+   `mxcli brain init` when `docs/brain/` is missing (every install), with coverage on also `tests/coverage.mjs`, then
    `mxcli init --sync-skills .`, so mxcli's own skills and its sections of `CLAUDE.md`/`AGENTS.md` match the
    pinned binary (after our files: it fills the mxcli markers step 6 may have written). Then
    `.mxcodr/theme.mjs` and `.mxcodr/themes/`.
 7. **`--request <file>`**: the request saved word for word as `docs/requests/NN.md`.
 8. **`--boot`**: `mxcli run --local --detach` (Mendix's default ports when free, else three free ones from
-   18080), `mxcli run wait --ready`, `mxcli run stop`.
+   18080; free: a bind on 127.0.0.1 works and nothing answers a connect on 127.0.0.1 or ::1), `mxcli run wait --ready`, `mxcli run stop`.
 
 ## Live mode (the Studio Pro extension)
 

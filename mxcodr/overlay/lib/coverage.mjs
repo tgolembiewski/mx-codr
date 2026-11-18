@@ -1,8 +1,8 @@
 // Whether the agent is held to a test per requirement (plan docs/plans/built/plan-coverage-stage1.md). Off is the
-// install as it was; on adds four things: the rule file's done sentence becomes "node tests/coverage.mjs shows
-// 0 missing", requirements-interview is installed (numbered requirements in the project brain, promoted by the
-// agent itself), durable-tests' first finishing step points at tests/coverage.mjs, and tests/coverage.mjs is
-// written on every install. Asked once on a terminal, after the agent question; --coverage / --no-coverage
+// install as it was; on adds three things: the rule file's done sentence becomes "node tests/coverage.mjs shows
+// 0 missing" (numbered requirements in the project brain, recorded with requirements-interview, which is
+// installed always since 2026.11.14.2), durable-tests' first finishing step points at tests/coverage.mjs, and
+// tests/coverage.mjs is written on every install. Asked once on a terminal, after the agent question; --coverage / --no-coverage
 // decide without asking; no terminal and no flag: off. A choice made (asked or by flag) is recorded in
 // installed.json and kept on a reinstall unless a flag changes it; an install that defaulted to off records
 // nothing, so its installed.json is the one it always was.

@@ -60,9 +60,10 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
 
 The person picks the app's look in the pane's Look tab; `./mxcodr-live look` says which one is active (one of the
 themes, their own colour/corners/font, or the app's own look as it came). Change it only when the person asks, with
-`./mxcodr-live look apply <theme>` (never `mxcli theme`, which bypasses the record). Style pages with the theme's
-classes and variables (Atlas's classes and design properties, `var(--mxt-brand)` and the other `--mxt-*` tokens),
-never hard-coded colours, so a new look reaches every page.
+`./mxcodr-live look apply <theme>` (never `mxcli theme`, which bypasses the record). Style with what Atlas gives
+first (classes, design properties); own SCSS only where that is not enough, with colours, corners, fonts, spacing
+and shadows from theme variables, never hard-coded colours or other fixed values, or no look reaches them (skill
+`spacing-and-layout`, `reference/own-styles.md`; `./mxcodr-live styles` lists them).
 
 ## Task list
 

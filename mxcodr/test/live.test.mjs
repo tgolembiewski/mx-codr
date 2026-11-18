@@ -71,6 +71,14 @@ test('live writeRules: mxcodr.md (live edits) and mxcodr-live.md; file mode writ
   assert.doesNotMatch(lr, /Close App and open the app again/, 'live.26: the reopen was only for our own git init');
   // live.36: the look is the person's (the Look tab); theme classes and variables, never hard-coded colours
   assert.match(lr, /## The app's look[\s\S]*\.\/mxcodr-live look[\s\S]*never hard-coded colours/);
+  // 2026.11.15.3 (owner decision, warn only): Atlas first, own SCSS from theme variables; one sentence, the details in
+  // spacing-and-layout's reference/own-styles.md, the list from ./mxcodr-live styles
+  const look = lr.slice(lr.indexOf("## The app's look"), lr.indexOf('\n## ', lr.indexOf("## The app's look") + 3));
+  assert.match(look, /Style with what Atlas gives\nfirst \(classes, design properties\); own SCSS only where that is not enough, with colours, corners, fonts, spacing\nand shadows from theme variables/);
+  assert.match(look, /`spacing-and-layout`, `reference\/own-styles\.md`; `\.\/mxcodr-live styles` lists them\)\./);
+  assert.equal((look.match(/Style with/g) || []).length, 1, 'one sentence about styling');
+  assert.ok(look.split('\n').length <= 9, 'the section stays short');
+  assert.ok(fs.existsSync(new URL('../overlay/skills/spacing-and-layout/reference/own-styles.md', import.meta.url)), 'the rule points at a file the skill ships');
   // live.33: a task list for 3+ steps (the pane's step bar); the plan-first rule is its own file, switched in the pane
   assert.match(lr, /## Task list[\s\S]*three or more steps[\s\S]*TaskCreate[\s\S]*TaskUpdate[\s\S]*After an approved plan/);
   const plan = fs.readFileSync(new URL('../overlay/templates/plan-first.md', import.meta.url), 'utf8');

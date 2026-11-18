@@ -10,7 +10,7 @@ import path from 'node:path';
 import { decideCoverage, answerCoverage, askCoverage, coverageRecord } from '../overlay/lib/coverage.mjs';
 import { writeRules, copySkills, copyTestKit, copyFilm, copyCoverage, coverageOff, initBrain, summary, COVERAGE } from '../overlay/install.mjs';
 import { INSTALLED_SKILLS, skillsFor } from '../overlay/lib/skills.mjs';
-import { readTemplate, parseRule, bodyLines, START, END } from '../overlay/lib/rules.mjs';
+import { readTemplate, ruleText, parseRule, bodyLines, SKILLS_DIR, START, END } from '../overlay/lib/rules.mjs';
 import { makeUi } from '../overlay/lib/ui.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-cov-inst-'));
@@ -75,8 +75,9 @@ test('main(): the flags read, asked after the agents and before the theme, recor
   assert.match(src, /writeRules\(app, agents, \{ coverage: cov\.on \}\)/);
   assert.match(src, /copySkills\(app, agents, undefined, \{ coverage: cov\.on \}\)/);
   assert.match(src, /skills, \.\.\.coverageRecord\(cov\), testKit/);
-  assert.match(src, /ui\.plan\(13 \+ \(newApp \? 1 : 0\) \+ \(cov\.on \? 1 : 0\)/);
-  assert.match(src, /if \(cov\.on\) \{\n\s*ui\.begin\('installing the coverage check'\);\n\s*const brain = initBrain\(app, mpr, args => run\(mxcli, args\)\);\n\s*ui\.done\('coverage', `1 \$\{ui\.i\.arrow\} \$\{copyCoverage\(app\)\}/);
+  assert.match(src, /ui\.plan\(14 \+ \(newApp \? 1 : 0\) \+ \(cov\.on \? 1 : 0\)/);
+  // the brain is created on every install, in its own step before this one (test/brain.test.mjs)
+  assert.match(src, /if \(cov\.on\) \{\n\s*ui\.begin\('installing the coverage check'\);\n\s*ui\.done\('coverage', `1 \$\{ui\.i\.arrow\} \$\{copyCoverage\(app\)\}/);
   assert.match(src, /\} else \{\n\s*const off = coverageOff\(app, prev\);/);
 });
 
@@ -85,22 +86,25 @@ test('off writes byte for byte what an install without the option writes, for ev
   const off = tree(files(stubApp(), ALL, { coverage: false }));
   assert.deepEqual(off, plain);
   // and that is today's install: the template rule, the bundle's skills unchanged, no coverage files
-  assert.equal(off['.claude/rules/mxcodr.md'], readTemplate('mxcodr.md'));
+  assert.equal(off['.claude/rules/mxcodr.md'], readTemplate('mxcodr.md') + '\n' + readTemplate('brain.md'));
   for (const dir of DIRS) {
     assert.equal(off[`${dir}/durable-tests/SKILL.md`], bundleSkill('durable-tests/SKILL.md'));
-    assert.ok(!Object.keys(off).some(f => f.startsWith(`${dir}/requirements-interview/`)), `${dir}: no requirements-interview`);
+    // installed always since 2026.11.14.2 (owner decision 2026-11-14), the bundle's text
+    assert.equal(off[`${dir}/requirements-interview/SKILL.md`], bundleSkill('requirements-interview/SKILL.md'), `${dir}: requirements-interview`);
   }
   assert.ok(!(COVERAGE in off));
-  assert.ok(!Object.values(off).some(t => t.includes('tests/coverage.mjs')), 'nothing an agent reads mentions tests/coverage.mjs');
+  // nothing an agent reads mentions tests/coverage.mjs, except requirements-interview's lines that say "with coverage on"
+  for (const [f, t] of Object.entries(off)) for (const l of t.split('\n').filter(l => l.includes('tests/coverage.mjs')))
+    assert.ok(f.includes('requirements-interview/') && /with coverage on/i.test(l), `${f}: ${l}`);
 });
 
-test('on: every agent\'s rule has the coverage done sentence, 25 lines; requirements-interview installed; durable-tests points at tests/coverage.mjs; the script written', () => {
+test('on: every agent\'s rule has the coverage done sentence, as many lines; requirements-interview installed (as when off); durable-tests points at tests/coverage.mjs; the script written', () => {
   const d = files(stubApp(), ALL, { coverage: true });
   const done = readTemplate('coverage-done.md').trimEnd();
   const claude = get(d, '.claude/rules/mxcodr.md');
   assert.ok(claude.includes(done));
-  assert.equal(claude.split('\n').length - 1, 25);
-  assert.equal(bodyLines(parseRule(get(d, '.cursor/rules/mxcodr.mdc')).body), 22);
+  assert.equal(claude.split('\n').length, ruleText(SKILLS_DIR.claude).split('\n').length, 'as many lines as without coverage');
+  assert.equal(bodyLines(parseRule(get(d, '.cursor/rules/mxcodr.mdc')).body), bodyLines(ruleText(SKILLS_DIR.cursor)));
   assert.ok(get(d, '.cursor/rules/mxcodr.mdc').includes(done));
   const md = get(d, 'AGENTS.md');
   assert.ok(md.slice(md.indexOf(START), md.indexOf(END)).includes(done), 'the AGENTS.md block too');
@@ -116,8 +120,9 @@ test('on: every agent\'s rule has the coverage done sentence, 25 lines; requirem
       get(path.join(d, dir, s), f).split('\n').forEach((l, i) => assert.doesNotMatch(l, GATE, `${dir}/${s}/${f}:${i + 1}`));
   }
   assert.equal(get(d, COVERAGE), readTemplate('coverage.mjs'));
-  assert.deepEqual(skillsFor({ coverage: true }), [...INSTALLED_SKILLS, 'requirements-interview']);
+  assert.equal(skillsFor({ coverage: true }), INSTALLED_SKILLS, 'the same skills with coverage on or off');
   assert.equal(skillsFor(), INSTALLED_SKILLS);
+  assert.ok(INSTALLED_SKILLS.includes('requirements-interview'));
 });
 
 test('a reinstall that switches it off: plain rule and skills again, tests/coverage.mjs removed, docs/brain/ kept; a reinstall that stays on rewrites the script', () => {
@@ -131,21 +136,21 @@ test('a reinstall that switches it off: plain rule and skills again, tests/cover
   files(d, ['claude'], { coverage: false });
   assert.match(coverageOff(d, { coverage: true }), /coverage is off now: removed tests\/coverage\.mjs; .*docs\/brain\/ stays/);
   assert.ok(!exists(d, COVERAGE));
-  assert.ok(!exists(d, '.claude/skills/requirements-interview'));
-  assert.equal(get(d, '.claude/rules/mxcodr.md'), readTemplate('mxcodr.md'));
+  assert.ok(exists(d, '.claude/skills/requirements-interview'), 'installed with coverage off too');
+  assert.equal(get(d, '.claude/rules/mxcodr.md'), readTemplate('mxcodr.md') + '\n' + readTemplate('brain.md'));
   assert.equal(get(d, '.claude/skills/durable-tests/SKILL.md'), bundleSkill('durable-tests/SKILL.md'));
   assert.equal(get(d, 'docs/brain/plan/01-orders.md'), 'the plan');
   const plain = files(stubApp(), ['claude'], { coverage: false });
   for (const f of ['.claude/rules/mxcodr.md', '.claude/skills/durable-tests/SKILL.md']) assert.equal(get(d, f), get(plain, f));
 });
 
-test('the brain: mxcli brain init when docs/brain/ is missing, never over one that exists; a failure is a note, not the end', () => {
+test('the brain (every install, test/brain.test.mjs): mxcli brain init when docs/brain/ is missing, never over one that exists; a failure is a note, not the end', () => {
   const d = stubApp();
   const calls = [];
   const ok = initBrain(d, 'App.mpr', args => { calls.push(args); fs.mkdirSync(path.join(d, 'docs', 'brain'), { recursive: true }); return { status: 0 }; });
   assert.deepEqual(calls, [['brain', 'init', '-p', 'App.mpr']]);
   assert.equal(ok.ok, true);
-  assert.match(ok.line, /docs\/brain\/ created .*docs\/brain\/plan\//);
+  assert.equal(ok.line, 'docs/brain/ created (mxcli brain init)');
   assert.equal(initBrain(d, 'App.mpr', () => { throw new Error('must not run'); }), null);
   const failed = initBrain(stubApp(), 'App.mpr', () => ({ status: 1, stderr: 'boom' }));
   assert.equal(failed.ok, false);
@@ -153,7 +158,7 @@ test('the brain: mxcli brain init when docs/brain/ is missing, never over one th
   assert.match(initBrain(stubApp(), 'App.mpr', null).line, /no mxcli to create it/);
 });
 
-test('the summary: one coverage line when on, none when off; the skills row counts the installed skills', () => {
+test('the summary: one coverage line when on, none when off; the skills row counts the installed skills (the same on and off)', () => {
   const show = coverage => {
     let text = '';
     const ui = makeUi({ out: { write: t => { text += t; } }, err: { write() {} }, env: {}, isTTY: false });
@@ -162,7 +167,7 @@ test('the summary: one coverage line when on, none when off; the skills row coun
   };
   const on = show(true), off = show(false);
   assert.match(on, /\n {5}coverage {4}on {2}docs\/brain\/plan \+ tests\/coverage\.mjs/);
-  assert.match(on, new RegExp(`\\n {5}skills +${INSTALLED_SKILLS.length + 1} `));
+  assert.match(on, new RegExp(`\\n {5}skills +${INSTALLED_SKILLS.length} `), 'the same skills with coverage on');
   assert.doesNotMatch(off, /coverage/);
   assert.match(off, new RegExp(`\\n {5}skills +${INSTALLED_SKILLS.length} `));
 });
