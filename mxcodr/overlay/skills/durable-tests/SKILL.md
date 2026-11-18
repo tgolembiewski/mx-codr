@@ -67,13 +67,6 @@ output is lost. macOS has no `timeout` command; set the tool's own timeout inste
 - Your own pages, users, home markers and flows go in `tests/helpers.ts`, which imports the kit:
   `import { signIn, signOut, oql } from './mx';`. A spec takes `test` and `expect` from the kit, not from
   `@playwright/test`: `import { test, expect } from './mx';`. That one line adds the per-test session check.
-- A test that checks a numbered requirement carries its tag `[R<n>]` in its title, the number exactly as
-  the requirement's title starts (`R3`, never `R03`), so the test and its last result show under that
-  requirement: `test('[R3] a player can ask for a hint', ...)`. Several as `[R3][R4]`; a tag on a
-  `test.describe` title counts for every test inside; a microflow test, when you write one, carries it in
-  its `@test` title (`@test [R3] a hint names one right colour`). No numbered requirement, no tag. An
-  existing test gets its tag when you next change it for a requirement; never retag the others. A `--grep`
-  is a regular expression, where `[R3]` matches one letter: grep by the words after the tag.
 - Passwords of demo users are not in the model (`DESCRIBE DEMO USER` masks them); put them in
   `tests/.env` as `DEMO_PASSWORD=...` (the kit reads it), never in a spec.
 - Before the first selector or expected value, read `reference/mendix-dom.md`: how Mendix renders

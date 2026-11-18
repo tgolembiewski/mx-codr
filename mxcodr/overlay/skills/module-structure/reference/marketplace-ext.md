@@ -1,9 +1,11 @@
 # Changing a Marketplace module (skill module-structure)
 
-**Never edit a document inside a Marketplace module.** Updating the module from the
-Marketplace replaces the whole module, and every change made in it is gone without
-a warning. Instead, create a module named after it with `Ext` appended —
-`AdministrationExt` for `Administration` — and put the changed functionality there.
+**Never add a document to a Marketplace module, and never edit one inside it.** Updating
+the module from the Marketplace replaces the whole module: every document added to it is
+deleted and every change made in it is gone, without a warning. A document of the app's
+own (a task page, a snippet, a microflow that works with the module's data) goes in the
+app's own module from the start. A change to a Marketplace document goes in a module named
+after it with `Ext` appended — `AdministrationExt` for `Administration`.
 
 Which modules are Marketplace modules: the `Source` column says so.
 
@@ -30,7 +32,16 @@ fix belongs in `AdministrationExt.Account_Overview`, with the Accounts menu item
 pointing at that page — not in `Administration` itself, where the next Marketplace
 update brings the broken filter back.
 
-Two things that are easy to miss:
+Before any copy, look for the module's own way in: a constant you set per configuration, a
+snippet you place on your own page, a microflow it asks you to call from your after-startup
+microflow, the documents of its `UseMe`/`USE_ME` folder and its documentation page. Those
+survive an update; a copy has to be compared after each one.
+
+Three things that are easy to miss:
+
+- **Already added a document to the module?** Move it out to the app's own module
+  (`move page WorkflowCommons.Order_Approve to folder 'Orders/UI' in Shop;`, the same for
+  microflows, snippets, nanoflows and enumerations), then run the check below again.
 
 - **Already changed the original?** Moving the fix into `<Module>Ext` is half the
   job: the original must go back to what the Marketplace shipped, or it keeps a
@@ -45,4 +56,13 @@ Two things that are easy to miss:
 
 After a Marketplace update, open the originals once and compare: a fix the vendor
 has since shipped means the Ext copy can go.
+
+**Check it**: `node <the skill's folder>/marketplace-check.mjs -p app.mpr` lists, per
+Marketplace module, each document added (`warning ... added`) or changed
+(`warning ... changed`) since the package version the app records. A changed document
+is a warning only when the app has the check's baseline (what differed when the
+app was created; never write or edit it yourself); without it, it shows as
+`note ... differs`, because Mendix's app template already ships some Marketplace
+documents changed. It never blocks anything; `not checked` (no `./mxcli auth login`,
+a version the Marketplace no longer lists) is not clean.
 

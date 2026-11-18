@@ -127,7 +127,8 @@ name fails to resolve — `params: { $Invoice: RT."Invoice" }` exits with
 unquoted there (`RT.Invoice`), whatever the general quoting advice says.
 
 A snippet used by two processes belongs in the module's `_Shared/` folder — see
-[module-structure](../module-structure/SKILL.md).
+[module-structure](../module-structure/SKILL.md). Never in a Marketplace module, even when it shows
+that module's data: the module's next update deletes it.
 
 ## Snippets, not fragments
 

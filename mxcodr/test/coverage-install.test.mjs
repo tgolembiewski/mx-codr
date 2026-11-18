@@ -23,6 +23,8 @@ const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 
 const bundleSkill = rel => fs.readFileSync(new URL(`../overlay/skills/${rel}`, import.meta.url), 'utf8');
 const ALL = ['claude', 'cursor', 'codex', 'opencode', 'pi'];
 const DIRS = ['.claude/skills', '.cursor/skills', '.agents/skills', '.opencode/skills'];
+// a script beside a skill may keep its data in .mxcodr/ (test/skills-clean.test.mjs says why); skill texts may not
+const scriptPaths = (file, line) => (file.endsWith('.mjs') ? line.replace(/\.mxcodr\//g, '') : line);
 const GATE = /\bgates?\b|mxgate|\.mxgate|\.mxcodr|tests\/(orient|peek|lib|gate|film\.sh)|scenario\(|# covers|rulebook|--only\b|\bDONE\b/;
 
 function stubApp() {
@@ -117,7 +119,7 @@ test('on: every agent\'s rule has the coverage done sentence, as many lines; req
     assert.doesNotMatch(dt, /Print a table `requirement -> test/, 'one definition of done, not two');
     assert.equal(get(d, `${dir}/requirements-interview/SKILL.md`), bundleSkill('requirements-interview/SKILL.md'));
     for (const s of skillsFor({ coverage: true })) for (const f of walk(path.join(d, dir, s)))
-      get(path.join(d, dir, s), f).split('\n').forEach((l, i) => assert.doesNotMatch(l, GATE, `${dir}/${s}/${f}:${i + 1}`));
+      get(path.join(d, dir, s), f).split('\n').forEach((l, i) => assert.doesNotMatch(scriptPaths(f, l), GATE, `${dir}/${s}/${f}:${i + 1}`));
   }
   assert.equal(get(d, COVERAGE), readTemplate('coverage.mjs'));
   assert.equal(skillsFor({ coverage: true }), INSTALLED_SKILLS, 'the same skills with coverage on or off');

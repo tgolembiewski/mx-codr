@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.16.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.17.15** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,18 +10,131 @@ Bundle **2026.11.16.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
-- 2026.11.16.3 (2026-11-16): `durable-tests` (Setup) asks for the requirement's tag in a test's title: a browser
-  test that checks a numbered requirement carries `[R<n>]` (`test('[R3] a player can ask for a hint', ...)`), several
-  as `[R3][R4]`, a `test.describe` tag for every test inside, a microflow test the same in its `@test` title; no
-  numbered requirement, no tag; an existing test is tagged when next changed for a requirement, never a mass retag;
-  a `--grep` by the words after the tag (Playwright reads it as a regular expression: `[R3] a hint` matches nothing).
-  The text matches the Studio Pro extension's reader (`translator/src/tests-list.mjs`, `TAG` in `tests-state.mjs`:
-  `[R<n>]` anywhere in the title or a describe title, matched exactly against the number the requirement's title
-  starts with, so `[R03]` never links to R3), which shows the test and its last result under the requirement in the
-  Brain tab. `requirements-interview` and, with coverage on, `templates/coverage-durable-tests.md` already said the
-  same in their own steps; unchanged. File and live mode. No check added: file mode runs nothing while the agent builds; in live mode
-  `translator/src/affected.mjs` (new and changed spec files, entries with `tags`) is where a warning would go, not built.
-  `spikes/studio-pro-ext/translator/test/brain.test.mjs` runs the installed skill's examples through that reader.
+- 2026.11.17.15 (2026-11-17): `live.md`, CE4899 (an empty default-language text, `Empty caption. [German,
+  Switzerland]`), CW0263 or a request for another language: the agent translates through `./mxcodr-live translate`
+  (`status`, `todo`, its translations into the file the todo names, `apply`, then `problems`); `copy --from` only when
+  the person asks for a copy. Texts written by `translate` are the one exception to "never change a Marketplace
+  module" (a default-language text must be in the module itself): `marketplace update` compares without them and puts
+  them back, and `module-structure`'s `marketplace-check.mjs` lists the documents named in `.mxcodr/translations/`
+  as a note, never a warning (another edit in such a document is not told apart there). Never translations through
+  `exec`, `create translations` or `./mxcli` while Studio Pro has the app open.
+- 2026.11.17.14 (2026-11-17): `live.md`, two rules measured after an OIDC update (CE1613 on a button in a legacy Data
+  grid's control bar): mxcli cannot address those buttons (`widget not found`, `SHOW WIDGETS` skips them), so the agent
+  never guesses a name and gives the person one exact Studio Pro step, or offers a Data grid 2 replacement in the
+  app's own module (a redesign, asked first, never in a Marketplace module); in `bson dump` output a widget is read
+  by its whole object, never by the `Name` line nearest a hit (keys are sorted, `Action` before `Name`: the agent
+  had picked the "New" button instead of "Edit"), and confirmed with `DESCRIBE`.
+- 2026.11.17.13 (2026-11-17): `marketplace update` and `marketplace install` name the modules the new version's
+  package calls that the app lacks (`needs UserCommons (not in the app): ./mxcodr-live marketplace install 223053` on
+  a large real app's OIDC 5.0.0), and the update refuses while one is missing. `live.md`: install it first (tell the person),
+  `--accept-missing-modules` only when the person decided to update without it; `likely too old` is the next update;
+  after `marketplace install` a `needs` line is the next install. Also, three-way from the package: Java and
+  JavaScript actions are compared with the package's own sources and without the generator's imports (a large real app's
+  OIDC: 33 conflicts -> the 16 real ones).
+- 2026.11.17.12 (2026-11-17): `marketplace update` stays three-way when Studio Pro's importer refuses the installed
+  version's package (a package saved before Mendix 10.21): mxcli reads that package's model directly as the base.
+  `live.md`: `Mode: three-way (base read by mxcli from the package)` is three-way too; `Mode: TWO-WAY` only when the
+  package cannot be read at all, or `--no-base`. Measured on a large real app's OIDC 2.3.2 -> 5.0.0 (copies, Mac): 1
+  addition, 16 real edits (all also changed by 5.0.0: conflicts), 7 upgrade-only differences not counted, 43 s.
+- 2026.11.17.11 (2026-11-17): `marketplace update`'s two-way mode moves only on evidence (a large real app, OIDC 2.3.2 ->
+  5.0.0: 60 of 61 "only in the app's copy" documents were OIDC's own, and the fifth move failed after 4 had landed).
+  `live.md`: in two-way mode a document only in the app's copy moves only when it is the app's; the rest is saved
+  under `kept/` and removed by the update; tell the person the moves by type, the kept ones and which the app uses
+  (repoint after the update); `MOVE GUARD` -> `--accept-moves` only after the person's yes; `BLOCKED` -> the person
+  moves those in Studio Pro first; a stopped move script -> run the `undo-moves.mdl` it names before anything else.
+  The extension's side (base list from the installed package, the guard, the undo list, plans never reused after a
+  run) is in `spikes/studio-pro-ext/README.md`.
+- 2026.11.17.10 (2026-11-17): `marketplace update` runs (live mode only), after a measured slow day on Windows
+  (a large real app, Studio Pro 11.12.1: ~89% of each run was mx-codr's own preparation). `live.md`: start an update, with or
+  without `--plan-only`, as a background command where the tool has one (Claude Code: `run_in_background`) and wait for
+  its completion notification (no polling, no own timeouts, never a second update while one runs: it refuses; no
+  `query`, `check`, `exec` or `mxcheck` until then, they would wait for it and give up after 3 minutes); read
+  `report.md` for the full lists (stdout now ends with counts, what was NOT done and the report's path); the run after
+  a yes reuses the plan while nothing changed; `NEEDS --keep-in`: ask which module. The review bullet points at
+  `report.md` for the per-file hints. The extension's side (one shadow sync per phase, plan reuse, early `--keep-in`,
+  progress lines, the lock that names its holder, the parent watch) is in `spikes/studio-pro-ext/README.md`.
+- 2026.11.17.9 (2026-11-17): CE6087 (design properties renamed in the theme, one error with no document, after almost
+  every Atlas or Marketplace update). `live.md`: run `./mxcodr-live fix design-properties` first (Studio Pro's own
+  "Update all renamed design properties in project" in the open model, Marketplace modules included: Studio Pro's own
+  fix is allowed there, MDL edits are not), never `./mxcli fix design-properties` while Studio Pro has the app open,
+  the person's right-click in the Errors pane only on a PERSON ACTION line. The two-way review bullet and
+  `marketplace update`'s review summary name `fix design-properties` before `fix widgets` and `problems`.
+- 2026.11.17.8 (2026-11-17): two CE cases after a WorkflowCommons / Atlas_Core update (live mode only). `live.md`:
+  CE7247 (`... of type 'Reference'`) on an association path in a Data grid 2 column of a Marketplace module's page
+  usually means an old Data Widgets (Studio Pro checks the column against `widgets/com.mendix.widget.web.Datagrid.mpk`,
+  which the module brings; Datagrid 2.22 has no association types on a column, 2.26 has them, read from the packages):
+  `marketplace outdated`, then update Data Widgets (`--plan-only` first, then ask), never edit the Marketplace page; a
+  column's "caption is required if 'Can hide'" is the Data grid's own warning, not blocking, left alone. And the review
+  of two-way files (an Atlas_Core update too): an app customisation goes into an app-owned copy (a layout in the app's
+  theme module) with the app's pages repointed, never back into the Marketplace module; the rest is template drift;
+  then `fix widgets` and `problems`. The extension's `marketplace update` prints, per review file, the line counts
+  against the new version's DESCRIBE, the first app-only line and the next step (also in `report.md`).
+- 2026.11.17.7 (2026-11-17): a build that fails in a Marketplace module's Java. The case: an 11.12.1 app whose Run
+  failed with 30 javac errors in old CommunityCommons, OIDC, Email_Connector and MxModelReflection (APIs Mendix 11
+  removed), and the agent began editing their Java. The extension's `app run` now lists the errors by module and, for a
+  Marketplace module, names `./mxcodr-live marketplace update <id> --plan-only` with the newest version.
+  `live.md`: on such a failure, update the module (`--plan-only` first, then ask), never edit a Marketplace module's
+  Java (the update overwrites it); errors in the app's own modules are fixed in their Java. A new bullet: after a
+  Mendix version change or a failed build, `./mxcodr-live marketplace outdated` (modules behind for the app's Mendix
+  version, `OLD` ones made for an older Mendix first), each updated the same way.
+- 2026.11.17.6 (2026-11-17): the live texts follow `marketplace update`'s two-way mode. When the installed version's
+  package cannot be read (a 3.x package saved before Mendix 10.21, in an 11.x app: exit 117), or with `--no-base`, the
+  plan says `Mode: TWO-WAY` and nothing is run again. `live.md`: the agent then tells the person which documents
+  were moved to their module (each to check: the app's own, or one the new version dropped) and which were saved for
+  review. After the update it compares each file under `.mxcodr/marketplace/<Module>/review/` with the new version
+  before changing anything. The live edit of `marketplace-ext.md` says the same in one clause.
+- 2026.11.17.5 (2026-11-17): live mode points the agent at the extension's `./mxcodr-live marketplace update <id|name>`
+  for a newer version of a module the app has (one that fixes an error, such as CE4271 in WorkflowCommons). The texts
+  said an installed module was never updated from the pane. `live.md`: a new bullet. Run `--plan-only` first
+  (`--to x.y.z` for a version other than the newest), tell the person what it will move and re-apply, and update only
+  after a yes. The update moves the app's additions into the app's own module, has Studio Pro replace the module,
+  re-applies the app's edits where the new version left them alone, then prints the error list. On exit 4 the agent
+  passes on the person's steps, then runs `--resume`. `live.mjs`: `files-and-images`' live text names the update
+  instead of "an update is the person's", and a new live edit of `module-structure/reference/marketplace-ext.md` names
+  the update. File mode is unchanged.
+- 2026.11.17.4 (2026-11-17, owner decision): `marketplace-check.mjs`'s baseline moves to the app's `.mxcodr/` folder,
+  `.mxcodr/marketplace-baseline.json` (created when missing); one beside the `.mpr` (bundles .2/.3) is still read when
+  `.mxcodr/` has none, no migration. The CLI is unchanged (`--baseline` as before; the Marketplace update work calls it
+  after an install or update). `.mxcodr/` is git-ignored in live mode (the extension's setup writes `/.mxcodr/` into
+  `.gitignore`), so there the baseline is per checkout; the file-mode installer adds no ignore line, so it is committed
+  unless the person ignores it. The skills-clean and coverage-install tests still refuse `.mxcodr/` in skill texts
+  (`.md`); a script beside a skill (`.mjs`, run and never read as advice) may name it, so the path stays a constant in
+  the script. Measured: `--baseline` on the scratch app writes `.mxcodr/marketplace-baseline.json`.
+- 2026.11.17.3 (2026-11-17): the baseline of `marketplace-check.mjs` can no longer clear the agent's own edits.
+  In .2, `--baseline` added a module's current `changed` elements to its existing entry and the reference told the
+  agent to run it after a module install, so it could whitelist its own edits in every other module. Now an existing
+  entry (same module and version) is never widened, `--baseline` writes no file when no module was checked (a
+  logged-out run wrote an empty one) and says what it did on stderr (not into `--json`), and the agent's texts no
+  longer mention `--baseline`: the reference says the file records what differed when the app was created and is
+  never written or edited by the agent. Taking it is the installer's or the extension's (not built: right after
+  `mxcli new` and after `./mxcodr-live marketplace install`); until then edits show as notes. Measured: the
+  reference's remedy (`move microflow ... to folder '...' in <Module>`, the same for a snippet) on the scratch app
+  clears both `added` warnings and adds no `changed`.
+- 2026.11.17.2 (2026-11-17, owner decision): **nothing added to or changed in a Marketplace module.** An app's agent
+  had put its own documents in WorkflowCommons and edited snippets there; the module's Marketplace update deleted
+  them. The texts: one sentence in the rule file's line 25 (still 25 lines), one in `live.md`'s Marketplace bullet,
+  `module-structure`'s Marketplace section (how to tell one: `list modules`, Source `Marketplace v...`; never create
+  a document in one; use the module's constants, snippets, startup microflows and `UseMe` folder from the app's
+  side; a document that must change is copied into `<Module>Ext`), its `reference/marketplace-ext.md` (moving an
+  addition out with `move ... in <Module>`) and one sentence in `reuse-and-snippets`. The warning:
+  `module-structure/marketplace-check.mjs -p app.mpr` (read-only, exit 0 whatever it finds), which the skill asks
+  the agent to run before work in a module is finished; nothing runs it behind the agent's back. Per Marketplace
+  module (content id and version read from its module unit in `mprcontents/`; an MPR v1 app: `list modules`, and
+  "not checked") it runs mxcli 0.32's `marketplace diff <id> --module <Name> --json`, which imports the recorded
+  package version into a throwaway project and compares DESCRIBE output: `onlyInstalled` (added) is always a
+  warning; `modified` is a warning only against a baseline (`marketplace-baseline.json` beside the `.mpr`, since .4 in `.mxcodr/`, written
+  by `--baseline`, per module and version; see 2026.11.17.3), else a note without a fix, because a fresh `mxcli new` 11.12.1 app
+  already differs in 8 elements of Atlas_Core, FeedbackModule and Administration (Mendix's template ships them
+  changed; measured 2026-11-17). Elements mxcli cannot describe (page templates, building blocks) are a note;
+  no login, a version the Marketplace no longer lists (NanoflowCommons 6.0.0 under its recorded id) or no content
+  id are "not checked", never clean. Measured on a scratch app: an added microflow and snippet, an attribute added
+  to `Administration.Account` and an `alter snippet` on `Administration.ReadMe` all reported; 2-10 s a module
+  once the package is cached. Tests: `test/marketplace-check.test.mjs` (mxcli's measured JSON as fixtures).
+- 2026.11.17.1 (2026-11-17): 2026.11.16.3's paragraph in `durable-tests` (Setup) is gone again. It asked for
+  `[R<n>]` in the title of a test that checks a numbered requirement, so the Studio Pro extension's Brain tab could
+  show the test under it; the Brain tab no longer shows tests, so the tagging was wasted work for the agent.
+  `mxcodr/test/req-tags.test.mjs` and the translator's test of the skill's examples went with it.
+  `requirements-interview` and, with coverage on, `templates/coverage-durable-tests.md` keep their own steps as before.
 - 2026.11.16.2 (2026-11-16): `--boot`'s port check no longer calls a busy port free. It bound 127.0.0.1 only, and
   on macOS that bind succeeds while `python -m http.server` listens on `*:<port>` (IPv6 dual-stack): measured with
   python on `*:18765`, the old check said free, the new one busy (and free again once python stopped). The probe is
@@ -343,7 +456,8 @@ work, keeps those checks as plain Playwright tests and shapes the app the way th
     stacked lists in tabs, totals as tiles, charts 360 px high
   - `naming-and-captions`: variable names, a business-words caption on every activity and decision (a self-check
     before a flow is done), widgets `<Page>_<What><Type>`
-  - `module-structure`: which module, the starting folders, `<Module>Ext` for Marketplace changes
+  - `module-structure`: which module, the starting folders, nothing added to or changed in a Marketplace module
+    (`<Module>Ext` for a changed copy); `marketplace-check.mjs` beside it warns about what is there anyway
   - `reuse-and-snippets`: reuse a microflow, share a page, extract a snippet
   - `files-and-images`: uploads, images, documents, a generated PDF
   - `java-action-docs`: every Java action's documentation, in the model (the action, its parameters, the return
@@ -466,8 +580,15 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   the session count from the teardown line, CE0463 fixed by the person in Studio Pro;
 - `files-and-images`: the agent installs the File Uploader itself with `./mxcodr-live marketplace install 235351`
   (Studio Pro's own Marketplace import, through its internal `mendix.MarketplaceInstallApi`; publishers Mendix or
-  Mendix Labs only, an existing module refused, no upgrades; Studio Pro must be signed in and mxcli logged in);
+  Mendix Labs only, an existing module refused; Studio Pro must be signed in and mxcli logged in); a newer version of
+  a module the app has goes in with `./mxcodr-live marketplace update` (since bundle 2026.11.17.5);
   asking the person is the fallback when the command refuses;
+- `module-structure/reference/marketplace-ext.md`: a newer version through `./mxcodr-live marketplace update` (additions
+  moved out first, edits run again afterwards; in two-way mode nothing is run again, differing documents saved for review);
+- `live.md` itself (since bundle 2026.11.17.7): a build that fails in a Marketplace module's Java is fixed by updating
+  that module, never by editing its Java; `./mxcodr-live marketplace outdated` after a Mendix version change or a failed
+  build; since 2026.11.17.8, CE7247 on a Marketplace page's Data grid column -> update Data Widgets, the "Can hide"
+  caption warning left alone, and two-way review files: app customisations into app-owned copies, the rest accepted;
 - `module-structure`: `MyFirstModule` is dropped only after the person said yes, and only when it is still Mendix's
   untouched starter; a module with the person's work is never dropped: the agent proposes a name and the person
   renames it in Studio Pro (the live push does not rename a module: `RENAME MODULE` would leave references to a
@@ -510,7 +631,7 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   full run, never started unasked, and recommended strongly after a whole-app change (security, roles, access rules,
   navigation, the after-startup microflow, a layout, the theme). File mode keeps the shuffled whole suite;
 - `.claude/rules/mxcodr-live.md` (`overlay/templates/live.md`): CE0463 (a changed widget definition) is `./mxcodr-live fix widgets` (Studio Pro's own
-  Update all widgets through the extension, live.43; the person's App > Update all widgets only when it says so), never `./mxcli fix widgets`; when a command cannot reach Studio Pro, its own instruction passed on word for word (live.73); what a turn changed from `./mxcodr-live changes list` / `changes show --turn <id>`, never git, with the actions Studio Pro regenerated at a build marked as its own (live.74); the `exec` verdicts, `./mxcodr-live problems` after
+  Update all widgets through the extension, live.43; the person's App > Update all widgets only when it says so), never `./mxcli fix widgets`; CE6087 (renamed design properties) is `./mxcodr-live fix design-properties` (Studio Pro's own renamer, Marketplace modules included; since 2026.11.17.9), never `./mxcli fix design-properties`; when a command cannot reach Studio Pro, its own instruction passed on word for word (live.73); what a turn changed from `./mxcodr-live changes list` / `changes show --turn <id>`, never git, with the actions Studio Pro regenerated at a build marked as its own (live.74); the `exec` verdicts, `./mxcodr-live problems` after
   every exec, `./mxcodr-live mxcheck` for the full check (it overrides `CLAUDE.md`'s `~/.mxcli/mxbuild/` mx path, which
   has no `mx` on a Mac with Studio Pro 11.16), `logs` when a run or a test fails on the server, `open` and `save` (ask first),
   `open <file>[:line]` (a file of the app in an editor tab inside Studio Pro, a theme `.scss`/`.css`/`.js`/`.json` in Studio Pro's own editor; the person may edit and save it there), the app commands,

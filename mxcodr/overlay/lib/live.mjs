@@ -75,7 +75,7 @@ export const SKILL_EDITS = {
     ['After an exec that writes a `fileuploader`, run `./mxcli fix widgets -p App.mpr`; without it the\nbuild fails with CE0463.',
       'After an exec that writes a `fileuploader`, `./mxcodr-live app status` counts the model\'s errors: on a\nCE0463 (stale widget definition) run `./mxcodr-live fix widgets` (Studio Pro\'s own Update all widgets;\n`./mxcli fix widgets` writes the .mpr, which Studio Pro has open).'],
     ['```bash\n./mxcli run stop -p App.mpr && ./mxcli marketplace install 235351 -p App.mpr && ./mxcli fix widgets -p App.mpr\n./mxcli run --local --watch --detach -p App.mpr      # boot again before the next test run\n```',
-      '```bash\n./mxcodr-live marketplace install 235351     # Studio Pro imports it, then prints its error list\n```\n\nOnly when it refuses (a Studio Pro version it is not measured on, or Studio Pro reports an error): ask the\nperson to add **File Uploader** (publisher Mendix) from Studio Pro\'s Marketplace, wait until they say it\nis in, then go on (`./mxcodr-live query "SHOW MODULES"` shows it). An installed module is never updated\nfrom here: the install refuses it, and an update is the person\'s, in Studio Pro.'],
+      '```bash\n./mxcodr-live marketplace install 235351     # Studio Pro imports it, then prints its error list\n```\n\nOnly when it refuses (a Studio Pro version it is not measured on, or Studio Pro reports an error): ask the\nperson to add **File Uploader** (publisher Mendix) from Studio Pro\'s Marketplace, wait until they say it\nis in, then go on (`./mxcodr-live query "SHOW MODULES"` shows it). The install refuses a module the app\nalready has; a newer version goes in with `./mxcodr-live marketplace update` (`.claude/rules/mxcodr-live.md`).'],
   ],
   'film-tests/SKILL.md': [
     ['Normal runs are not affected: `npx playwright test` records nothing and is not\nslowed',
@@ -99,6 +99,11 @@ export const SKILL_EDITS = {
       'To see what still uses it before the drop: `./mxcodr-live query "list references to MyFirstModule.Home_Web"`\n(and the same for its other documents).\n\n3. It holds the person\'s own documents or changes: never drop it. Look at what it holds (its entities,\n   pages, microflows), propose one or two names that fit it and say why (`Orders` for a module with\n   `Order` and `OrderLine`), and ask whether it may be renamed. The rename is the person\'s, in Studio\n   Pro (right-click the module in the App Explorer > Rename), which updates every reference. Never\n   `rename module` through `./mxcodr-live exec`: the push does not rename the module itself, so Studio\n   Pro would get references to a module that does not exist. When they say it is done,\n   `./mxcodr-live query "list modules"` shows the new name.'],
     ['- [ ] `MyFirstModule` is gone, and the administrators open on a page of the app\'s own module',
       '- [ ] `MyFirstModule` removed only after the person said yes (or renamed by them in Studio Pro), and the administrators open on a page of the app\'s own module'],
+  ],
+  // a newer version through the extension's update (2026-11-17): additions moved out first, edits re-applied
+  'module-structure/reference/marketplace-ext.md': [
+    ['After a Marketplace update, open the originals once and compare:',
+      'A newer version goes in with `./mxcodr-live marketplace update <id|name>` (`.claude/rules/mxcodr-live.md`): it\nmoves what the app added to the module out first and runs its edits again afterwards (`Mode: TWO-WAY`: nothing\nis run again, the differing documents are saved for review). After an update,\nopen the originals once and compare:'],
   ],
   'spacing-and-layout/SKILL.md': [
     ['`./mxcli check` and `./mxcli exec` it (`choose-edit-mode`', '`./mxcodr-live check` and `./mxcodr-live exec` it (`choose-edit-mode`'],

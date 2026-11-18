@@ -13,6 +13,9 @@ const rel = f => path.relative(dir, f);
 // The gate is gone: no skill may send the agent to a verdict, a gate script or a scenario DSL.
 // `\bgate\b` keeps "navigate" and "aggregate"; `verify-` spares mxcli's own verify-with-oql skill.
 const GATE_WORDS = /\bgates?\b|mxgate|\.mxgate|\.mxcodr|tests\/(orient|peek|lib|gate|film\.sh|rulebook|checks)|scenario\(|verify-(?!with-oql)|# covers|rulebook|--only\b|journey:/i;
+// A script beside a skill (run, never read as advice) may keep its data in the app's .mxcodr/ folder, as the
+// installer does (module-structure/marketplace-check.mjs: its baseline, owner decision 2026-11-17); the skill texts may not.
+const scriptPaths = (file, line) => (file.endsWith('.mjs') ? line.replace(/\.mxcodr\//g, '') : line);
 const VERDICT = /\bDONE\b/; // the gate's verdict word, in capitals
 // The card codes moved into prose; mxcli's own lint rule names (SEC001, CONV011 ...) and Studio Pro's CE codes may stay.
 const CODE = /\b(?!(?:CE|SEC|CONV|MPR|QUAL|ARCH|DESIGN|MOD|REU|UI|CUSTOM)\d)[A-Z]{2,10}\d{2,3}\b/;
@@ -30,7 +33,7 @@ test('the bundle holds the planned skills; requirements-interview installed alwa
 test('skills-clean: no gate vocabulary and no card codes in any installed file', () => {
   for (const f of all) {
     fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
-      assert.doesNotMatch(line, GATE_WORDS, `${rel(f)}:${i + 1}: ${line.trim()}`);
+      assert.doesNotMatch(scriptPaths(f, line), GATE_WORDS, `${rel(f)}:${i + 1}: ${line.trim()}`);
       assert.doesNotMatch(line, VERDICT, `${rel(f)}:${i + 1}: ${line.trim()}`);
       assert.doesNotMatch(line, CODE, `${rel(f)}:${i + 1}: a card code: ${line.trim()}`);
     });
