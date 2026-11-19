@@ -60,7 +60,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 </head>
 <body>
 <div class="wrap">
-  <p class="label">mx-codr · harness v2, skills only · bundle 2026.11.18.7 · mxcli v0.32.0</p>
+  <p class="label">mx-codr · harness v2, skills only · bundle 2026.11.18.9 · mxcli v0.32.0</p>
   <h1>How the harness is wired</h1>
   <p class="lede">Read left to right: a person installs once, the files land in the app, the agent reads <b>one rule file on every turn</b> and a skill when a part of the app calls for one, and keeps its checks as tests. <b>One thing is wired into the agent's tools</b>, in Claude Code (since bundle 2026.11.18.2) and, in the Studio Pro extension, Codex (since 2026.11.18.6): the skill gate, two hooks that refuse a model change or a test file until the agent has read the project skill for it whole (for Codex: in its own command, nothing cut from the output it saw). No command is wrapped, no verdict is printed into its context.</p>
 
@@ -97,6 +97,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     <tr><td><code>./mxcli run --local</code>, <code>run stop</code>, <code>run restart</code></td><td><code>./mxcodr-live app run</code>, <code>app stop</code>, <code>app restart</code> (Studio Pro's run)</td></tr>
     <tr><td><code>./mxcli test</code> on the app</td><td><code>./mxcodr-live test</code> on a copy (<code>.mxcodr-test/</code>)</td></tr>
     <tr><td><code>./mxcli docker check</code>, <code>mx check</code></td><td><code>./mxcodr-live problems</code> (Studio Pro's error list); <code>./mxcodr-live mxcheck</code> (<code>docker check</code> on a copy); never a hand-built <code>~/.mxcli/mxbuild/</code> path</td></tr>
+    <tr><td>the app's quality score from <code>./mxcli report</code> (mxcli's <code>assess-quality</code> skill, CLAUDE.md's "Best Practices Report")</td><td>live mode only: <code>mxcodr-live.md</code> (since bundle 2026.11.18.8): the first line of <code>./mxcodr-live quality</code>, <code>Best practices N/100 (...)</code>, the number the pane's Quality tab shows (per 100 documents of the app's own modules, info not counted); mxcli's own score only labelled as such</td></tr>
     <tr><td>the runtime's log from <code>./mxcli run</code></td><td><code>./mxcodr-live logs</code> (Studio Pro's Console)</td></tr>
     <tr><td>a file opened in the person's editor (e.g. <code>open tests/x.spec.ts</code>)</td><td><code>./mxcodr-live open &lt;file&gt;[:line]</code>: an editor tab inside Studio Pro (the hub relays <code>host.openFile</code> to the C# host; files inside the app only); a theme file (<code>.scss</code>/<code>.css</code>/<code>.js</code>/<code>.json</code> under <code>theme/</code> or <code>themesource/</code>) in Studio Pro's own editor, the tab only when that fails</td></tr>
     <tr><td><code>npx playwright test</code> (list reporter)</td><td><code>./mxcodr-live tests run &lt;file&gt;:&lt;line&gt;</code> or <code>--grep</code> (Studio Pro has no npm: Playwright 1.64.1 comes from the extension's setup into <code>tests/node_modules</code>, its ffmpeg for videos downloaded only when the person turns videos on (mx-codr 1.75.16), and no live text says <code>npx</code> or <code>npm install</code>), with a JSON report and progress in <code>.mxcodr/tests/</code> for the pane's Tests tab (<code>./mxcodr-live tests status|run|clear</code>), and a trace of every test from which the progress reporter maps what each test opened and called (<code>coverage-map.json</code>); a kept config gets them wired in by setup (<code>wireTestsTab</code>)</td></tr>
@@ -123,7 +124,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     <li>The run's transcript and logs stay in <code>harness-eval/results/runs/</code>; a written report goes to <code>docs/sessions/&lt;date&gt;-&lt;name&gt;/</code>.</li>
   </ul>
 
-  <footer>Generated from the files of bundle 2026.11.18.7. v1 (gate, hooks, checkers) is in the tags <code>v1-best-hb1</code> and <code>v1-last</code>.</footer>
+  <footer>Generated from the files of bundle 2026.11.18.9. v1 (gate, hooks, checkers) is in the tags <code>v1-best-hb1</code> and <code>v1-last</code>.</footer>
 </div>
 </body>
 </html>

@@ -390,6 +390,30 @@ test('live mxcodr-live.md: the app open in Studio Pro is the only app built in; 
   assert.ok(lr.indexOf('only app you build in') < lr.indexOf('./mxcodr-live exec <script.mdl>'), 'near the top, before how to write a change');
 });
 
+// bundle 2026.11.18.8 (owner, 2026-11-19, Windows, Codex): the agent reported "74/100" from `mxcli report` while the
+// pane's Quality tab showed 86/100. The live rule (Claude Code's file, and Codex's AGENTS.md live block, which setup
+// copies from it) names the tab's number and overrides mxcli's own report texts by name.
+test('live mxcodr-live.md: the app\'s quality score is ./mxcodr-live quality\'s first line (the Quality tab), never mxcli report\'s', () => {
+  const d = tmp();
+  writeRules(d, ['claude', 'codex'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  const at = lr.indexOf("- **The app's quality score is the Quality tab's.**");
+  assert.ok(at > 0, 'the bullet is there');
+  const b = lr.slice(at, lr.indexOf('\n- ', at + 3) > 0 ? lr.indexOf('\n- ', at + 3) : lr.indexOf('\n\n', at));
+  assert.match(b, /run `\.\/mxcodr-live quality` after your last model change/);
+  assert.match(b, /give its first line,\s+`Best practices N\/100 \(\.\.\.\)`/);
+  assert.match(b, /the number the person sees in the pane's Quality tab/);
+  assert.match(b, /Never give the score of `\.\/mxcli report`/);
+  assert.match(b, /the `assess-quality` skill/);
+  assert.match(b, /CLAUDE\.md's\s+"Best Practices Report"/);
+  assert.match(b, /only labelled as mxcli's own score/);
+  // Codex reads AGENTS.md only up to its project-doc size cap (32 KiB by default); CarFleetCodexSol's AGENTS.md is
+  // 36,233 bytes, its live block from byte 12,891, cut inside the tests bullets: the bullet stays near the top
+  assert.ok(at < lr.indexOf('- After every exec that lands'), 'early in the list, before problems and the tests bullets');
+  assert.ok(at < 6000, `within the first 6,000 characters of the live rule (at ${at})`);
+  assert.ok(!/\.\/mxcodr-live quality (intend|unintend|rule-off|rule-on)/.test(lr), 'marking findings stays the person\'s');
+});
+
 // bundle 2026.11.18.3 (CarFleetCodexSol, Codex): Plan first for the agents that read AGENTS.md, in their words; the
 // extension writes it between its own markers, and an AGENTS.md with nothing else of the person's stays generated
 test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGENTS.md block counts as generated', async () => {

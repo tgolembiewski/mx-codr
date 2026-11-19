@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.18.7** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.18.9** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,26 @@ Bundle **2026.11.18.7** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.18.9 (2026-11-19): **build an anchor under exactly its name**. The owner's Windows test (Codex, AssetBench):
+  R2..R7 were built under other names than the plan's anchors (`Flota.ACT_WydajSamochod` planned,
+  `Flota.ACT_Samochod_Wydaj` built; `MojeSamochody` never built), so the Brain tab said "Not built" while their tagged
+  tests passed. `templates/brain.md`'s exception now reads "Except: build an anchor under exactly its name; if named
+  otherwise, or a finished requirement has none, run at once `./mxcli brain edit <id> -a @<the document you built>`
+  (id: `brain list`)." To make room: "1. A feature request not in the requirement list", "an odd mxbuild error or
+  Marketplace version", the panel block reflowed (one line saved). 26 lines, 2,447 characters; the size cap 2,400 ->
+  2,450 (`test/brain.test.mjs`). The Studio Pro extension's Brain tab now also counts a requirement done by its tagged
+  tests' last results (`spikes/studio-pro-ext/README.md`, "Brain progress also from tests").
+- 2026.11.18.8 (2026-11-19): **the app's quality score is the Quality tab's**. The owner's Windows test (Codex):
+  at the end of the build the agent reported "74/100" from `mxcli report` (mxcli's CLAUDE.md "Best Practices Report",
+  its `assess-quality` skill) while the pane's Quality tab showed Best practices 86/100, another formula (errors and
+  warnings per 100 documents of the app's own modules, info free; mxcli's counts every finding against 100).
+  `templates/live.md` gains one bullet (6 lines, early, before `problems`: Codex reads `AGENTS.md` only up to its
+  size cap, and the live block's end is past it in CarFleetCodexSol's 36 KB file): to report the app's quality, run `./mxcodr-live quality` after the
+  last model change and give its first line, `Best practices N/100 (...)`; never the score of `./mxcli report`, the
+  `assess-quality` skill or CLAUDE.md's "Best Practices Report", named only as mxcli's own score. Live mode only (file
+  mode has no Quality tab); Codex reads it in the `AGENTS.md` live block. `templates/mxcodr.md` and file mode are
+  unchanged. The command and the tab print one number (`spikes/studio-pro-ext/README.md`, "The agent reports the
+  tab's score").
 - 2026.11.18.7 (2026-11-19): **a plan's requirements name the document that builds them**. The owner's Windows
   test (Codex, AssetBench): the plan card's brain block showed "Progress cannot be tracked for this one yet." under
   each of R1-R13, because Codex wrote every `Requirement:` line without `| anchor`, which the rule allowed ("no anchor

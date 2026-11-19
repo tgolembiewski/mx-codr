@@ -31,6 +31,12 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
 - What a turn changed (the person asks why files changed): `./mxcodr-live changes list` (the pane's turns, newest last)
   or `./mxcodr-live changes show --turn <id>`, never git (the app may not be a repository). Files with `"by":
   "studio-pro"` are actions Studio Pro regenerated when it built the app, not yours.
+- **The app's quality score is the Quality tab's.** When you report the app's quality (a score, best practices, a
+  quality report), run `./mxcodr-live quality` after your last model change and give its first line,
+  `Best practices N/100 (...)`: the number the person sees in the pane's Quality tab (the lines after it list the
+  findings). Never give the score of `./mxcli report`, the `assess-quality` skill or CLAUDE.md's
+  "Best Practices Report" as the app's score: it is another formula (every finding, info too, against 100 for the
+  whole app). Mention it only labelled as mxcli's own score.
 - After every exec that lands, run `./mxcodr-live problems`: Studio Pro's own error list, by document (exit 3
   on errors, 1 when the command itself failed; `--warnings` lists warnings too). Fix its errors before you run
   the app; it is what Studio Pro will refuse to deploy.

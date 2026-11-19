@@ -24,16 +24,15 @@ actionbutton InvoiceDetail_SendButton (Caption: 'Send', Action: call microflow S
 ```
 
 Each part left out has failed: no `margin-right`, the buttons touch; `margin-bottom` on one only, they
-sit ten pixels out of line; none at all, a narrow window wraps the row against itself.
-
-That is Studio Pro's own **Spacing** design property, not `Class:`, `Style:` or custom CSS.
+sit ten pixels out of line; none at all, a narrow window wraps the row against itself. That is Studio
+Pro's own **Spacing** design property, not `Class:`, `Style:` or custom CSS.
 
 - Sides: `margin-top|right|bottom|left`, the same as `padding-`; on any widget, row or column.
 - Values: **`None` `S` `M` `L`** only. Atlas Core defines nothing else; `mxcli check` accepts `'XL'`
   and `mx check` then fails with CE6083 "Design property Spacing is not supported by your theme".
-- A heading with something under it gets `margin-bottom` (`S` or `M`). So does a button or line of
-  text right above or under a grid, list or card, a grid header's buttons included: Atlas gives
-  neither side a vertical margin, so without it they touch.
+- **An inline widget with a widget right under it gets `margin-bottom`**: a button, link button, heading,
+  text, image, checkbox, a filter on its own line (a `controlbar`'s, not a column's; example under Grids).
+  `S`, or `M` above a grid, list or card from outside it. Atlas gives them no vertical margin: they touch.
 
 Block widgets carry the theme's spacing; margins on them make it worse: inputs in a data view, `datagrid`,
 `listview`, `gallery`, `layoutgrid`, `container`, `snippetcall`, a grid row or column, a footer or header.
@@ -166,6 +165,7 @@ container OrderDetail_CancelNoticeBox (Class: 'alert alert-danger',
 ```sql
 datagrid OrderOverview_OrdersGrid (DataSource: database from Sales.Order, Selection: single) {
   controlbar {
+    textfilter OrderOverview_SearchFilter (attrchoice: linked, attributes: [Sales.Order.Number], DesignProperties: ('Spacing': ('margin-bottom': 'S')))
     actionbutton OrderOverview_NewOrderButton (Caption: 'New order', Action: call microflow Sales.ACT_Order_New, ButtonStyle: Primary,
       Icon: 'Atlas_Core.Atlas_Filled.add', DesignProperties: ('Spacing': ('margin-right': 'S', 'margin-bottom': 'S')))
     actionbutton OrderOverview_MarkPaidButton (Caption: 'Mark paid', Action: call microflow Sales.ACT_Order_MarkPaid(Order = $OrderOverview_OrdersGrid),
