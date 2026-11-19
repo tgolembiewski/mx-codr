@@ -210,15 +210,15 @@ test('the request archive (--request): saved once, numbered, hashed; atomic writ
 
 const kitSource = name => fs.readFileSync(new URL(`../overlay/templates/tests/${name}`, import.meta.url), 'utf8');
 
-test('test kit, absent: tests/mx.ts, mx.teardown.ts, playwright.config.ts and package.json are copied from the bundle', () => {
+test('test kit, absent: tests/mx-impl.ts, mx.ts, mx.teardown.ts, playwright.config.ts and package.json are copied from the bundle', () => {
   const d = stubApp();
   const { written, lines } = copyTestKit(d);
   assert.deepEqual(written, TEST_KIT);
-  assert.deepEqual(TEST_KIT, ['tests/mx.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json']);
+  assert.deepEqual(TEST_KIT, ['tests/mx-impl.ts', 'tests/mx.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json']);
   assert.equal(JSON.parse(get(d, 'tests/package.json')).devDependencies['@playwright/test'], PLAYWRIGHT);
   assert.equal(PLAYWRIGHT, '1.64.1');
   for (const rel of TEST_KIT) assert.equal(get(d, rel), kitSource(path.basename(rel)), rel);
-  assert.match(lines.join('\n'), /test kit -> tests\/mx\.ts/);
+  assert.match(lines.join('\n'), /test kit -> tests\/mx-impl\.ts, tests\/mx\.ts/);
   assert.deepEqual(copyTestKit(d).written, [], 'a second install writes nothing');
 });
 
@@ -231,8 +231,8 @@ test('test kit, present: the app\'s own files, specs and helpers.ts stay byte fo
   put(d, 'tests/orders.spec.ts', 'the agent\'s test');
   const before = walk(d);
   const { written, lines } = copyTestKit(d, ['tests/mx.ts', 'tests/playwright.config.ts']); // the agent edited the kit's mx.ts
-  assert.deepEqual(written, ['tests/mx.teardown.ts']);
-  assert.deepEqual(walk(d), [...before, 'tests/mx.teardown.ts'].sort());
+  assert.deepEqual(written, ['tests/mx-impl.ts', 'tests/mx.teardown.ts']);
+  assert.deepEqual(walk(d), [...before, 'tests/mx-impl.ts', 'tests/mx.teardown.ts'].sort());
   assert.equal(get(d, 'tests/mx.ts'), '// the agent edited this\n');
   assert.equal(get(d, 'tests/playwright.config.ts'), 'export default { workers: 1 };\n');
   assert.equal(get(d, 'tests/helpers.ts'), 'export const mine = 1;\n');
@@ -245,7 +245,7 @@ test('test kit: a Playwright config at the app root means no second config in te
   const d = stubApp();
   put(d, 'playwright.config.ts', 'export default {};\n');
   const { written, lines } = copyTestKit(d);
-  assert.deepEqual(written, ['tests/mx.ts', 'tests/mx.teardown.ts']);
+  assert.deepEqual(written, ['tests/mx-impl.ts', 'tests/mx.ts', 'tests/mx.teardown.ts']);
   assert.ok(!exists(d, 'tests/playwright.config.ts'));
   assert.match(lines.join('\n'), /the app has playwright\.config\.ts; name globalTeardown/);
   assert.ok(!exists(d, 'tests/package.json'));
@@ -256,7 +256,7 @@ test('test kit: a package.json at the app root means no second one in tests/, an
   const d = stubApp();
   put(d, 'package.json', '{"name":"app"}\n');
   const { written, lines } = copyTestKit(d);
-  assert.deepEqual(written, ['tests/mx.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts']);
+  assert.deepEqual(written, ['tests/mx-impl.ts', 'tests/mx.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts']);
   assert.ok(!exists(d, 'tests/package.json'));
   assert.equal(get(d, 'package.json'), '{"name":"app"}\n');
   assert.match(lines.join('\n'), /no tests\/package\.json, the app has package\.json at its root; pin @playwright\/test there: npm install -D -E @playwright\/test@1\.64\.1/);
@@ -312,7 +312,11 @@ test('test kit: with the person\'s own tests/mx.ts the teardown and config are n
   assert.match(lines.join('\n'), /skipped tests\/mx\.teardown\.ts, tests\/playwright\.config\.ts: tests\/mx\.ts is the app's own .*move tests\/mx\.ts aside and install again/);
   const e = stubApp();
   put(e, 'tests/mx.ts', kitSource('mx.ts'));
-  assert.deepEqual(copyTestKit(e).written, ['tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json'], 'the bundle\'s own mx.ts is the kit');
+  assert.deepEqual(copyTestKit(e).written, ['tests/mx-impl.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json'], 'the bundle\'s own mx.ts is the kit');
+  // the person's own mx.ts built on the kit's code (it imports ./mx-impl): the code is written beside it
+  const f = stubApp();
+  put(f, 'tests/mx.ts', "export * from './mx-impl';\nexport const mine = 1;\n");
+  assert.deepEqual(copyTestKit(f).written, ['tests/mx-impl.ts', 'tests/package.json']);
 });
 
 // D4: the finish condition runs npx playwright test --shuffle, which needs 1.64.1.

@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.18.9** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.20.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,28 @@ Bundle **2026.11.18.9** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.20.1 (2026-11-20): **shorter harness text agents read** (an analysis of four sessions: the always-loaded
+  live rule, the gated skills and `tests/mx.ts` were 25-45% of tool output, the live rule re-sent on every call).
+  `templates/live.md` keeps one pointer per rare event (24.4k -> 16.9k characters); the steps for CE0463/CE6087/CE4899/
+  CE7247, the Marketplace update and review, the legacy Data grid and `bson dump` are printed by `./mxcodr-live problems`,
+  `exec`, `marketplace update` and `translate` themselves (translator). The seven gated skills carry no rule twice
+  (94.7k -> 83.9k characters, the kit table included). `tests/mx.ts` is the helper list (one typed re-export with a doc
+  line per helper, 23.2k -> 5.4k), the code is in the new `tests/mx-impl.ts` (`TEST_KIT`, `kit-shipped.json`, never
+  edited like `mx.ts`: `mxcodr.md`, `durable-tests`). The skill gate gains `reset`: a compaction clears the session's
+  read skills (Claude Code: SessionStart `compact` in `.claude/settings.local.json`; Codex: PreCompact in the
+  extension). In the extension (live.84): Pi refuses edits of the harness's files, and Codex names one fixed launcher
+  path, so its AGENTS.md no longer changes with the runtime.
+- 2026.11.19.1 (2026-11-19): **read the model from disk**. A Pi session on a large app (Windows VM, 3 h) spent 12 of
+  96 active minutes and a quarter of its context on model reads: 98 queries, 30 of them one DESCRIBE re-run to page
+  through it, 17 run in `for` loops, and 57 greps of binary `mprcontents/` files. The Studio Pro extension now keeps
+  the model as text in `.mxcodr/model/` (one file per document, `INDEX.tsv`; `spikes/studio-pro-ext/README.md`, "The
+  model on disk"). `templates/live.md`'s read bullet (one line before, 7 now, early in the file, before the quality
+  bullet: Codex cuts `AGENTS.md` at its size cap and the live block comes last) says: grep `.mxcodr/model/`
+  (`INDEX.tsv` first) and read the one file, never grep `mprcontents/`; `./mxcodr-live query` for a fresh read before
+  a change, for `search` / `show references to` / `show context of` / a catalog select, and when the dump lags;
+  several statements in one query, never a loop; never a query re-run to page it (read or grep the `.mxcodr/out/` file
+  it names); a refused read lists the valid forms. Live mode only; Codex and Pi read it in the `AGENTS.md` live block
+  (setup copies `mxcodr-live.md` there). `test/live.test.mjs` pins the bullet, its length and its place.
 - 2026.11.18.9 (2026-11-19): **build an anchor under exactly its name**. The owner's Windows test (Codex, AssetBench):
   R2..R7 were built under other names than the plan's anchors (`Flota.ACT_WydajSamochod` planned,
   `Flota.ACT_Samochod_Wydaj` built; `MojeSamochody` never built), so the Brain tab said "Not built" while their tagged
@@ -630,7 +652,9 @@ has read the project skill for it whole; no verdict, no other refusals.
   every install since 2026.11.14.1, with coverage on or off.) Switched off on a reinstall: `tests/coverage.mjs` goes, the plain texts come back, `docs/brain/`
   stays. The choice is recorded in `installed.json` (`coverage`) once made, asked or by flag, and kept on a
   reinstall unless a flag changes it; an install that defaulted to off records nothing.
-- **The starter test kit** (`overlay/templates/tests/`): `tests/mx.ts` (sign-in and sign-out that never leak
+- **The starter test kit** (`overlay/templates/tests/`): since 2026.11.20.1 `tests/mx.ts` is the short list a spec
+  needs (one typed re-export per helper, its signature and a one-line doc comment) and `tests/mx-impl.ts` holds the
+  code; specs import from `./mx` only. The helpers (sign-in and sign-out that never leak
   a session, `test`/`expect` with a per-test session check that names the leaking test, `oql()` over `./mxcli oql --json`, `sessionsLeft`, grid rows, cells and filters, Combobox,
   inputs, dialogs, the menu, `apiContext`, recording and forging a button's call, `retrieveByIds`; each
   helper commented with the Mendix fact it relies on, no app names), `tests/mx.teardown.ts` (prints
@@ -642,7 +666,9 @@ has read the project skill for it whole; no verdict, no other refusals.
   when it has a `package.json` or Playwright config there (the installer prints the pin to add instead).
   When `tests/mx.ts` is the person's own (not in the last `installed.json` and not a text mx-codr shipped), the teardown
   and config, which import from it, are not written either; the installer says so (move `tests/mx.ts` aside and
-  install again to get the kit). A kept `tests/package.json` that pins another `@playwright/test` gets the pin
+  install again to get the kit), and no `tests/mx-impl.ts` unless that `mx.ts` imports `./mx-impl`. The thin
+  `tests/mx.ts` is written or updated only beside the kit's own `tests/mx-impl.ts` (a file of that name the kit did
+  not write holds it back, with a line). A kept `tests/package.json` that pins another `@playwright/test` gets the pin
   hint (`npm install -D -E @playwright/test@1.64.1` in `tests/`).
 - **The film recorder** (`overlay/templates/film.mjs`): `tests/film.mjs`, written on **every** install and
   reinstall (unlike the kit it is the bundle's, so an edit there is replaced; it is written also when the kit is
@@ -745,7 +771,7 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   asks the person for a password and never prints one (`./mxcodr-live exec` masks passwords in its output);
 - the starter test kit (`copyTestKit(..., { live: true })`, `KIT_EDITS`): `playwright.config.ts` also writes a JSON
   report and progress lines to `.mxcodr/tests/` (what the pane's Tests tab reads, so the agent's own runs show up there)
-  and a screenshot of a failed test; `mx.ts`'s sign-in failure says `./mxcodr-live app restart`. `tests/film.mjs`
+  and a screenshot of a failed test; `mx-impl.ts`'s sign-in failure says `./mxcodr-live app restart`. `tests/film.mjs`
   (`copyFilm(..., { live: true })`, `FILM_EDITS`): Studio Pro runs the app. Kit files are written when absent and
   replaced when unedited (a plain kit file becomes the live one); a
   `tests/playwright.config.ts` kept from before (the plain kit, or one with the person's edits) gets the json and

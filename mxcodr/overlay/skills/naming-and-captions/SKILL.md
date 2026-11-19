@@ -8,19 +8,21 @@ description: "Business-readable names and captions: a variable says what it hold
 A microflow is read in Studio Pro as a diagram, by people who did not write it: they see the variable names and
 the captions on the boxes. This skill makes the flow, and the page, readable from the canvas without opening a shape.
 
-**Every activity's `@caption` says what the step does for the business (`Record the approval`), never
-Mendix's default (`Change Order`); every decision's `@caption` is the question it answers (`Waiting for
-approval?`), never the condition.** Both are equally hard (measured runs captioned 96-99% of decisions,
-25-46% of activities): a flow is done only when *Before you finish a flow* passes.
-
 ## Caption every activity as you write it
 
 **Every retrieve, create, change, commit, delete, rollback, call, show page, close page, show message,
-log, list operation, validation feedback, `declare` and `set` gets an `@caption` on the line above it, typed together with the statement**: a short verb phrase saying what the step does in the
-process. A call that stores its result (`$Name = call microflow ...`) and a create (`$Line = create ...`)
-count too. Captioning only the decisions leaves most of the canvas showing Mendix's defaults, *"Retrieve
-Order"*, *"Call microflow SUB_User_DisplayName"*, *"Show page Order_Details"*, which repeat the icon and
-the variable. Decisions get a question (below).
+log, list operation, validation feedback, `declare` and `set` gets an `@caption` on the line above it, typed
+together with the statement**: a short verb phrase saying what the step does for the business (`Record the
+approval`), never Mendix's default (`Change Order`, *"Call microflow SUB_User_DisplayName"*). A call that
+stores its result and a create (`$Line = create ...`) count too. Every decision's `@caption` is the question
+it answers (`Waiting for approval?`, below). Activities are the ones that get forgotten:
+
+- `'Load the current board'` not `'Retrieve Game'`; `'Open the decoding board'` not `'Show page Game_Board'`
+- `'Score the seated line'` not `'Call microflow SUB_Game_Score'`; `'Mark hidden peg 1 as taken'` not `'Change variable'`
+
+Nor a caption that only restates its line (*"Save the ticket"* over `commit $Ticket`, *"Work out the
+value"* over a `set`) or a placeholder: say why the step runs (*"Record who closed the ticket"*). If the
+honest caption equals the default, find the business operation.
 
 ```mdl
   @caption 'Waiting for approval?'
@@ -43,21 +45,7 @@ No lint rule sees activity captions (CONV012 is decisions only). Read the flow b
 "describe microflow Module.Flow"`) and check, line by line: **every statement has an `@caption` line
 directly above it** -- except `return`, `raise error`, the structure (`begin`, `end ...`, `else`, `when`)
 and loops, which take an `@annotation`. One statement without, or with a caption that is the default
-(`Commit $Line`), and the flow is not done: add the caption and read it again. Before, only the `if` had one
-(the canvas showed *Retrieve OrderLine*, *Show message*, *Commit Order*); after:
-
-```mdl
-  @caption 'Load the order''s lines'
-  retrieve $Lines from Sales.OrderLine where Sales.OrderLine_Order = $Order;
-  @caption 'Over the credit limit?'
-  if $Order/Total > $Customer/CreditLimit then
-    @caption 'Tell the clerk the limit is passed'
-    show message 'Over the credit limit' type Warning;
-    return false;
-  end if;
-  @caption 'Accept the order'
-  commit $Order;
-```
+(`Commit $Line`), and the flow is not done: add the caption and read it again.
 
 One more thing `./mxcli check` passes and the build fails with CE0117: a `{1}` in `show message`, `log` or `validation feedback` that is not a String (`with ({1} = toString($LineCount))`, not `$LineCount`).
 `check` refuses the other CE0117 causes, so write them right first: `count` in its own step (`$LineCount = count $Lines;`), an `if` operand in parentheses (`'Total: ' + (if $Paid then 'paid' else 'open')`), and no OQL in an expression: `startsWith`/`endsWith`/`contains` for `like`, `$N >= 1 and $N <= 5` for `between`, `$N = 1 or $N = 2` for `in (...)`, `$S = empty` for `is null`.
@@ -133,21 +121,7 @@ A tile, a value or a section heading is named after what it shows: `Dashboard_Ov
 pattern, is a rename later, and renaming a widget breaks a test that finds `.mx-name-<old>`:
 rename both.
 
-## Activity captions: what they say
-
-The rule is at the top of this page. Say what the step does in the process:
-
-- `'Load the current board'` not `'Retrieve Game'`
-- `'Score the seated line'` not `'Call microflow SUB_Game_Score'`
-- `'Open the decoding board'` not `'Show page Game_Board'`
-- `'Mark hidden peg 1 as taken'` not `'Change variable'`
-
-Do not ship a caption that restates the Mendix default (activity kind + type). If the honest caption
-would be identical to that default, the activity is not yet named — find the business operation, do not
-type the default out by hand. Nor one that only restates its line: *"Run send reminder"* over a call of
-`SUB_Reminder_Send`, *"Save the ticket"* over `commit $Ticket`, *"Load the open tickets"* over `retrieve
-$OpenTickets`, *"Work out the value"* over a `set`, nor a placeholder left unfilled. Say why the step
-runs: *"Mark the ticket as resolved"*, *"Record who closed the ticket"*.
+## Quotes and line breaks in captions and texts
 
 Escape a single quote by doubling it: `@caption 'Load the customer''s invoices'`. A backslash is no
 escape in an MDL string: `'a\nb'` is four characters, so a text built with `\n` or `\t` shows them as
@@ -177,10 +151,8 @@ must show no CONV012; every `if` you wrote has a caption.
 
 ### The exception: `loop` and `while`
 
-A Mendix loop has no caption property, so `@caption` on a `loop` is dropped and
-`mxcli check` warns that it is — but a loop does take an `@annotation`, a note as if drawn in Studio Pro
-(the worked example below has one). A **`while` loop is the same**: `check` warns about `@caption` on it too,
-and the caption is gone from `describe`:
+A Mendix loop has no caption property, so `@caption` on a `loop` or `while` is dropped (`mxcli check` warns)
+-- but a loop takes an `@annotation`, a note as if drawn in Studio Pro:
 
 ```mdl
 @annotation 'Fill the chart one month at a time, oldest first'
@@ -194,40 +166,9 @@ An annotation is drawn at the **loop's own `@position`**, not beside it, so at t
 can land across the branch labels of a split inside the loop. Move the loop's position if that happens;
 leave the rest of the generated layout alone.
 
-## Worked example
-
-Everything above in one flow. Before, it was `SUB_Invoice_Check` over `$Invoice_List`,
-counting into `$Int1`, with no caption or annotation anywhere. After:
-
-```mdl
-create microflow Sales.SUB_Invoice_CountUnpaid (
-  $Invoices: list of Sales.Invoice
-)
-returns Integer as $UnpaidCount
-begin
-  @caption 'Start counting at zero'
-  declare $UnpaidCount Integer = 0;
-
-  @annotation 'One pass over the customer''s invoices'
-  loop $Invoice in $Invoices
-  begin
-    @caption 'Invoice still unpaid?'
-    if $Invoice/IsPaid = false then
-      @caption 'Count an unpaid invoice'
-      set $UnpaidCount = $UnpaidCount + 1;
-    end if;
-  end loop;
-
-  return $UnpaidCount;
-end;
-```
-
-Same logic, and the canvas now answers "what does this flow do?" without opening a single shape.
-
 ## Flows that are safe to read
 
-A reader trusts what the canvas shows. These are the places where the flow does something the canvas does
-not say:
+Where the flow does something the canvas does not say:
 
 - **An error handler is noticed.** When you add an `on error` handler, have it log, show a
   message, `raise error;` or return, and let its log name the error itself

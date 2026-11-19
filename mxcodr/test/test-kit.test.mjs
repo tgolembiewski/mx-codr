@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = p => fs.readFileSync(new URL(`../overlay/templates/tests/${p}`, import.meta.url), 'utf8');
-const KIT = ['mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'];
+const KIT = ['mx-impl.ts', 'mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'];
 export const EXPORTS = ['test', 'expect', 'env', 'PASSWORD', 'BASE', 'oql', 'sessionsLeft', 'signIn', 'signOut', 'apiContext', 'marker', 'rowOf', 'cell',
   'filterGrid', 'pickCombo', 'fillInput', 'dialogText', 'dismissDialog', 'menuItems', 'Operation', 'captureOperation', 'forgeOperation', 'retrieveByIds'];
 // so2's app vocabulary, and any demo user or module name: none of it belongs in a kit for any app
 const APP_WORDS = /\bSales\.|\bOrders?\b|\bInvoices?\b|\bCustomers?\b|\bProducts?\b|demo_|b2bfull|\bShop\b|\bUSERS\b|\bHOME\b/;
 
-test('the kit is four files: mx.ts, its teardown, a config that names the teardown and a package.json pinning Playwright', () => {
+test('the kit is five files: mx.ts and its code in mx-impl.ts, its teardown, a config that names the teardown and a package.json pinning Playwright', () => {
   assert.deepEqual(fs.readdirSync(new URL('../overlay/templates/tests/', import.meta.url)).sort(), [...KIT].sort());
   const cfg = read('playwright.config.ts');
   assert.match(cfg, /globalTeardown: '\.\/mx\.teardown\.ts'/);
@@ -26,28 +26,43 @@ test('the kit is four files: mx.ts, its teardown, a config that names the teardo
   assert.equal(pkg.type, undefined, 'CommonJS: mx.ts relies on __dirname');
 });
 
-test('mx.ts exports the helpers the durable-tests skill lists, and nothing else', () => {
-  const names = [...read('mx.ts').matchAll(/^export (?:(?:async function|function|const|type) (\w+)|\{ (\w+) \})/gm)].map(m => m[1] ?? m[2]);
-  assert.deepEqual([...names].sort(), [...EXPORTS].sort());
-  const skill = fs.readFileSync(new URL('../overlay/skills/durable-tests/SKILL.md', import.meta.url), 'utf8');
-  for (const n of EXPORTS.filter(n => n !== 'Operation')) assert.match(skill, new RegExp(`\`${n}\\b`), `durable-tests names ${n}`);
+const exportsOf = f => [...read(f).matchAll(/^export (?:(?:async function|function|const|type) (\w+)|\{ (\w+) \})/gm)].map(m => m[1] ?? m[2]);
+test('mx.ts and mx-impl.ts export the same helpers, and nothing else', () => {
+  assert.deepEqual([...exportsOf('mx.ts')].sort(), [...EXPORTS].sort());
+  assert.deepEqual([...exportsOf('mx-impl.ts')].sort(), [...EXPORTS].sort());
 });
 
-test('every export carries a comment on the line before it (the Mendix fact it encodes)', () => {
-  const lines = read('mx.ts').split('\n');
-  lines.forEach((l, i) => { if (/^export /.test(l)) assert.match(lines[i - 1], /^\/\/ \S/, `mx.ts:${i + 1}: ${l}`); });
+// bundle 2026.11.20.1: agents read tests/mx.ts whole whatever a skill says (24.6k characters a session); it is now the
+// list an agent needs (signature + one doc comment per helper), the code in mx-impl.ts, which specs never import
+test('mx.ts is short: one typed re-export of mx-impl.ts per helper, each with its doc comment; no code', () => {
+  const mx = read('mx.ts');
+  assert.ok(mx.length < 7000, `mx.ts is ${mx.length} characters`);
+  assert.match(mx, /^import \* as kit from '\.\/mx-impl';$/m);
+  assert.match(mx, /^import type \{ Page, Locator, APIRequestContext \} from '@playwright\/test';$/m);
+  assert.doesNotMatch(mx, /\bfunction\b|=>\s*\{|\bawait\b|\bfs\./, 'no implementation in mx.ts');
+  for (const n of EXPORTS) assert.match(mx, new RegExp(`^export (?:const ${n}\\b[^\\n]*= kit\\.${n};|type ${n} = kit\\.${n};)$`, 'm'), n);
+  const lines = mx.split('\n');
+  lines.forEach((l, i) => { if (/^export /.test(l)) assert.match(lines[i - 1], /(\*\/|^\/\/ \S)/, `mx.ts:${i + 1}: ${l}`); });
+  assert.match(mx, /Never edit this file or tests\/mx-impl\.ts to silence a check/);
+  const skill = fs.readFileSync(new URL('../overlay/skills/durable-tests/SKILL.md', import.meta.url), 'utf8');
+  assert.match(skill, /`tests\/mx\.ts` lists every helper/);
+});
+
+test('every export of mx-impl.ts carries a comment on the line before it (the Mendix fact it encodes)', () => {
+  const lines = read('mx-impl.ts').split('\n');
+  lines.forEach((l, i) => { if (/^export /.test(l)) assert.match(lines[i - 1], /^\/\/ \S/, `mx-impl.ts:${i + 1}: ${l}`); });
 });
 
 test('no app vocabulary in the kit: no module, entity, page or user names; the .mpr is found, not named', () => {
   for (const f of KIT) read(f).split('\n').forEach((l, i) => assert.doesNotMatch(l, APP_WORDS, `${f}:${i + 1}: ${l.trim()}`));
-  const mx = read('mx.ts');
+  const mx = read('mx-impl.ts');
   assert.doesNotMatch(mx, /['"`][\w-]+\.mpr['"`]/, 'no .mpr file name in the source');
   assert.match(mx, /readdirSync\(APP\)\.filter\(f => f\.endsWith\('\.mpr'\)\)/);
   assert.match(mx, /'--json'/);
 });
 
 test('signIn waits 20 s for the home marker or "Sign in failed", and its failure names the sessions alive', () => {
-  const mx = read('mx.ts');
+  const mx = read('mx-impl.ts');
   assert.match(mx, /expect\(home\.or\(failed\)\)\.toBeVisible\(\{ timeout: 20_000 \}\)/);
   assert.match(mx, /getByText\('Sign in failed'\)/);
   assert.match(mx, /did not complete in 20 s'\}; \$\{alive\} sessions alive on the server/);
@@ -55,7 +70,7 @@ test('signIn waits 20 s for the home marker or "Sign in failed", and its failure
 });
 
 test('signOut never returns silently on a missing token, and a leak names the test and the users', () => {
-  const mx = read('mx.ts');
+  const mx = read('mx-impl.ts');
   assert.doesNotMatch(mx, /if \(!token\) return;/);
   assert.match(mx, /throw new Error\(`signOut: could not end the session of the page at \$\{page\.url\(\)\}/);
   assert.match(mx, /data: \{ action: 'logout', params: \{\} \}/, 'logout without params answers 560');

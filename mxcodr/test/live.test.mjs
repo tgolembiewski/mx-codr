@@ -67,7 +67,7 @@ test('live writeRules: mxcodr.md (live edits) and mxcodr-live.md; file mode writ
   assert.equal(lr, readTemplate('live.md'));
   assert.equal(lr[0], '#');
   assert.ok(!lr.split('\n').some(l => l.trim() === '---'));
-  for (const must of ['./mxcodr-live marketplace install', 'Only publishers Mendix or Mendix Labs', '`MyFirstModule` is the person', './mxcodr-live exec', './mxcodr-live app run', './mxcodr-live test', 'APP_URL', 'Never run `mxcli init`', 'Only the person commits', 'commit in Studio Pro: Version\nControl > Commit', 'Upload to Version Control Server', 'Run only read-only git', 'Every other git command is the person\'s']) assert.ok(lr.includes(must), must);
+  for (const must of ['./mxcodr-live marketplace install', 'publishers Mendix or Mendix Labs only', '`MyFirstModule` is the person', './mxcodr-live exec', './mxcodr-live app run', './mxcodr-live test', 'APP_URL', 'Never run `mxcli init`', 'Only the person commits', 'commit in Studio Pro: Version\nControl > Commit', 'Upload to Version Control Server', 'Run only read-only git', 'Every other git command is the person\'s']) assert.ok(lr.includes(must), must);
   assert.doesNotMatch(lr, /Close App and open the app again/, 'live.26: the reopen was only for our own git init');
   // live.36: the look is the person's (the Look tab); theme classes and variables, never hard-coded colours
   assert.match(lr, /## The app's look[\s\S]*\.\/mxcodr-live look[\s\S]*never hard-coded colours/);
@@ -102,23 +102,23 @@ test('live test kit and film: every edit applies, no file-mode run left, file mo
   const r = copyTestKit(live, [], undefined, { live: true });
   copyFilm(live, undefined, { live: true });
   copyTestKit(plain); copyFilm(plain);
-  assert.equal(r.written.length, 4);
+  assert.equal(r.written.length, 5);
   for (const [name, edits] of Object.entries(KIT_EDITS)) {
     const t = fs.readFileSync(path.join(live, 'tests', name), 'utf8');
     for (const [from, to] of edits) { assert.ok(!t.includes(from) || to.includes(from), `${name} still has ${from.slice(0, 50)}`); assert.ok(t.includes(to), `${name} lacks ${to.slice(0, 50)}`); }
   }
   const film = fs.readFileSync(path.join(live, 'tests', 'film.mjs'), 'utf8');
   for (const [from, to] of FILM_EDITS) { assert.ok(!film.includes(from)); assert.ok(film.includes(to)); }
-  for (const f of ['mx.ts', 'playwright.config.ts', 'film.mjs']) for (const re of FILE_MODE) assert.doesNotMatch(fs.readFileSync(path.join(live, 'tests', f), 'utf8'), re, `${f} ${re}`);
+  for (const f of ['mx-impl.ts', 'mx.ts', 'playwright.config.ts', 'film.mjs']) for (const re of FILE_MODE) assert.doesNotMatch(fs.readFileSync(path.join(live, 'tests', f), 'utf8'), re, `${f} ${re}`);
   const cfg = fs.readFileSync(path.join(live, 'tests', 'playwright.config.ts'), 'utf8');
   assert.match(cfg, /'json', \{ outputFile: path\.join\(MXCODR, 'tests', 'report\.json'\) \}/);
   assert.match(cfg, /screenshot: 'only-on-failure'/);
   // a second live install sees its own edited kit as the kit's (recorded as ours, nothing rewritten)
   const again = copyTestKit(live, [], undefined, { live: true });
   assert.deepEqual(again.written, []);
-  assert.equal(again.ours.length, 4);
+  assert.equal(again.ours.length, 5);
   // file mode: the template bytes, untouched
-  for (const f of ['mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'])
+  for (const f of ['mx-impl.ts', 'mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'])
     assert.equal(fs.readFileSync(path.join(plain, 'tests', f), 'utf8'), fs.readFileSync(new URL(`../overlay/templates/tests/${f}`, import.meta.url), 'utf8'));
   assert.equal(fs.readFileSync(path.join(plain, 'tests', 'film.mjs'), 'utf8'), fs.readFileSync(new URL('../overlay/templates/film.mjs', import.meta.url), 'utf8'));
 });
@@ -444,4 +444,29 @@ test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGEN
   assert.equal(isScaffoldLeftover('AGENTS.md', f, null), true);
   fs.appendFileSync(f, '\nMine.\n');
   assert.equal(isScaffoldLeftover('AGENTS.md', f, null), false, 'text of the person\'s own still counts');
+});
+
+// 2026-11-19 (faster model reads, items 2 and 3): the model on disk (.mxcodr/model/, written by the extension's
+// translator, src/model-dump.mjs) is where the agent greps and reads; query is for a fresh read before a change, the
+// catalog and a dump that lags; several statements in one query; a long result is read from its file, never re-run.
+// One bullet in the live rule, which setup copies into AGENTS.md's live block for Codex and Pi: early, and short.
+test('live mxcodr-live.md: reading the model is a grep of .mxcodr/model/ and one file; query only for fresh reads and the catalog', () => {
+  const d = tmp();
+  writeRules(d, ['claude', 'codex'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  const at = lr.indexOf('- Reading the model:');
+  assert.ok(at > 0, 'the bullet is there');
+  const b = lr.slice(at, lr.indexOf('\n- ', at + 3));
+  assert.match(b, /grep `\.mxcodr\/model\/` \(one file\s+per document, `INDEX\.tsv` first\) and read the one file/);
+  assert.match(b, /never grep `mprcontents\/`/);
+  assert.match(b, /read a document fresh before you change it/);
+  assert.match(b, /`search '<text>'`,\s+`show references to M\.Name`, `show context of M\.Name`/);
+  assert.match(b, /`INDEX\.tsv`'s state line or\s+`\.\/mxcodr-live model status` says it lags/);
+  assert.match(b, /several statements in one query[\s\S]*never a loop/);
+  assert.match(b, /never run a query again to page it: read or grep the `\.mxcodr\/out\/` file it names/);
+  assert.match(b, /Check a script first with `\.\/mxcodr-live check <script\.mdl>`/);
+  assert.ok(b.split('\n').length <= 7, `short: ${b.split('\n').length} lines`);
+  assert.ok(!/DESCRIBE ENTITY Module\.Entity"` \(or `SHOW \.\.\.`\)/.test(lr), 'the old one-line read advice is gone');
+  // before the bullets Codex's AGENTS.md size cap can cut (the live block comes last there)
+  assert.ok(at < lr.indexOf("- **The app's quality score is the Quality tab's.**") && at < 4000, `early (at ${at})`);
 });

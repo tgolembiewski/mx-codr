@@ -14,23 +14,9 @@ microflow clause — live in mxcli's own
 [organize-project](../../../.ai-context/skills/organize-project/SKILL.md). This
 skill is the decision, not the syntax.
 
-## When to Use This Skill
-
-- Before `create module`
-- Before adding the first pages or microflows to a module
-- When new functionality could plausibly go in two places
-- When a module has grown and someone suggests splitting it
-- Before changing anything in a Marketplace module (Administration, Atlas_Core, DataWidgets, …)
-
 ## When a new module is justified
 
-Mendix's own rule: *"Modules should be treated like standalone replaceable
-services; for example, the customer module should function as a standalone customer
-management system as much as possible, replaceable by a different customer
-management system."*
-([dev-best-practices](https://docs.mendix.com/refguide10/dev-best-practices/))
-
-Three triggers, each with the test that settles it:
+A module should work as a standalone, replaceable service. Three triggers, each with the test that settles it:
 
 **1. Business domain / bounded context.** Could this be lifted out and replaced by a
 bought system, without the rest of the app noticing anything but a changed
@@ -52,10 +38,6 @@ mappings and entities. When the vendor changes, the blast radius is that one mod
 - *"A different developer wrote it."* Ownership is not a boundary either — two
   people can own two processes in one module.
 - *"This entity is only used here."* Then it is already in the right module.
-
-The real ceiling is the app, not the module: roughly 3,000 microflows and 750
-entities on a high-end machine (2,000 / 500 on lower spec). Past that, split the
-**app**, not the module.
 
 ## Folder structure: by process
 
@@ -119,8 +101,7 @@ the same style.
 
 ## Shared modules look different
 
-A module other apps consume carries the Marketplace layout instead of processes
-([app-setup](https://docs.mendix.com/appstore/creating-content/best-practices/app-setup/)):
+A module other apps consume carries the Marketplace layout instead of processes:
 
 ```
 PaymentsConnector/
@@ -155,21 +136,14 @@ WorkflowCommons, and its edits of snippets there, that way).
 ## Dependencies between modules
 
 **No cycles.** If A needs B and B needs A, you have one module wearing two names, or
-a third module waiting to be extracted. The single documented exception is a
-solution module paired with its adaptable counterpart, which Mendix treats as one
-module
-([sol-architecting](https://docs.mendix.com/appstore/creating-content/sol-architecting/)).
+a third module waiting to be extracted (the one exception: a solution module and its
+adaptable counterpart).
 
 Point the dependency at the more stable side: features depend on the domain, never
 the other way round.
 
-Find the violations rather than guessing at them:
-
-```bash
-./mxcli graph-report -p app.mpr        # cohesion, "surprise edges", god nodes
-./mxcli lint -p app.mpr                # ARCH001: a page reading another module's entities
-./mxcli -p app.mpr -c "list impact of Module.Entity"
-```
+Find the violations with `./mxcli graph-report -p app.mpr` (cycles, cross-module coupling) and
+`./mxcli lint -p app.mpr` (ARCH001: a page reading another module's entities).
 
 Security follows the same boundary: each user role maps to exactly **one** module
 role per module (lint rule CONV008), so a module's roles describe that module's
@@ -187,8 +161,7 @@ access and nothing else.
 5. Write the whole domain model in **one script, before any page or microflow**:
    entities, associations, enumerations, module roles and their access rules. Under
    `mxcli run --watch` a change to any of those restarts the runtime (about 10 s),
-   while a page or microflow hot-applies in about 2 s. Measured on a 43-exec session,
-   that restart was most of the 13 s every test run waited for. Schema once, up front;
+   while a page or microflow hot-applies in about 2 s. Schema once, up front;
    screens and logic as often as you like.
 
 ## MyFirstModule goes once the app has its own module
@@ -245,18 +218,10 @@ page opened only by its URL) stays; say why in its documentation comment, and ca
 
 ## Check it
 
-```bash
-./mxcli lint -p app.mpr | grep -E 'ARCH001|CONV008'
-./mxcli -p app.mpr -c "refresh catalog; select QualifiedName, Folder from catalog.pages where Folder = '' or Folder in ('Pages','Microflows','Nanoflows','Snippets','Entities')"
-./mxcli -p app.mpr -c "select QualifiedName, Folder from catalog.microflows where Folder = '' or Folder in ('Pages','Microflows','Nanoflows','Snippets','Entities')"
-./mxcli graph-report -p app.mpr
-```
-
-The two queries list a page or microflow at module root or in a folder named after a document
-type (ignore marketplace modules; repeat for `catalog.snippets`
-and `catalog.nanoflows`). `ARCH001` — a page reading another module's entities.
-`CONV008` — a module role mapped to more than one user role. `graph-report` shows
-cycles and cross-module coupling that no single rule catches.
+`./mxcli lint -p app.mpr` shows no ARCH001 or CONV008 (a module role mapped to more than one user role), and
+no page, snippet, microflow or nanoflow of the app's modules sits at module root or in a folder named after a
+document type (`select QualifiedName, Folder from catalog.pages where Folder = '' or Folder in
+('Pages','Microflows','Nanoflows','Snippets','Entities')`, the same for the other catalogs).
 
 Before you call work in a module finished, and after any script that touched a Marketplace module:
 
@@ -274,16 +239,11 @@ documents changed. `not checked` is not clean: say which modules and why in your
 
 ## Validation checklist
 
-- [ ] Every new module answers yes to domain, reuse, or integration boundary
 - [ ] The domain model, roles and access rules went in first, in one script; pages and microflows after
-- [ ] No document sits at module root
 - [ ] `MyFirstModule` is gone, and the administrators open on a page of the app's own module
 - [ ] No document is left that nothing uses; its script in `mdlsource/` is gone too
-- [ ] Every document in `<process>/UI`, `/FNC` or `/ENV`; no folder named after a document type
-- [ ] Shared documents live in `_Shared/`, not duplicated
-- [ ] A consumable module exposes `UseMe/` and hides `Private/`
-- [ ] No cyclic dependency between modules (`graph-report`, ARCH001)
-- [ ] `./mxcli lint -p app.mpr` clean for the module, CONV008 included
+- [ ] Every document in `<process>/UI`, `/FNC` or `/ENV`, none at module root or in a folder named after a document type
+- [ ] No cyclic dependency between modules; `./mxcli lint -p app.mpr` clean for the module (ARCH001, CONV008)
 - [ ] No document in a Marketplace module was added or changed; the app's own documents live in its own
       modules, changed copies in `<Module>Ext` (`marketplace-check.mjs` shows no warning)
 - [ ] A Marketplace document changed before the move is back to what the Marketplace shipped

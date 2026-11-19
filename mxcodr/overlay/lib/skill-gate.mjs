@@ -10,6 +10,8 @@
 //   node skill-gate.mjs pre    PreToolUse on Bash|PowerShell|Write|Edit|MultiEdit: a model write (./mxcodr-live exec,
 //                              mxcli exec, mxcli -c) or a test spec write that needs a project skill not read yet in
 //                              this session is refused (exit 2, the reason on stderr, which Claude Code shows the agent)
+//   node skill-gate.mjs reset  SessionStart with source "compact" (bundle 2026.11.20): the context was compacted, so the
+//                              skills read before it are no longer in it; this session's read marks go (others stay)
 //
 // Which skills an action needs (GATED, only those the app has in .claude/skills/): by the MDL the command runs (the
 // script file it names, else the command's own text, e.g. a heredoc), case-insensitive, comments and quoted strings
@@ -18,8 +20,9 @@
 // environment Claude Code runs in switches it off. Self-contained (node: modules only): the file-mode installer
 // copies it to .mxcodr/skill-gate.mjs, the Studio Pro extension runs it from its verified copy.
 //
-// Codex (bundle 2026.11.18.6, the extension's .codex/hooks.json only): `node skill-gate.mjs pre|post --agent=codex
-// [--shell=powershell]`. Codex reads a skill with a shell command, so see "Codex" below for what counts as a read.
+// Codex (bundle 2026.11.18.6, the extension's .codex/hooks.json only): `node skill-gate.mjs pre|post|reset --agent=codex
+// [--shell=powershell]` (reset on Codex's PreCompact, bundle 2026.11.20). Codex reads a skill with a shell command,
+// so see "Codex" below for what counts as a read.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -245,6 +248,29 @@ function sessionDir(root, session, now = Date.now()) {
     try { if (now - fs.statSync(p).mtimeMs > KEEP_DAYS * 864e5) fs.rmSync(p, { recursive: true, force: true }); } catch { /* gone */ }
   }
   return mine;
+}
+
+/** Compaction (bundle 2026.11.20): after it the model has only a summary, not the skills it read, so the gate counted
+ * them as read while they were gone. A compaction clears this session's marks (its folder); other sessions keep theirs.
+ * Measured with Claude Code 2.1.326 (`/compact` on a resumed `claude -p` session): PreCompact {trigger}, then
+ * SessionStart {source: "compact"}, then PostCompact {trigger, compact_summary}, all with the same session_id. Nothing
+ * is written to stdout: SessionStart's becomes context for the model, PreCompact's instructions for the summary.
+ * -> true when the event is a compaction (whether or not there was anything to clear). */
+// Codex (0.167.0) registers it on PreCompact only; its event name is not measured there, so a Codex input without
+// one counts too, and the spelling may be pre_compact.
+export function isCompaction(e, { agent = null } = {}) {
+  const name = String(e?.hook_event_name ?? '').replace(/_/g, '').toLowerCase();
+  if (!name) return agent === 'codex';
+  return name === 'precompact' || name === 'postcompact' || (name === 'sessionstart' && e?.source === 'compact');
+}
+export function clearReads(root, session) {
+  if (!root || session == null || session === '') return false;
+  // never through a link (as stateDir)
+  for (const d of [path.join(root, '.mxcodr'), path.join(root, STATE_DIR)]) { try { if (fs.lstatSync(d).isSymbolicLink()) return false; } catch { return false; } }
+  const mine = statePath(root, session);
+  try { if (fs.lstatSync(mine).isSymbolicLink()) { fs.unlinkSync(mine); return true; } } catch { return false; }
+  fs.rmSync(mine, { recursive: true, force: true });
+  return true;
 }
 
 export function markRead(root, session, name, now = Date.now()) {
@@ -541,6 +567,9 @@ export function codexDecide(e, { root = e?.cwd, env = process.env, powershell = 
 // ---- the hooks' registration (.claude/settings.local.json: mxcli init overwrites settings.json, not this) ----------
 
 export const PRE_MATCHER = 'Bash|PowerShell|Write|Edit|MultiEdit', POST_MATCHER = 'Read|Skill';
+// bundle 2026.11.20: SessionStart's matcher is the source; "compact" fires after a compaction (manual or auto)
+export const RESET_EVENT = 'SessionStart', RESET_MATCHER = 'compact';
+const GATE_EVENTS = ['PreToolUse', 'PostToolUse', RESET_EVENT];
 /** The file-mode installer's commands: the copy in the app, run by the Node on PATH (the installer needs it). */
 export const fileModeCommand = mode => `node "$CLAUDE_PROJECT_DIR/.mxcodr/skill-gate.mjs" ${mode}`;
 const isGate = h => JSON.stringify(h ?? '').includes(MARK);
@@ -548,7 +577,7 @@ const isGate = h => JSON.stringify(h ?? '').includes(MARK);
 /** Settings (a parsed settings JSON object) without our gate entries; the person's hooks stay. Changes cfg. */
 export function withoutGateHooks(cfg) {
   if (!cfg?.hooks || typeof cfg.hooks !== 'object') return cfg;
-  for (const ev of ['PreToolUse', 'PostToolUse']) {
+  for (const ev of GATE_EVENTS) {
     if (!Array.isArray(cfg.hooks[ev])) continue;
     const kept = cfg.hooks[ev].filter(e => !isGate(e));
     if (kept.length) cfg.hooks[ev] = kept; else delete cfg.hooks[ev];
@@ -557,12 +586,14 @@ export function withoutGateHooks(cfg) {
   return cfg;
 }
 
-/** Settings with our two entries, in place of any earlier ones: command(mode) -> the command for 'pre' / 'post'. */
+/** Settings with our three entries, in place of any earlier ones: command(mode) -> the command for 'pre' / 'post' /
+ * 'reset' (the person's own SessionStart hooks, e.g. mxcli's bootstrap in settings.json, are not touched). */
 export function withGateHooks(cfg, command = fileModeCommand) {
   withoutGateHooks(cfg);
   cfg.hooks = cfg.hooks ?? {};
   cfg.hooks.PreToolUse = [...(cfg.hooks.PreToolUse ?? []), { matcher: PRE_MATCHER, hooks: [{ type: 'command', command: command('pre'), timeout: 15 }] }];
   cfg.hooks.PostToolUse = [...(cfg.hooks.PostToolUse ?? []), { matcher: POST_MATCHER, hooks: [{ type: 'command', command: command('post'), timeout: 15 }] }];
+  cfg.hooks[RESET_EVENT] = [...(cfg.hooks[RESET_EVENT] ?? []), { matcher: RESET_MATCHER, hooks: [{ type: 'command', command: command('reset'), timeout: 15 }] }];
   return cfg;
 }
 
@@ -572,6 +603,10 @@ export function runHook(mode, input, env = process.env, { agent = null, powershe
   try {
     if (env.MXCODR_SKILL_GATE === '0') return { code: 0 };
     const e = JSON.parse(input);
+    if (mode === 'reset') {
+      if (isCompaction(e, { agent })) clearReads(agent === 'codex' ? e.cwd || env.CLAUDE_PROJECT_DIR : env.CLAUDE_PROJECT_DIR || e.cwd, e.session_id);
+      return { code: 0 };
+    }
     if (agent === 'codex') {
       const root = e.cwd || env.CLAUDE_PROJECT_DIR;
       if (!root) return { code: 0 };

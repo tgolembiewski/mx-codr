@@ -30,8 +30,8 @@ side as the permitted role; never add a button, widen access or lower security s
 Write and run the tests yourself in the foreground, never through a background agent, and never end your turn while a test run or an agent is still going. **You are done only
 when** you have printed a table `requirement -> test that asserts it` covering every requirement of the
 request (write the missing tests first), then run the whole suite once as `npx playwright test --shuffle`
-in `tests/` and shown it green with `sessions left: 0`. Never edit `tests/mx.ts` or `tests/mx.teardown.ts`
-to silence a check; fix the leaking test. Stop the app with
+in `tests/` and shown it green with `sessions left: 0`. Never edit `tests/mx.ts`, `tests/mx-impl.ts` or
+`tests/mx.teardown.ts` to silence a check; fix the leaking test. Stop the app with
 `./mxcli run stop`, and any other process only by the exact PID you started, never by a name pattern
 (`pkill`, `killall`): that also kills the person's own browsers and test runs.
 

@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { copyTestKit, TEST_KIT } from '../overlay/install.mjs';
-import { liveKitText, wireTestsTab } from '../overlay/lib/live.mjs';
+import { liveKitText, wireTestsTab, KIT_EDITS } from '../overlay/lib/live.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const SRC = fileURLToPath(new URL('../overlay/templates/tests/', import.meta.url));
@@ -59,7 +59,7 @@ test('kit update: an absent file is still copied, next to an updated one', () =>
   const d = app();
   put(d, 'tests/mx.ts', OLD_MX);
   const r = copyTestKit(d, [], SRC, { shipped: shippedFor(['tests/mx.ts', OLD_MX]) });
-  assert.deepEqual(r.written, ['tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json'], 'an unedited old mx.ts not in the record is the kit: its teardown and config are written');
+  assert.deepEqual(r.written, ['tests/mx-impl.ts', 'tests/mx.teardown.ts', 'tests/playwright.config.ts', 'tests/package.json'], 'an unedited old mx.ts not in the record is the kit: its code, teardown and config are written');
   assert.deepEqual(r.updated, ['tests/mx.ts']);
   for (const rel of TEST_KIT) assert.equal(get(d, rel), kitSource(path.basename(rel)), rel);
   assert.deepEqual(r.ours, TEST_KIT);
@@ -134,12 +134,39 @@ test('the signOut fix reaches an app with the mx.ts from before 5f8d6bb6, plain 
   assert.ok(before.length > 1000 && before !== kitSource('mx.ts'));
   const d = app();
   put(d, 'tests/mx.ts', before);
-  assert.deepEqual(copyTestKit(d, TEST_KIT).updated, ['tests/mx.ts']);
+  const r = copyTestKit(d, TEST_KIT);
+  assert.deepEqual(r.updated, ['tests/mx.ts']);
+  assert.deepEqual(r.written.slice(0, 1), ['tests/mx-impl.ts'], 'the split kit (bundle 2026.11.20.1): mx.ts beside its code');
   assert.equal(get(d, 'tests/mx.ts'), kitSource('mx.ts'));
+  assert.equal(get(d, 'tests/mx-impl.ts'), kitSource('mx-impl.ts'));
   const beforeLive = spawnSync('git', ['-C', repo, 'show', '5f8d6bb6^:mxcodr/overlay/lib/live.mjs'], { encoding: 'utf8' }).stdout;
   assert.ok(beforeLive.includes('KIT_EDITS'));
   const e = app();
-  put(e, 'tests/mx.ts', liveKitText('mx.ts', before));   // KIT_EDITS for mx.ts did not change in 5f8d6bb6
+  // the live edit of the old one-file mx.ts (KIT_EDITS for it did not change in 5f8d6bb6; it is mx-impl.ts's since 2026.11.20.1)
+  const [from, to] = KIT_EDITS['mx-impl.ts'][0];
+  assert.ok(before.includes(from));
+  put(e, 'tests/mx.ts', before.split(from).join(to));
   assert.deepEqual(copyTestKit(e, TEST_KIT, SRC, { live: true }).updated, ['tests/mx.ts']);
   assert.equal(get(e, 'tests/mx.ts'), liveKitText('mx.ts', kitSource('mx.ts')));
+  assert.equal(get(e, 'tests/mx-impl.ts'), liveKitText('mx-impl.ts', kitSource('mx-impl.ts')));
+  assert.match(get(e, 'tests/mx-impl.ts'), /restart the app with \.\/mxcodr-live app restart/);
+});
+
+test('kit split: a tests/mx-impl.ts the kit did not write keeps the old mx.ts (never a thin mx.ts over a foreign impl); its own impl updates', () => {
+  const d = app();
+  put(d, 'tests/mx.ts', OLD_MX);
+  put(d, 'tests/mx-impl.ts', 'export const somethingElse = 1;\n');
+  const r = copyTestKit(d, [], SRC, { shipped: shippedFor(['tests/mx.ts', OLD_MX]) });
+  assert.equal(get(d, 'tests/mx.ts'), OLD_MX);
+  assert.equal(get(d, 'tests/mx-impl.ts'), 'export const somethingElse = 1;\n');
+  assert.ok(!r.updated.includes('tests/mx.ts'));
+  assert.match(r.lines.join('\n'), /not updated tests\/mx\.ts \(tests\/mx-impl\.ts is not the kit's\): the kit's tests\/mx\.ts imports tests\/mx-impl\.ts; move yours aside and install again/);
+  // the kit's own impl, edited by nobody, from an earlier split kit: updated with mx.ts
+  const e = app();
+  const oldImpl = kitSource('mx-impl.ts') + '// an older impl line\n';
+  put(e, 'tests/mx.ts', OLD_MX);
+  put(e, 'tests/mx-impl.ts', oldImpl);
+  const r2 = copyTestKit(e, [], SRC, { shipped: shippedFor(['tests/mx.ts', OLD_MX], ['tests/mx-impl.ts', oldImpl]) });
+  assert.deepEqual(r2.updated, ['tests/mx-impl.ts', 'tests/mx.ts']);
+  assert.equal(get(e, 'tests/mx-impl.ts'), kitSource('mx-impl.ts'));
 });

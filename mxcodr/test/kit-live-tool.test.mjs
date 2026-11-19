@@ -30,7 +30,7 @@ async function kitIn(setupApp) {
   fs.writeFileSync(path.join(app, 'App.mpr'), '');
   fs.writeFileSync(path.join(dir, 'fakes.mjs'), FAKES);
   setupApp(app);
-  const src = strip(fs.readFileSync(new URL('../overlay/templates/tests/mx.ts', import.meta.url), 'utf8'))
+  const src = strip(fs.readFileSync(new URL('../overlay/templates/tests/mx-impl.ts', import.meta.url), 'utf8'))
     .replace(/from '@playwright\/test'/, "from './fakes.mjs'")
     .replace(/from 'node:child_process'/, "from './fakes.mjs'");
   const f = path.join(dir, `mx${n++}.mjs`);

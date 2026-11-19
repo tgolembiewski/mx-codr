@@ -17,15 +17,12 @@ them on one line, and that line wraps when the window narrows.
 ```sql
 actionbutton InvoiceDetail_EditButton (Caption: 'Edit', Action: show page Sales.Invoice_Edit(Invoice = $Invoice),
   Icon: 'Atlas_Core.Atlas_Filled.pencil', DesignProperties: ('Spacing': ('margin-right': 'S', 'margin-bottom': 'S')))
-actionbutton InvoiceDetail_DeleteButton (Caption: 'Delete', Action: call microflow Sales.ACT_Invoice_Delete(Invoice = $Invoice),
-  Icon: 'Atlas_Core.Atlas_Filled.trash-can', DesignProperties: ('Spacing': ('margin-right': 'S', 'margin-bottom': 'S')))
 actionbutton InvoiceDetail_SendButton (Caption: 'Send', Action: call microflow Sales.ACT_Invoice_Send(Invoice = $Invoice),
   Icon: 'Atlas_Core.Atlas_Filled.email', DesignProperties: ('Spacing': ('margin-bottom': 'S')))
 ```
 
-Each part left out has failed: no `margin-right`, the buttons touch; `margin-bottom` on one only, they
-sit ten pixels out of line; none at all, a narrow window wraps the row against itself. That is Studio
-Pro's own **Spacing** design property, not `Class:`, `Style:` or custom CSS.
+Without `margin-right` the buttons touch; with `margin-bottom` on one only they sit out of line. That is
+Studio Pro's own **Spacing** design property, not `Class:`, `Style:` or custom CSS.
 
 - Sides: `margin-top|right|bottom|left`, the same as `padding-`; on any widget, row or column.
 - Values: **`None` `S` `M` `L`** only. Atlas Core defines nothing else; `mxcli check` accepts `'XL'`
@@ -49,10 +46,6 @@ layoutgrid InvoiceOverview_PageLayout {
   row {
     column (DesktopWidth: 8) {
       dynamictext InvoiceOverview_HeadingText (Content: 'Invoices', RenderMode: H2, DesignProperties: ('Spacing': ('margin-bottom': 'S')))
-    }
-    column (DesktopWidth: 4) {
-      actionbutton InvoiceOverview_PrintButton (Caption: 'Print', Action: call microflow Sales.ACT_Invoice_PrintList,
-        Icon: 'Atlas_Core.Atlas_Filled.print', DesignProperties: ('Spacing': ('margin-bottom': 'S')))
     }
   }
   row {
@@ -101,9 +94,7 @@ create or modify page Sales.Customer_NewEdit (
           textarea CustomerNewEdit_NotesInput (Label: 'Notes', Attribute: Notes)
           footer {
             actionbutton CustomerNewEdit_SaveButton (Caption: 'Save', Action: save changes close page, ButtonStyle: Primary,
-              Icon: 'Atlas_Core.Atlas_Filled.floppy-disk', DesignProperties: ('Spacing': ('margin-right': 'S')))
-            actionbutton CustomerNewEdit_CancelButton (Caption: 'Cancel', Action: cancel changes close page,
-              Icon: 'Atlas_Core.Atlas_Filled.remove')
+              Icon: 'Atlas_Core.Atlas_Filled.floppy-disk')
           }
         }
       }
@@ -171,7 +162,6 @@ datagrid OrderOverview_OrdersGrid (DataSource: database from Sales.Order, Select
     actionbutton OrderOverview_MarkPaidButton (Caption: 'Mark paid', Action: call microflow Sales.ACT_Order_MarkPaid(Order = $OrderOverview_OrdersGrid),
       Icon: 'Atlas_Core.Atlas_Filled.checkmark', DesignProperties: ('Spacing': ('margin-bottom': 'S')))
     dropdownfilter OrderOverview_StatusFilter (attrchoice: linked, attributes: [Sales.Order.Status], multiSelect: true)
-    dropdownfilter OrderOverview_CustomerFilter (association: Sales.Order_Customer, datasource: database Sales.Customer, captionattribute: Name)
   }
   column (Attribute: Number, Caption: 'Number') { textfilter OrderOverview_NumberFilter }
   column (Attribute: Status, Caption: 'Status')
@@ -206,9 +196,8 @@ listview MyJobs_JobsList (DataSource: database from Field.RepairJob) {
 - **Totals are tiles.** A view that always holds one row (totals, no group by) is shown as tiles, not
   a list: a data view fed by a microflow, one `card` container a figure, in grid columns.
 - **Stacked lists go in tabs.** Two or more lists (data grid, list view, gallery) one under another on
-  a page go in one `tabcontainer`: one list a `tabpage`, the heading that stood over the list as its
-  `Caption:`, so nobody scrolls past one list to find the next. Not stacked: lists side by side in
-  columns of one row (each `DesktopWidth` below 12), or a list already in a tab page. Two lists used
+  a page go in one `tabcontainer`: one list a `tabpage`, the heading that stood over it as its
+  `Caption:`. Not stacked: lists side by side in columns of one row, or a list already in a tab page. Two lists used
   at once (pick from one, fill the other) go side by side instead. On a phone or tablet page, an
   object's form with a list of its related objects under it goes in tabs too, the object's tab first.
   The widgets keep their names; a test clicks the tab (`.mx-name-<tab>`) before it reads its list.
@@ -220,14 +209,6 @@ listview MyJobs_JobsList (DataSource: database from Field.RepairJob) {
   data-source microflow, oldest first, 0 when empty, labelled `formatDateTime($Start, 'MMM yyyy')`.
 
 ```sql
-dataview SalesDashboard_TotalsForm (DataSource: microflow Sales.DS_SalesTotals) {
-  layoutgrid SalesDashboard_TotalsLayout { row { column (DesktopWidth: 4) {
-    container SalesDashboard_OpenBox (Class: 'card') {
-      dynamictext SalesDashboard_OpenText (Content: '{1}', RenderMode: H2, ContentParams: ({1} = OpenCount))
-      dynamictext SalesDashboard_OpenLabelText (Content: 'Open orders')
-    }
-  } } }
-}
 layoutgrid CustomerDetail_PageLayout { row { column (DesktopWidth: 12) {
   tabcontainer CustomerDetail_ListsTabs {
     tabpage CustomerDetail_OrdersTab (Caption: 'Orders') {
