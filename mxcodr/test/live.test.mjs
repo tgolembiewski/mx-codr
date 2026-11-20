@@ -476,7 +476,8 @@ test('live mxcodr-live.md: reading the model is a grep -rn of .mxcodr/model/ and
   // 2026-11-20 (live.88, a large app on the Windows VM: `grep -rlniE ... . | grep -v ...` 100.7 s): the project's files are
   // searched with the folders left out by grep itself, never a filter after a pipe; never git grep (it misses tests/.env)
   const g = lr.slice(lr.indexOf("- Searching the project's files"), lr.indexOf('\n- ', lr.indexOf("- Searching the project's files") + 3));
-  assert.match(g, /`grep -rn --exclude-dir=\{\.mxcodr,\.mxcodr-test,mprcontents,deployment,node_modules,\.git,vendorlib,theme-cache,\.mendix-cache\} '<pattern>' \.`/);
+  // 2026-11-20 (bundle 2026.11.20.4): .mxcli too (mxcli's own caches: catalog.db, unit-contents.db, widget definitions)
+  assert.match(g, /`grep -rn --exclude-dir=\{\.mxcodr,\.mxcodr-test,\.mxcli,mprcontents,deployment,node_modules,\.git,vendorlib,theme-cache,\.mendix-cache\} '<pattern>' \.`/);
   assert.match(g, /never `grep -r \.\.\. \. \| grep -v \.\.\.`: the filter after the pipe does not stop the reading/);
   assert.match(g, /The\s+`\{\.\.\.\}` list needs bash or zsh; in PowerShell or sh give one `--exclude-dir=<name>` per folder\./);
   assert.ok(!/git grep/.test(g) && g.split('\n').length <= 3, g);

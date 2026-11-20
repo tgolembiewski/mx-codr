@@ -32,7 +32,7 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   `search '<text>'`, `show references to M.Name`, `show context of M.Name` or a catalog select, and when `INDEX.tsv`'s
   state line or `./mxcodr-live model status` says it lags. Several statements in one query, never a loop; never re-run
   one to page it: read the `.mxcodr/out/` file it names. Check a script first with `./mxcodr-live check <script.mdl>`.
-- Searching the project's files (tests, Java, theme): `grep -rn --exclude-dir={.mxcodr,.mxcodr-test,mprcontents,deployment,node_modules,.git,vendorlib,theme-cache,.mendix-cache} '<pattern>' .`,
+- Searching the project's files (tests, Java, theme): `grep -rn --exclude-dir={.mxcodr,.mxcodr-test,.mxcli,mprcontents,deployment,node_modules,.git,vendorlib,theme-cache,.mendix-cache} '<pattern>' .`,
   never `grep -r ... . | grep -v ...`: the filter after the pipe does not stop the reading (100 s on a large app). The
   `{...}` list needs bash or zsh; in PowerShell or sh give one `--exclude-dir=<name>` per folder.
 - `./mxcodr-live status` says whether Studio Pro is connected, its version, the open editors, and how many

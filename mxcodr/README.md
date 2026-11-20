@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.20.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.20.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,10 @@ Bundle **2026.11.20.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.20.4 (2026-11-20): the project-files grep in `templates/live.md` also leaves out `.mxcli` (mxcli's own caches
+  in the app folder: catalog.db, unit-contents.db, widget definitions). `test/live.test.mjs` pins it. In the extension
+  (live.91) a read's copy now also follows `widgets/` and `modules/`, and a busy `.mpr` is waited for up to 5 s
+  (`spikes/studio-pro-ext/README.md`, "Reads mirror widgets/ and modules/").
 - 2026.11.20.3 (2026-11-20): **search the project's files without reading the copies**. On the owner's Windows VM
   (Pi, a large app) two agent greps over the app folder, `grep -rlniE "..." . | grep -v "mprcontents|..."`, took 100.7 s
   each: grep reads everything before the filter after the pipe, the extension's own copies of the app included.
@@ -21,7 +25,7 @@ Bundle **2026.11.20.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   templates, building blocks) and says to run `./mxcodr-live query "search '<text>'"` before calling something absent.
   `test/live.test.mjs` pins both. In the extension (live.88) the shadow and the model dump's source copy moved out of
   the app into the person's app-state folder (`spikes/studio-pro-ext/README.md`, "The copies live in the person's
-  folder"). Measured on a large app copy on a Mac (BSD grep, warm cache): the piped form 16.8 s before the move and
+  folder"). Measured on a copy of a large app on a Mac (BSD grep, warm cache): the piped form 16.8 s before the move and
   7.2 s after; the `--exclude-dir` form 2.6 s after; `.mxcodr/model/` alone 0.1 s.
 - 2026.11.20.2 (2026-11-20): **read only the lines you need from `.mxcodr/model/`**. An A/B of the read changes
   (bundle 2026.11.18.9 against 2026.11.20.1, CarFleet, three read-only tasks) found that Claude Code took the dump
