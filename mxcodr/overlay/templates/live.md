@@ -26,10 +26,15 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
 - Reading the model: `.mxcodr/model/` has one file per document (`INDEX.tsv` lists them); never grep `mprcontents/`.
   Find what you need with one `grep -rn` (several names in one pattern), then read only the lines around the hits (Read
   with offset and limit, or `sed -n 40,90p` on several files in one command); a whole file only when you need all of
-  it. Use `./mxcodr-live query` (a copy of what Studio Pro saved) to read a document fresh before you change it, for
+  it. It leaves out System, add-on modules (`modules/*.mxmodule`), image and icon collections, page templates and
+  building blocks: when a grep there finds nothing, `./mxcodr-live query "search '<text>'"` before you call it absent.
+  Use `./mxcodr-live query` (a copy of what Studio Pro saved) to read a document fresh before you change it, for
   `search '<text>'`, `show references to M.Name`, `show context of M.Name` or a catalog select, and when `INDEX.tsv`'s
   state line or `./mxcodr-live model status` says it lags. Several statements in one query, never a loop; never re-run
   one to page it: read the `.mxcodr/out/` file it names. Check a script first with `./mxcodr-live check <script.mdl>`.
+- Searching the project's files (tests, Java, theme): `grep -rn --exclude-dir={.mxcodr,.mxcodr-test,.mxcli,mprcontents,deployment,node_modules,.git,vendorlib,theme-cache,.mendix-cache} '<pattern>' .`,
+  never `grep -r ... . | grep -v ...`: the filter after the pipe does not stop the reading (100 s on a large app). The
+  `{...}` list needs bash or zsh; in PowerShell or sh give one `--exclude-dir=<name>` per folder.
 - `./mxcodr-live status` says whether Studio Pro is connected, its version, the open editors, and how many
   files are uncommitted. When a command says it cannot reach Studio Pro, pass on its own instruction to the
   person word for word; do not add steps of your own.
@@ -55,6 +60,8 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   mxbuild, so that folder has no `mx`, and another version's `mx` refuses this app). Errors and warnings come
   from `./mxcodr-live problems`; the full check is `./mxcodr-live mxcheck` (`mxcli docker check` on a copy of
   what Studio Pro saved, the right `mx` for the app's version).
+- Step 3 of `CLAUDE.md`'s "Finishing a change" does not apply here: never write or read `FINDINGS.md`. Say what you
+  found and how you verified it in your answer; the project brain takes only what its rule's three triggers name.
 - Marketplace modules (publishers Mendix or Mendix Labs only): `./mxcodr-live marketplace install <id|name>`
   (`marketplace search <words>` finds the id); a newer version with `./mxcodr-live marketplace update <id|name>
   --plan-only` first: tell the person what the plan prints and ask; the real run only after their yes. After the

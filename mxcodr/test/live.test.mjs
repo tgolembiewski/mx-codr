@@ -141,6 +141,24 @@ test('live rule file overrides CLAUDE.md on mx: problems and mxcheck, never a ha
   assert.match(t, /never call `mx` by a\n  path under `~\/\.mxcli\/mxbuild\/` or a glob/);
 });
 
+// bundle 2026.11.20.5: mxcli init's CLAUDE.md/AGENTS.md "Finishing a change" step 3 has agents append to FINDINGS.md (a
+// large app: 13.5 KB in a day, read whole before each append, read by nobody; setup git-ignores it). In live mode the
+// finding goes into the answer, and the brain keeps only what its rule's three capture triggers name.
+test('live rule file overrides CLAUDE.md step 3: no FINDINGS.md, the finding goes into the answer; right after the mx bullet', () => {
+  const d = tmp();
+  writeRules(d, ['claude', 'codex'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  const at = lr.indexOf('- Step 3 of `CLAUDE.md`');
+  assert.ok(at > 0, 'the bullet is there');
+  const b = lr.slice(at, lr.indexOf('\n- ', at + 3));
+  assert.match(b, /Step 3 of `CLAUDE\.md`'s "Finishing a change" does not apply here: never write or read `FINDINGS\.md`\./);
+  assert.match(b, /Say what you\s+found and how you verified it in your answer; the project brain takes only what its rule's three triggers name\./);
+  assert.ok(b.split('\n').length <= 2, `short: ${b.split('\n').length} lines`);
+  assert.ok(lr.lastIndexOf('- This replaces what `CLAUDE.md` says about `mx`', at) > 0 && at < lr.indexOf('- Marketplace modules'), 'beside the other CLAUDE.md override');
+  // the brain rule it points at names exactly three triggers
+  assert.match(readTemplate('brain.md'), /Capture on three\ntriggers only/);
+});
+
 test('live.74 live rule file: what a turn changed comes from ./mxcodr-live changes, never git; Studio Pro\'s regenerated files are named', () => {
   const t = fs.readFileSync(new URL('../overlay/templates/live.md', import.meta.url), 'utf8');
   assert.match(t, /`\.\/mxcodr-live changes list`/);
@@ -469,7 +487,19 @@ test('live mxcodr-live.md: reading the model is a grep -rn of .mxcodr/model/ and
   assert.match(b, /Several statements in one query, never a loop/);
   assert.match(b, /never re-run\s+one to page it: read the `\.mxcodr\/out\/` file it names/);
   assert.match(b, /Check a script first with `\.\/mxcodr-live check <script\.mdl>`/);
-  assert.ok(b.split('\n').length <= 7, `short: ${b.split('\n').length} lines`);
+  // 2026-11-20 (live.88): what the dump leaves out (model-dump.mjs SKIP; System and add-on modules are no units of the
+  // .mpr), and a search before calling something absent
+  assert.match(b, /It leaves out System, add-on modules \(`modules\/\*\.mxmodule`\), image and icon collections, page templates and\s+building blocks: when a grep there finds nothing, `\.\/mxcodr-live query "search '<text>'"` before you call it absent\./);
+  assert.ok(b.split('\n').length <= 9, `short: ${b.split('\n').length} lines`);
+  // 2026-11-20 (live.88, a large app on the Windows VM: `grep -rlniE ... . | grep -v ...` 100.7 s): the project's files are
+  // searched with the folders left out by grep itself, never a filter after a pipe; never git grep (it misses tests/.env)
+  const g = lr.slice(lr.indexOf("- Searching the project's files"), lr.indexOf('\n- ', lr.indexOf("- Searching the project's files") + 3));
+  // 2026-11-20 (bundle 2026.11.20.4): .mxcli too (mxcli's own caches: catalog.db, unit-contents.db, widget definitions)
+  assert.match(g, /`grep -rn --exclude-dir=\{\.mxcodr,\.mxcodr-test,\.mxcli,mprcontents,deployment,node_modules,\.git,vendorlib,theme-cache,\.mendix-cache\} '<pattern>' \.`/);
+  assert.match(g, /never `grep -r \.\.\. \. \| grep -v \.\.\.`: the filter after the pipe does not stop the reading/);
+  assert.match(g, /The\s+`\{\.\.\.\}` list needs bash or zsh; in PowerShell or sh give one `--exclude-dir=<name>` per folder\./);
+  assert.ok(!/git grep/.test(g) && g.split('\n').length <= 3, g);
+  assert.ok(lr.indexOf("- Searching the project's files") === at + b.length + 1, 'right after the read bullet');
   assert.ok(!/DESCRIBE ENTITY Module\.Entity"` \(or `SHOW \.\.\.`\)/.test(lr), 'the old one-line read advice is gone');
   // before the bullets Codex's AGENTS.md size cap can cut (the live block comes last there)
   assert.ok(at < lr.indexOf("- **The app's quality score is the Quality tab's.**") && at < 4000, `early (at ${at})`);
