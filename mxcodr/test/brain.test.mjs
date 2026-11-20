@@ -67,13 +67,15 @@ test('the brain rule: the contract\'s points, short (read every session by every
   // owner, 2026-11-19 (a Codex plan left out every anchor, 13 rows saying progress cannot be tracked): the plan's
   // anchor names the NEW page or microflow that will build it; left out only when the requirement has none of its own
   assert.doesNotMatch(b, /no anchor yet: leave out/);
-  assert.match(b, /\| why <details>` \(anchor: the NEW page or\nmicroflow that builds it, even before it exists; left out only if it has none\); per business-rule assumption one line\n/);
+  assert.match(b, /\| why <details>`\n\(anchor: the NEW page or microflow that builds it, even before it exists; left out only if it has none\); per\nbusiness-rule assumption one line /);
   // and the one edit the agent makes unasked: a finished requirement without an anchor gets the document that builds it
-  // (mxcli 0.32 `brain edit <id> -a`: replaces the anchors, keeps id, text and place; measured on a scratch brain)
-  assert.match(b, /unless asked in the chat\.\nExcept: a requirement you finished with no anchor gets `\.\/mxcli brain edit <id> -a @<its document>` \(id: `brain list`\)\.\n/);
+  // (mxcli 0.32 `brain edit <id> -a`: replaces the anchors, keeps id, text and place; measured on a scratch brain);
+  // 2026-11-19 (owner's Windows test: Codex built R2..R7 under other names than the plan's anchors, so Brain said "Not
+  // built" while their tagged tests passed): build the anchor under exactly its name, or fix the anchor at once
+  assert.match(b, /unless asked in the chat\.\nExcept: build an anchor under exactly its name; if named otherwise, or a finished requirement has none, run at once\n`\.\/mxcli brain edit <id> -a @<the document you built>` \(id: `brain list`\)\.\n/);
   // capture with --json; three triggers; the open question captured before asking; at most 3 findings a turn
   assert.match(b, /`\.\/mxcli brain capture "<text>" \.\.\. --json`/);
-  assert.match(b, /^1\. A request for a feature that is not in the requirement list/m);
+  assert.match(b, /^1\. A feature request not in the requirement list/m);
   assert.match(b, /^2\. You cannot go on without a business-rule answer: capture the question with `--open` first, then ask it \(plan mode: no\n {3}`--open`, the answer goes into the plan's lines\)\./m);
   assert.match(b, /^3\. The person corrected the same thing a second time, or you chose between real alternatives/m);
   assert.match(b, /At most 3 per turn\./);
@@ -93,11 +95,11 @@ test('the brain rule: the contract\'s points, short (read every session by every
   // a finding carries its why on the second line, and the person decides by it (the panel shows it as "Why: ...")
   assert.match(b, /\(the person decides by that why;/);
   // (b) every business-rule assumption of a plan on its own Decision line, approved with the plan; an open choice still asked
-  assert.match(b, /per business-rule assumption one line\n`Decision: D<n> <title> \| anchor @Module\.Document \| why <details>` \(anchor and why optional, approved with the plan\); open\nchoices: trigger 2\./);
+  assert.match(b, /per\nbusiness-rule assumption one line `Decision: D<n> <title> \| anchor @Module\.Document \| why <details>` \(anchor and why\noptional, approved with the plan\); open choices: trigger 2\./);
   // owner, 2026-11-14: decisions are numbered D<n> like requirements' R<n>; the pack names the next free numbers
   assert.match(b, /capture `"D<n> <title>\\n<why>" -a @\.\.\.` \(the person decides by that why;\n {3}n after the highest D, queue too\)\. At most 3 per turn\./);
   assert.match(b, /The pack names the next free R, D and slice numbers\./);
-  assert.match(b, /A\nplan captures nothing: per new requirement one line\n`Requirement: /);
+  assert.match(b, /A plan captures nothing:\nper new requirement one line `Requirement: /);
   // the switch, and the pack instead of reading docs/brain/
   // shell-neutral: `echo $MXCODR_PANEL` prints nothing in PowerShell, so the rule names no shell command for it
   assert.match(b, /\*\*With `MXCODR_PANEL=1`\*\* set, the person approves in mx-codr's panel: promote nothing else\./);
@@ -109,9 +111,10 @@ test('the brain rule: the contract\'s points, short (read every session by every
   assert.match(b, /\*\*Without it\*\*, promote only what the person approved in the chat/);
   // small: lines and characters (about 4 characters a token)
   // owner, 2026-11-14: raised from 24 lines / 2,000 characters for the title + details form and the D numbers;
-  // 2026-11-19: 2,300 -> 2,400 characters for the plan anchor's wording and the brain edit exception (owner's request)
+  // 2026-11-19: 2,300 -> 2,400 characters for the plan anchor's wording and the brain edit exception (owner's request);
+  // 2,400 -> 2,450 for "build an anchor under exactly its name" (19 characters of other wording trimmed first)
   assert.ok(b.split('\n').length - 1 <= 26, `${b.split('\n').length - 1} lines`);
-  assert.ok(b.length <= 2400, `${b.length} characters`);
+  assert.ok(b.length <= 2450, `${b.length} characters`);
   assert.doesNotMatch(b, /^---$/m);
 });
 

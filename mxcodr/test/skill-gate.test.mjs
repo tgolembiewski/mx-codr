@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   GATED, MARK, skillsForMdl, modelWrites, skillsForCall, skillRead, markRead, readSkills, statePath, decide, runHook,
-  withGateHooks, withoutGateHooks, fileModeCommand, PRE_MATCHER, POST_MATCHER,
+  withGateHooks, withoutGateHooks, fileModeCommand, PRE_MATCHER, POST_MATCHER, RESET_EVENT, RESET_MATCHER, clearReads, isCompaction,
 } from '../overlay/lib/skill-gate.mjs';
 import { installSkillGate, SKILL_GATE } from '../overlay/install.mjs';
 
@@ -208,6 +208,7 @@ test('installSkillGate: the script in .mxcodr/, two hooks in settings.local.json
   assert.deepEqual(s.permissions, { allow: ['Bash(npm test)'] });
   assert.deepEqual(s.hooks.PreToolUse, [mine, { matcher: PRE_MATCHER, hooks: [{ type: 'command', command: 'node "$CLAUDE_PROJECT_DIR/.mxcodr/skill-gate.mjs" pre', timeout: 15 }] }], 'once, after the person\'s');
   assert.deepEqual(s.hooks.PostToolUse, [{ matcher: POST_MATCHER, hooks: [{ type: 'command', command: 'node "$CLAUDE_PROJECT_DIR/.mxcodr/skill-gate.mjs" post', timeout: 15 }] }]);
+  assert.deepEqual(s.hooks.SessionStart, [{ matcher: 'compact', hooks: [{ type: 'command', command: 'node "$CLAUDE_PROJECT_DIR/.mxcodr/skill-gate.mjs" reset', timeout: 15 }] }], 'bundle 2026.11.20: the reset after a compaction, once');
   assert.ok(fileModeCommand('pre').includes(MARK));
   // Claude Code no longer chosen: the script and the hooks go, the person's stay
   assert.equal(installSkillGate(d, ['codex']), null);
@@ -220,7 +221,9 @@ test('installSkillGate: the script in .mxcodr/, two hooks in settings.local.json
   // the extension's commands replace the file mode's (one marker in both)
   const ext = withGateHooks(withGateHooks({}), m => `sh '/rt/live/translator/bin/guard.sh' ${MARK} ${m}`);
   assert.equal(ext.hooks.PreToolUse.length, 1);
+  assert.equal(ext.hooks.SessionStart.length, 1);
   assert.match(ext.hooks.PreToolUse[0].hooks[0].command, /guard\.sh' skill-gate pre$/);
+  assert.match(ext.hooks.SessionStart[0].hooks[0].command, /guard\.sh' skill-gate reset$/);
   assert.deepEqual(withoutGateHooks(ext), {});
 });
 
@@ -229,4 +232,73 @@ test('the installer wires it: one bar step, the summary says what runs while the
   assert.match(src, /ui\.begin\('installing the skill gate'\);\n\s*let gate = null, gateErr = null;\n\s*try \{ gate = installSkillGate\(app, agents\); \}/);
   assert.doesNotMatch(src, /no hooks, no gate/);
   assert.match(src, /MXCODR_SKILL_GATE=0/);
+});
+
+// bundle 2026.11.20: after a compaction the model has only a summary of the skills it read; the gate counted them as read
+test('a compaction clears this session\'s read skills (SessionStart source compact; PreCompact, PostCompact); other sessions and other SessionStarts keep them', () => {
+  const d = app();
+  for (const sess of ['s1', 's2']) for (const sk of ['app-security', 'durable-tests']) assert.equal(runHook('post', JSON.stringify(read(d, sk, {}, sess))).code, 0);
+  assert.deepEqual(readSkills(d, 's1').sort(), ['app-security', 'durable-tests']);
+  const start = (source, sess = 's1') => JSON.stringify({ session_id: sess, cwd: d, hook_event_name: 'SessionStart', source });
+  for (const source of ['startup', 'resume', 'clear', 'fork']) {
+    assert.deepEqual(runHook('reset', start(source)), { code: 0 });
+    assert.equal(readSkills(d, 's1').length, 2, `${source} keeps them`);
+  }
+  assert.deepEqual(runHook('reset', start('compact')), { code: 0 }, 'nothing on stdout or stderr');
+  assert.deepEqual(readSkills(d, 's1'), [], 'this session: read again');
+  assert.ok(!fs.existsSync(statePath(d, 's1')));
+  assert.deepEqual(readSkills(d, 's2').sort(), ['app-security', 'durable-tests'], 'another session keeps its own');
+  // the gate asks again after the compaction
+  put(d, 'mdlsource/sec.mdl', 'GRANT EXECUTE ON MICROFLOW Fleet.ACT_Save TO Fleet.Manager;\n');
+  assert.equal(runHook('pre', JSON.stringify(bash(d, './mxcodr-live exec mdlsource/sec.mdl'))).code, 2);
+  assert.equal(runHook('pre', JSON.stringify(bash(d, './mxcodr-live exec mdlsource/sec.mdl', 's2'))).code, 0);
+  for (const ev of ['PreCompact', 'PostCompact']) {
+    runHook('post', JSON.stringify(read(d, 'app-security', {}, 's3')));
+    runHook('reset', JSON.stringify({ session_id: 's3', cwd: d, hook_event_name: ev, trigger: 'auto' }));
+    assert.deepEqual(readSkills(d, 's3'), [], ev);
+  }
+  // Codex (its PreCompact hook): pre_compact, or no event name at all
+  runHook('post', JSON.stringify(read(d, 'app-security', {}, 's4')));
+  assert.equal(runHook('reset', JSON.stringify({ session_id: 's4', cwd: d }), process.env, { agent: 'codex' }).code, 0);
+  assert.deepEqual(readSkills(d, 's4'), []);
+  assert.equal(isCompaction({ hook_event_name: 'pre_compact' }), true);
+  assert.equal(isCompaction({}), false, 'Claude Code: an input without an event name is not a compaction');
+  assert.equal(isCompaction({ hook_event_name: 'UserPromptSubmit' }, { agent: 'codex' }), false);
+});
+
+test('reset fails open: bad input, no session, no state yet, a link, MXCODR_SKILL_GATE=0: exit 0, nothing removed outside', () => {
+  const d = app();
+  for (const input of ['garbage', '', 'null', '[]', JSON.stringify({ cwd: d, hook_event_name: 'SessionStart', source: 'compact' })]) assert.deepEqual(runHook('reset', input), { code: 0 }, input);
+  assert.equal(clearReads(d, 's1'), false, 'no state folder yet');
+  assert.equal(clearReads(null, 's1'), false);
+  // a planted link for .mxcodr is never followed
+  const elsewhere = tmp();
+  put(elsewhere, 'state/skills-read-s1/keep', '');
+  const linked = tmp();
+  fs.symlinkSync(elsewhere, path.join(linked, '.mxcodr'));
+  runHook('reset', JSON.stringify({ session_id: 's1', cwd: linked, hook_event_name: 'SessionStart', source: 'compact' }));
+  assert.ok(fs.existsSync(path.join(elsewhere, 'state/skills-read-s1/keep')));
+  // switched off: nothing happens
+  runHook('post', JSON.stringify(read(d, 'app-security')));
+  runHook('reset', JSON.stringify({ session_id: 's1', cwd: d, hook_event_name: 'SessionStart', source: 'compact' }), { MXCODR_SKILL_GATE: '0' });
+  assert.deepEqual(readSkills(d, 's1'), ['app-security']);
+  // as Claude Code runs it: sh, node, stdin; exit 0 and nothing printed, also for garbage
+  put(d, SKILL_GATE, fs.readFileSync(GATE, 'utf8'));
+  const env = { PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH}`, CLAUDE_PROJECT_DIR: d, HOME: os.homedir() };
+  for (const input of ['garbage', JSON.stringify({ session_id: 's1', cwd: d, hook_event_name: 'SessionStart', source: 'compact' })]) {
+    const r = spawnSync('sh', ['-c', fileModeCommand('reset')], { input, encoding: 'utf8', env, cwd: d });
+    assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout, ''); assert.equal(r.stderr, '');
+  }
+  assert.deepEqual(readSkills(d, 's1'), [], 'the program cleared it');
+  assert.equal(RESET_EVENT, 'SessionStart'); assert.equal(RESET_MATCHER, 'compact');
+});
+
+test('reinstall does not duplicate the reset; the person\'s own SessionStart hooks stay, and stay when ours go', () => {
+  const mine = { matcher: 'startup', hooks: [{ type: 'command', command: 'echo hello' }] };
+  let cfg = { hooks: { SessionStart: [mine] } };
+  cfg = withGateHooks(withGateHooks(withGateHooks(cfg)));
+  assert.equal(cfg.hooks.SessionStart.length, 2);
+  assert.deepEqual(cfg.hooks.SessionStart[0], mine);
+  assert.equal(cfg.hooks.SessionStart.filter(e => JSON.stringify(e).includes(MARK)).length, 1);
+  assert.deepEqual(withoutGateHooks(cfg), { hooks: { SessionStart: [mine] } });
 });

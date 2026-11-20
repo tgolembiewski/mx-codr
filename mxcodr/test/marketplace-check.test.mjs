@@ -181,74 +181,38 @@ test('the texts: the rule (every shape, still 38 lines), live.md, module-structu
   assert.match(skill('reuse-and-snippets/SKILL.md'), /Never in a Marketplace module, even when it shows\nthat module's data/);
 });
 
-test('live mode: a build failing in a Marketplace module\'s Java -> update it, never edit it; marketplace outdated (bundle 2026.11.17.7)', () => {
+// bundle 2026.11.20.1: the situational Marketplace, CE and Data grid steps moved out of the always-loaded live rule into
+// what the commands print (translator: ide-problems.mjs, live-exec.mjs, marketplace-update.mjs, translations.mjs; their
+// tests pin those lines). The rule keeps one pointer per topic: what the agent needs before it runs the command.
+test('live mode: a build failing in a Marketplace module\'s Java -> update it, never edit it; marketplace outdated (bundle 2026.11.17.7, short since 2026.11.20.1)', () => {
   const live = readTemplate('live.md');
   const run = live.slice(live.indexOf('## Running the app and testing it'));
-  assert.match(run, /A failed build lists its Java errors by module\. When\n {2}they are in a Marketplace module's Java \(`Java in Marketplace module \.\.\.`\), update that module with the\n {2}`marketplace update` command the reason names \(`--plan-only` first, then ask the person, as below\); never edit a\n {2}Marketplace module's Java, the update overwrites it\./);
+  assert.match(run, /A failed build lists its Java errors by module\. When\n {2}they are in a Marketplace module's Java \(`Java in Marketplace module \.\.\.`\), update that module with the\n {2}`marketplace update` command the reason names \(`--plan-only` first, then ask the person\); never edit a\n {2}Marketplace module's Java, the update overwrites it\./);
   assert.match(run, /Errors in the app's own modules: fix them in their Java\./);
-  assert.match(live, /After the app's Mendix version changed, or after a failed build, run `\.\/mxcodr-live marketplace outdated`/);
-  assert.match(live, /`OLD` for one made for an older Mendix \(its Java\n {2}or widgets likely broken\)\. Update those as above \(`--plan-only` first, then ask\), `OLD` ones first\./);
-  // the outdated bullet sits after the update bullet it refers to ("as above")
-  assert.ok(live.indexOf('marketplace outdated`: the') > live.indexOf('`./mxcodr-live marketplace update <id|name> --plan-only`'));
+  assert.match(live, /After the\n {2}app's Mendix version changed, or after a failed build, `\.\/mxcodr-live marketplace outdated`\./);
+  assert.match(live, /Each prints its next\n {2}steps and the person's steps: follow them, and pass the person's on word for word\./);
   // file mode never reads live.md: its rule file says nothing of ./mxcodr-live
   assert.doesNotMatch(readTemplate('mxcodr.md'), /marketplace outdated/);
 });
 
-test('live mode: CE7247 on a Marketplace Data grid column -> update Data Widgets; two-way review files into app-owned copies (bundle 2026.11.17.8)', () => {
+test('live mode: CE codes, the legacy Data grid and the review steps are in the commands\' output, the rule only points there (bundle 2026.11.20.1)', () => {
   const live = readTemplate('live.md');
-  assert.match(live, /CE7247 \(`\.\.\. of type 'Reference'`\) on an association path in a Data grid 2 column of a Marketplace module's page/);
-  assert.match(live, /`widgets\/com\.mendix\.widget\.web\.Datagrid\.mpk` \(the version is in its `package\.xml`\)/);
-  assert.match(live, /update Data Widgets as above \(`--plan-only` first, then ask\)\. Never\n {2}edit the Marketplace module's page\./);
-  assert.match(live, /'Can hide' is \.\.\." is listed as an\n {2}error but is the Data grid's own warning: not blocking/);
-  assert.match(live, /goes into an app-owned copy in one of the app's own modules[^]*the app's pages are repointed to that copy;\n {2}never re-apply it into the Marketplace module\. The rest is template drift: accept the new version\. Then\n {2}`\.\/mxcodr-live fix design-properties`, `\.\/mxcodr-live fix widgets` and `\.\/mxcodr-live problems`\./);
-  // CE6087 (bundle 2026.11.17.9): Studio Pro's own renamer, Marketplace modules included; never ./mxcli fix design-properties
-  assert.match(live, /- CE6087 \(design properties renamed in the theme;[^]*run `\.\/mxcodr-live fix design-properties` first\./);
-  assert.match(live, /Marketplace modules included \(Studio Pro's own fix is allowed\n {2}there; MDL edits are not\)/);
-  assert.match(live, /Never `\.\/mxcli fix design-properties` while Studio Pro has\n {2}the app open\./);
-  assert.match(live, /PERSON ACTION line, ask the person to right-click the CE6087 error/);
-  assert.ok(live.indexOf('- CE6087') > live.indexOf('- CE0463') && live.indexOf('- CE6087') < live.indexOf('This replaces what `CLAUDE.md`'));
-  // both after the bullets they refer to ("as above", "those files")
-  assert.ok(live.indexOf('CE7247') > live.indexOf('marketplace outdated`: the'));
-  assert.ok(live.indexOf('Reviewing those files') > live.indexOf('<Module>/review/'));
-  assert.doesNotMatch(readTemplate('mxcodr.md'), /CE7247/);
+  const problems = live.slice(live.indexOf('- After every exec that lands'), live.indexOf('\n- ', live.indexOf('- After every exec that lands') + 3));
+  assert.match(problems, /Under the list it prints a fix line for the codes that need\n {2}one \(CE0463, CE6087, CE4899, CE7247, \.\.\.\): run what it names\. Never `\.\/mxcli fix \.\.\.` while Studio Pro has the app\n {2}open\. A PERSON ACTION line, from any command: ask the person, in its words\./);
+  for (const gone of [/Datagrid\.mpk/, /'Can hide'/, /Forms\$DataGrid/, /bson dump/, /Reviewing those files/, /MOVE GUARD/, /`Mode: TWO-WAY`/, /undo-moves/, /Update all renamed design properties/])
+    assert.doesNotMatch(live, gone);
+  assert.doesNotMatch(readTemplate('mxcodr.md'), /CE7247|bson dump|Forms\$DataGrid/);
 });
 
-test('live mode: a legacy Data grid\'s control-bar buttons are not guessed; bson dump read by whole object (bundle 2026.11.17.14)', () => {
-  // measured with mxcli 0.32 after an OIDC update: CE1613 on a Forms$GridActionButton; alter ... on <button> says
-  // "widget not found", SHOW WIDGETS skips it; the agent took the Name line nearest the microflow hit in bson dump's
-  // JSON (keys sorted, Action before Name) and picked the "New" button instead of "Edit"
+test('live mode: an update runs in the background until its notification, never twice at once (bundle 2026.11.17.10)', () => {
   const live = readTemplate('live.md');
-  assert.match(live, /- `widget not found` on a button of a legacy Data grid \(DESCRIBE shows `-- Forms\$DataGrid \(gridN\) \.\.\. NOT\n {2}re-executable`\)/);
-  assert.match(live, /mxcli cannot address the buttons in its control bar \(its columns it can\)/);
-  assert.match(live, /never guess a name\./);
-  assert.match(live, /one exact Studio Pro step \(the page > the grid > its\n {2}control bar > the button by its caption > the property > the new value/);
-  assert.match(live, /say why in one line/);
-  assert.match(live, /replace the grid with a Data grid 2 in the\n {2}app's own module \(`alter page \.\.\. replace gridN with \{ datagrid \.\.\. \}`, every button and the default action kept\):\n {2}a redesign, ask first\. Never in a Marketplace module\./);
-  assert.match(live, /- Finding a widget in `bson dump` output: read its whole object \(its `Name` together with its `Action` and other\n {2}properties\), never the `Name` line nearest a hit/);
-  assert.match(live, /Confirm it with `DESCRIBE` before any change\./);
-  // after the Data grid bullets, before the MyFirstModule one; file mode's rule file has neither
-  assert.ok(live.indexOf('`widget not found`') > live.indexOf('CE7247') && live.indexOf('`bson dump`') < live.indexOf('`MyFirstModule` is the person'));
-  assert.doesNotMatch(readTemplate('mxcodr.md'), /bson dump|Forms\$DataGrid/);
-});
-
-test('live mode: an update runs in the background until its notification, reads report.md, never twice at once (bundle 2026.11.17.10)', () => {
-  const live = readTemplate('live.md');
-  assert.match(live, /start it as a background command where your\n {2}tool has one \(Claude Code: the Bash tool's `run_in_background`\) and wait for its completion notification; no\n {2}polling or sleep loops, no timeout of your own, and never a second update while one runs \(it refuses\)\./);
-  assert.match(live, /read `report\.md` for the full lists before telling the person/);
-  assert.match(live, /Until\n {2}the notification, run no other `\.\/mxcodr-live` command that reads or changes the model \(`query`, `check`,\n {2}`exec`, `mxcheck`\): it waits for the update and gives up after 3 minutes\./);
-  assert.match(live, /reuses the plan while\n {2}nothing in it changed/);
-  assert.match(live, /When the plan says `NEEDS --keep-in`, ask the\n {2}person which of the listed modules/);
-  assert.match(live, /`report\.md` says, per file, what differs from\n {2}the new version and the next step\./);
-  assert.doesNotMatch(live, /the update prints, per file/);
-  assert.ok(live.indexOf('Running an update') > live.indexOf('marketplace update <id|name> --plan-only') && live.indexOf('Running an update') < live.indexOf('Reviewing those files'));
+  assert.match(live, /An update \(`--plan-only` too\)\n {2}takes minutes: run it as a background command \(Claude Code: the Bash tool's `run_in_background`\) and wait for its\n {2}completion notification: no polling, no second update, and no other `query`, `check`, `exec` or `mxcheck` until\n {2}then\./);
 });
 
 test('live mode: a newer version through ./mxcodr-live marketplace update (bundle 2026.11.17.5); file mode keeps its texts', () => {
   const live = readTemplate('live.md');
-  assert.match(live, /`\.\/mxcodr-live marketplace update <id\|name> --plan-only`/);
-  assert.match(live, /Exit 4: pass on the\n {2}person's steps word for word, then `--resume`/);
+  assert.match(live, /`\.\/mxcodr-live marketplace update <id\|name>\n {2}--plan-only` first: tell the person what the plan prints and ask; the real run only after their yes\./);
   assert.doesNotMatch(live, /an update is the person's/);
-  assert.match(live, /`Mode: TWO-WAY`[^]*nothing is run again[^]*`\.mxcodr\/marketplace\/<Module>\/review\/` with the new version before changing anything/, 'two-way mode (bundle 2026.11.17.6)');
   for (const live of [false, true]) {
     const d = tmp();
     fs.writeFileSync(path.join(d, 'App.mpr'), 'mpr');
@@ -256,7 +220,8 @@ test('live mode: a newer version through ./mxcodr-live marketplace update (bundl
     const ref = fs.readFileSync(path.join(d, SKILLS_DIR.claude, 'module-structure', 'reference', 'marketplace-ext.md'), 'utf8');
     const files = fs.readFileSync(path.join(d, SKILLS_DIR.claude, 'files-and-images', 'SKILL.md'), 'utf8');
     if (live) {
-      assert.match(ref, /A newer version goes in with `\.\/mxcodr-live marketplace update <id\|name>`/);
+      assert.match(ref, /A newer version goes in with `\.\/mxcodr-live marketplace update <id\|name>` \(`--plan-only` first, then ask the\nperson\)/);
+      assert.doesNotMatch(ref + files, /mxcodr-live\.md/, 'the steps are in the command\'s output, not the rule (2026.11.20.1)');
       assert.match(ref, /`Mode: TWO-WAY`: nothing\nis run again/);
       assert.match(files, /a newer version goes in with `\.\/mxcodr-live marketplace update`/);
       assert.doesNotMatch(files, /An installed module is never updated/);
@@ -300,16 +265,10 @@ test('translated texts: a document ./mxcodr-live translate wrote into is a note,
   assert.deepEqual(classify(ADMIN, EDITED, null).translated, [], 'no map: nothing is an exception');
 });
 
-test('live mode: CE4899 -> ./mxcodr-live translate (todo, the agent translates, apply), the one exception in Marketplace modules (bundle 2026.11.17.15)', () => {
+test('live mode: CE4899 -> ./mxcodr-live translate (the agent translates), the one exception in Marketplace modules (bundle 2026.11.17.15, short since 2026.11.20.1)', () => {
   const live = readTemplate('live.md');
-  assert.match(live, /- CE4899 \(`Empty caption\. \[German, Switzerland\]` and the like: a text empty in the default language\) or CW0263/);
-  assert.match(live, /you translate, Studio Pro's\n {2}Batch translate only copies\./);
-  assert.match(live, /`\.\/mxcodr-live translate status`, then `\.\/mxcodr-live translate todo`/);
-  assert.match(live, /`\.\/mxcodr-live translate apply <that file>` and\n {2}`\.\/mxcodr-live problems`/);
-  assert.match(live, /Texts written by `translate` are allowed in Marketplace modules/);
-  assert.match(live, /Never write translations with\n {2}`exec`, `create translations` or `\.\/mxcli` while Studio Pro has the app open/);
-  assert.match(live, /an update deletes the one and undoes the other\. The one exception: texts written by\n {2}`\.\/mxcodr-live translate` \(above\)\./);
-  // after CE6087, before the mx paragraph; file mode's rule file has no translate
-  assert.ok(live.indexOf('- CE4899') > live.indexOf('- CE6087') && live.indexOf('- CE4899') < live.indexOf("This replaces what `CLAUDE.md` says about `mx`"));
+  assert.match(live, /- Texts in another language \(CE4899, CW0263, or the person asks for the app in another language\): you translate,\n {2}Studio Pro's Batch translate only copies\. Run `\.\/mxcodr-live translate status` and follow its `next:` lines\.\n {2}Never write translations with `exec`, `create translations` or `\.\/mxcli` while Studio Pro has the app open\./);
+  assert.match(live, /an update deletes the one and\n {2}undoes the other \(the one exception: texts written by `\.\/mxcodr-live translate`\)\./);
+  assert.ok(live.indexOf('- Texts in another language') > live.indexOf('- After every exec that lands') && live.indexOf('- Texts in another language') < live.indexOf("This replaces what `CLAUDE.md` says about `mx`"));
   assert.doesNotMatch(readTemplate('mxcodr.md'), /mxcodr-live translate/);
 });

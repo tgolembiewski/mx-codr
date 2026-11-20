@@ -67,7 +67,7 @@ test('live writeRules: mxcodr.md (live edits) and mxcodr-live.md; file mode writ
   assert.equal(lr, readTemplate('live.md'));
   assert.equal(lr[0], '#');
   assert.ok(!lr.split('\n').some(l => l.trim() === '---'));
-  for (const must of ['./mxcodr-live marketplace install', 'Only publishers Mendix or Mendix Labs', '`MyFirstModule` is the person', './mxcodr-live exec', './mxcodr-live app run', './mxcodr-live test', 'APP_URL', 'Never run `mxcli init`', 'Only the person commits', 'commit in Studio Pro: Version\nControl > Commit', 'Upload to Version Control Server', 'Run only read-only git', 'Every other git command is the person\'s']) assert.ok(lr.includes(must), must);
+  for (const must of ['./mxcodr-live marketplace install', 'publishers Mendix or Mendix Labs only', '`MyFirstModule` is the person', './mxcodr-live exec', './mxcodr-live app run', './mxcodr-live test', 'APP_URL', 'Never run `mxcli init`', 'Only the person commits', 'commit in Studio Pro: Version\nControl > Commit', 'Upload to Version Control Server', 'Run only read-only git', 'Every other git command is the person\'s']) assert.ok(lr.includes(must), must);
   assert.doesNotMatch(lr, /Close App and open the app again/, 'live.26: the reopen was only for our own git init');
   // live.36: the look is the person's (the Look tab); theme classes and variables, never hard-coded colours
   assert.match(lr, /## The app's look[\s\S]*\.\/mxcodr-live look[\s\S]*never hard-coded colours/);
@@ -102,23 +102,23 @@ test('live test kit and film: every edit applies, no file-mode run left, file mo
   const r = copyTestKit(live, [], undefined, { live: true });
   copyFilm(live, undefined, { live: true });
   copyTestKit(plain); copyFilm(plain);
-  assert.equal(r.written.length, 4);
+  assert.equal(r.written.length, 5);
   for (const [name, edits] of Object.entries(KIT_EDITS)) {
     const t = fs.readFileSync(path.join(live, 'tests', name), 'utf8');
     for (const [from, to] of edits) { assert.ok(!t.includes(from) || to.includes(from), `${name} still has ${from.slice(0, 50)}`); assert.ok(t.includes(to), `${name} lacks ${to.slice(0, 50)}`); }
   }
   const film = fs.readFileSync(path.join(live, 'tests', 'film.mjs'), 'utf8');
   for (const [from, to] of FILM_EDITS) { assert.ok(!film.includes(from)); assert.ok(film.includes(to)); }
-  for (const f of ['mx.ts', 'playwright.config.ts', 'film.mjs']) for (const re of FILE_MODE) assert.doesNotMatch(fs.readFileSync(path.join(live, 'tests', f), 'utf8'), re, `${f} ${re}`);
+  for (const f of ['mx-impl.ts', 'mx.ts', 'playwright.config.ts', 'film.mjs']) for (const re of FILE_MODE) assert.doesNotMatch(fs.readFileSync(path.join(live, 'tests', f), 'utf8'), re, `${f} ${re}`);
   const cfg = fs.readFileSync(path.join(live, 'tests', 'playwright.config.ts'), 'utf8');
   assert.match(cfg, /'json', \{ outputFile: path\.join\(MXCODR, 'tests', 'report\.json'\) \}/);
   assert.match(cfg, /screenshot: 'only-on-failure'/);
   // a second live install sees its own edited kit as the kit's (recorded as ours, nothing rewritten)
   const again = copyTestKit(live, [], undefined, { live: true });
   assert.deepEqual(again.written, []);
-  assert.equal(again.ours.length, 4);
+  assert.equal(again.ours.length, 5);
   // file mode: the template bytes, untouched
-  for (const f of ['mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'])
+  for (const f of ['mx-impl.ts', 'mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'])
     assert.equal(fs.readFileSync(path.join(plain, 'tests', f), 'utf8'), fs.readFileSync(new URL(`../overlay/templates/tests/${f}`, import.meta.url), 'utf8'));
   assert.equal(fs.readFileSync(path.join(plain, 'tests', 'film.mjs'), 'utf8'), fs.readFileSync(new URL('../overlay/templates/film.mjs', import.meta.url), 'utf8'));
 });
@@ -390,6 +390,30 @@ test('live mxcodr-live.md: the app open in Studio Pro is the only app built in; 
   assert.ok(lr.indexOf('only app you build in') < lr.indexOf('./mxcodr-live exec <script.mdl>'), 'near the top, before how to write a change');
 });
 
+// bundle 2026.11.18.8 (owner, 2026-11-19, Windows, Codex): the agent reported "74/100" from `mxcli report` while the
+// pane's Quality tab showed 86/100. The live rule (Claude Code's file, and Codex's AGENTS.md live block, which setup
+// copies from it) names the tab's number and overrides mxcli's own report texts by name.
+test('live mxcodr-live.md: the app\'s quality score is ./mxcodr-live quality\'s first line (the Quality tab), never mxcli report\'s', () => {
+  const d = tmp();
+  writeRules(d, ['claude', 'codex'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  const at = lr.indexOf("- **The app's quality score is the Quality tab's.**");
+  assert.ok(at > 0, 'the bullet is there');
+  const b = lr.slice(at, lr.indexOf('\n- ', at + 3) > 0 ? lr.indexOf('\n- ', at + 3) : lr.indexOf('\n\n', at));
+  assert.match(b, /run `\.\/mxcodr-live quality` after your last model change/);
+  assert.match(b, /give its first line,\s+`Best practices N\/100 \(\.\.\.\)`/);
+  assert.match(b, /the number the person sees in the pane's Quality tab/);
+  assert.match(b, /Never give the score of `\.\/mxcli report`/);
+  assert.match(b, /the `assess-quality` skill/);
+  assert.match(b, /CLAUDE\.md's\s+"Best Practices Report"/);
+  assert.match(b, /only labelled as mxcli's own score/);
+  // Codex reads AGENTS.md only up to its project-doc size cap (32 KiB by default); CarFleetCodexSol's AGENTS.md is
+  // 36,233 bytes, its live block from byte 12,891, cut inside the tests bullets: the bullet stays near the top
+  assert.ok(at < lr.indexOf('- After every exec that lands'), 'early in the list, before problems and the tests bullets');
+  assert.ok(at < 6000, `within the first 6,000 characters of the live rule (at ${at})`);
+  assert.ok(!/\.\/mxcodr-live quality (intend|unintend|rule-off|rule-on)/.test(lr), 'marking findings stays the person\'s');
+});
+
 // bundle 2026.11.18.3 (CarFleetCodexSol, Codex): Plan first for the agents that read AGENTS.md, in their words; the
 // extension writes it between its own markers, and an AGENTS.md with nothing else of the person's stays generated
 test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGENTS.md block counts as generated', async () => {
@@ -420,4 +444,33 @@ test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGEN
   assert.equal(isScaffoldLeftover('AGENTS.md', f, null), true);
   fs.appendFileSync(f, '\nMine.\n');
   assert.equal(isScaffoldLeftover('AGENTS.md', f, null), false, 'text of the person\'s own still counts');
+});
+
+// 2026-11-19 (faster model reads, items 2 and 3): the model on disk (.mxcodr/model/, written by the extension's
+// translator, src/model-dump.mjs) is where the agent greps and reads; query is for a fresh read before a change, the
+// catalog and a dump that lags; several statements in one query; a long result is read from its file, never re-run.
+// One bullet in the live rule, which setup copies into AGENTS.md's live block for Codex and Pi: early, and short.
+// 2026-11-20 (A/B of the read changes: Claude Code's tokens did not fall, it read whole files): one `grep -rn`, then
+// only the lines around the hits; a whole file only when all of it is needed.
+test('live mxcodr-live.md: reading the model is a grep -rn of .mxcodr/model/ and the lines around the hits; query only for fresh reads and the catalog', () => {
+  const d = tmp();
+  writeRules(d, ['claude', 'codex'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  const at = lr.indexOf('- Reading the model:');
+  assert.ok(at > 0, 'the bullet is there');
+  const b = lr.slice(at, lr.indexOf('\n- ', at + 3));
+  assert.match(b, /`\.mxcodr\/model\/` has one file per document \(`INDEX\.tsv` lists them\)/);
+  assert.match(b, /Find what you need with one `grep -rn` \(several names in one pattern\), then read only the lines around the hits/);
+  assert.match(b, /\(Read\s+with offset and limit, or `sed -n 40,90p` on several files in one command\); a whole file only when you need all of\s+it/);
+  assert.match(b, /never grep `mprcontents\/`/);
+  assert.match(b, /read a document fresh before you change it/);
+  assert.match(b, /`search '<text>'`,\s+`show references to M\.Name`, `show context of M\.Name`/);
+  assert.match(b, /`INDEX\.tsv`'s\s+state line or\s+`\.\/mxcodr-live model status` says it lags/);
+  assert.match(b, /Several statements in one query, never a loop/);
+  assert.match(b, /never re-run\s+one to page it: read the `\.mxcodr\/out\/` file it names/);
+  assert.match(b, /Check a script first with `\.\/mxcodr-live check <script\.mdl>`/);
+  assert.ok(b.split('\n').length <= 7, `short: ${b.split('\n').length} lines`);
+  assert.ok(!/DESCRIBE ENTITY Module\.Entity"` \(or `SHOW \.\.\.`\)/.test(lr), 'the old one-line read advice is gone');
+  // before the bullets Codex's AGENTS.md size cap can cut (the live block comes last there)
+  assert.ok(at < lr.indexOf("- **The app's quality score is the Quality tab's.**") && at < 4000, `early (at ${at})`);
 });

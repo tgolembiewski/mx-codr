@@ -6,10 +6,8 @@ description: "Photos, images and documents that users upload, show, download or 
 # Files and images
 
 A Mendix 11 app (React client) uploads, shows and downloads files with a few
-fixed parts. Each one below was built, checked with `mx check` and used in the
-browser (file-image session, 2026-10-13). Take these; do not search the mxcli
-binary or the widget packages for other spellings -- that cost a session a
-quarter of an hour.
+fixed parts, each below built, checked and used in the browser. Take these; do not
+search the mxcli binary or the widget packages for other spellings.
 
 ## 1. The entities
 
@@ -106,10 +104,6 @@ listview ProductDetail_PhotosList (DataSource: $currentObject/Catalogue.Product_
   image ProductDetail_PhotoImage (Image: $currentObject, WidthUnit: pixels, Width: 64)
 }
 ```
-
-Measured on mxcli 0.27.0 and Mendix 11.12.1: `exec` writes it and `mx check` reports 0 errors. If the
-page still shows "No image selected." for a photo that is there, a mxcli older than 0.27 wrote it:
-`./mxcli --version`, and the installer's pinned mxcli.
 
 **`ImageType` takes `image`, `imageUrl` or `icon` only.** Another value, such as
 `dynamicImage`, is stored without a warning and shows nothing.

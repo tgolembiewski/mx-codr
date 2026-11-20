@@ -20,11 +20,8 @@ Before you say the work is finished, in this order:
    with a tool timeout longer than the run. Show its output passing, with `sessions left: 0` as its last
    line; the random order proves the tests do not depend on order. If a test stays red, say which and why.
 3. **Never silence the kit.** A leaked session fails the test that leaked it, by name, and the run's last
-   line. Fix that test; never edit `tests/mx.ts` or `tests/mx.teardown.ts` to ignore a user, count fewer
-   sessions or skip a check.
-
-Do not end the turn while a run is pending. A run that hangs is stopped by its own PID or Ctrl-C, never
-by a name pattern.
+   line. Fix that test; never edit `tests/mx.ts`, `tests/mx-impl.ts` or `tests/mx.teardown.ts` to ignore a
+   user, count fewer sessions or skip a check.
 
 This skill is about what to test and how to keep it. The browser vocabulary is in mxcli's `test-app`
 skill, data checks by OQL in `verify-with-oql`, and logic tests in `test-microflows`.
@@ -58,7 +55,7 @@ output is lost. macOS has no `timeout` command; set the tool's own timeout inste
 
 ## Setup
 
-- `tests/` holds the starter kit the installer put there, yours to change: `mx.ts` (the helpers below),
+- `tests/` holds the starter kit the installer put there: `mx.ts` (the helpers), its code in `mx-impl.ts`,
   `mx.teardown.ts` and `playwright.config.ts` (`workers: 1`, `fullyParallel: false`: one runtime, one
   database, a trial licence of six sessions; `baseURL` from `APP_URL`, so every `page.goto` is relative,
   `/p/orders`). If it is missing, write the same yourself.
@@ -72,32 +69,16 @@ output is lost. macOS has no `timeout` command; set the tool's own timeout inste
 - Before the first selector or expected value, read `reference/mendix-dom.md`: how Mendix renders
   logins, dialogs, grids, comboboxes, decimals, member access and refusals.
 
-| `tests/mx.ts` export | What it does, and the Mendix fact behind it |
-|---|---|
-| `signIn(page, user, homeMarker, password?)` | Signs in on `/login.html` and waits 20 s for `homeMarker` (something only that role's home shows) or "Sign in failed."; a failure names the sessions alive on the server. Keeps the CSRF token for `signOut`. |
-| `signOut(page)` | Ends the session on the server (it leaves the app for `about:blank` first: `mx.logout()` reloads the app, and an app that lets anonymous users in starts a new session at once), also from a refused page (login form shown, no `window.mx`, session alive) and without a token from `signIn`; throws, naming the page, when it cannot. Call it in `test.afterEach`; a second `signIn` on the same page signs out first. |
-| `test`, `expect` | `@playwright/test`'s own, plus an automatic check after each test: a session the test left alive fails that test, naming it and the session's user. |
-| `sessionsLeft()` | Sessions alive on the server (`System.Session`); `mx.teardown.ts` prints `sessions left: N` after every run and fails the run when N > 0. |
-| `oql(query)` | One `./mxcli oql --json` read of the running app as administrator: an array of row objects keyed by alias, every value a string (Booleans `'true'`/`'false'`); needs the app running. Put every column a test needs in one query. |
-| `apiContext(user, password?)` | A Basic-auth request context for published REST and OData services; such a call creates no session. |
-| `marker(prefix?)` | `MARK-<time>`: a value no seeded row carries. |
-| `rowOf(page, grid, text)`, `cell(row, n)` | A Data Grid 2 row by its text, and its n-th cell (from 0). |
-| `filterGrid(page, filterWidget, text)` | Types into a grid's text filter, presses Enter and waits for a row with the text. |
-| `pickCombo(page, widget, option)` | Clicks the Combobox, types, then picks from its lazy menu. |
-| `fillInput(page, widget, value)` | `fill` then Tab: Mendix commits an input on blur. |
-| `dialogText(page)`, `dismissDialog(page)` | The newest message dialog's text, and its first button. |
-| `menuItems(page)` | The navigation menu's item texts. |
-| `captureOperation(page, trigger)`, `forgeOperation(page, op, params?)` | Records the call a button sends, and replays it as the signed-in user (section "Proving a refusal"). |
-| `retrieveByIds(page, ids, attributes)` | Reads objects by id as the signed-in user would (strict mode blocks `mx.data.get`). |
-| `env`, `PASSWORD`, `BASE` | `tests/.env` as read, `DEMO_PASSWORD`, the app's address. |
+`tests/mx.ts` lists every helper with its signature and what it does: `signIn` and `signOut` (never a leaked
+session), `test` and `expect` (with the per-test session check), `sessionsLeft`, `oql` (one read as administrator),
+`apiContext`, `marker`, grid, combobox, input and dialog helpers, `captureOperation` and `forgeOperation`
+(section "Proving a refusal"), `retrieveByIds`. Read it before your first spec; never `mx-impl.ts` (its code).
 
 Two traps leak sessions, and the kit's pair covers both: clearing cookies or closing the page leaves the
 session alive on the server, and a page the role may not open shows the login form while the session
 lives on. Past six sessions a sign-in fails, which reads as a broken feature. The per-test check names
 the test that leaked; fix it. If the limit is hit, run `./mxcli run restart -p App.mpr` and then
-`./mxcli run wait -p App.mpr`. Never stop browsers or test runners by
-name (`pkill -f chromium`, `killall`): that kills the person's own browsers and test runs too. Stop
-only a PID you started.
+`./mxcli run wait -p App.mpr`.
 
 ```ts
 const [order] = oql(`select o.Status as Status, o.ApprovalStatus as Approval from Shop."Order" as o where o.Number = '${number}'`);
@@ -118,12 +99,12 @@ after a fill can save the old value. From `test-app`, take the vocabulary but no
 
 When the app has one of these, test it this way. Each line is a test or a few, not a page visit.
 
-- **A role.** Sign in as a user of that role and assert, as that user, something only it sees: its
-  home page, its menu, a value. Every role a demo user holds, with a positive assertion each.
-- **A main flow per role.** Signed in as that role, walk the screens from the start to the result,
-  click the button that does the work, and assert both what the user sees and the row in the data.
-- **A rule.** Both sides: the allowed case as the permitted role, and the refused case (next section).
-  A limit, a status order, a required field, an owner check each has two sides.
+- **A role.** Signed in as each role a demo user holds, assert something only it sees (its home, its
+  menu, a value).
+- **A main flow per role.** Walk the screens from the start to the result, click the button that does
+  the work, and assert what the user sees and the row in the data.
+- **A rule** (a limit, a status order, a required field, an owner check): both sides, the allowed case
+  as the permitted role and the refused case (next section).
 - **A row-scoped entity** (read access constrained to the current user, or a path to it). As each role
   it is scoped for, on a data widget of that entity (grid, list view, gallery), assert that its own row
   is shown and that another user's row is not:
@@ -134,10 +115,9 @@ When the app has one of these, test it this way. Each line is a test or a few, n
   ```
 
   An OQL query cannot prove isolation: it reads as administrator and sees every row.
-- **A workflow user task.** For each outcome (approve, reject ...): start the workflow as one person,
-  sign out, sign in as the person the task targets and choose the outcome, sign back in as the first
-  and assert what they now see. One test per outcome, and one where a user the task does not target
-  is refused.
+- **A workflow user task.** Per outcome (approve, reject ...): start it as one person, choose the
+  outcome as the person the task targets, assert what the first now sees; and one test where a user
+  the task does not target is refused.
 - **A published REST or OData service.** Each operation called with `request` as a user who may, the
   answer asserted (status and content), and once without credentials, asserted refused (401 or 403).
 - **A delete with a non-default behaviour.** Cascade: delete through the app, then count the other
@@ -146,8 +126,8 @@ When the app has one of these, test it this way. Each line is a test or a few, n
 - **An upload.** On the page that holds the file or image entity, `setInputFiles` on
   `.mx-name-<uploader> input[type=file]` with a fixture under `tests/fixtures/`, save, then a positive
   assertion: the stored name shown, the image visible, the row in the data.
-- **A message the app can show** (a success notice, a validation error, a refusal). Walk the path that
-  shows it and assert four words of it in a row, or all of a shorter one. Refusals as well as successes.
+- **A message the app can show** (a notice, a validation error, a refusal): walk the path that shows it
+  and assert four words of it in a row, or all of a shorter one.
 - **A computed value, a total, an order, a format.** Assert the request's own number, caption, order
   or format as a literal, never a value read back from the app's data: "6 bars" checked against the
   rows the page happens to have passes on any page. Seed the data so the literal can be met. A control
@@ -164,37 +144,31 @@ Test the allowed side as the permitted role in the same file. From cheapest to d
    the login page; assert that (`#usernameInput` visible) and that the page's content is not shown.
 2. **An API request.** A REST or OData call as the wrong role or without credentials, asserted 401 or
    403, and the data unchanged.
-3. **A microflow.** A hidden button proves nothing by itself; the server must refuse the call too. Under
-   strict mode the Mendix 11 client refuses the older `mx.data.action`; a button sends a
-   `runtimeOperation` request to `/xas/` with an operation id. Record that request where the button is
-   offered (the permitted role, or an object in the allowed state), replay it from the refused side,
-   and assert, by OQL, that nothing changed. HTTP 560 alone is not a refusal: a crash and the session
-   limit answer 560 too. Assert the status and `failed for security reasons` in the body, and replay the
-   same call as the permitted role (200), since an unknown operation id gets the same security answer.
-   A flow that refuses by its own logic answers 200; skill `app-security` has the table of answers.
-
-   With the kit: as the permitted role, `const op = await captureOperation(page, () => button.click())`
-   records the POST to `/xas/` (`action: 'runtimeOperation'`, `operationId`, `params` such as
-   `{ Order: { guid } }`); then sign out, sign in as the refused role and `forgeOperation(page, op)`.
+3. **A microflow.** A hidden button proves nothing by itself; the server must refuse the call too. As
+   the permitted role (where the button is offered), `const op = await captureOperation(page, () =>
+   button.click())` records the `runtimeOperation` POST to `/xas/`; sign in as the refused role,
+   `forgeOperation(page, op)`, and assert 560 with `failed for security reasons` in the body (560 alone is
+   also a crash or the session limit), that nothing changed (OQL), and the same call as the permitted role
+   answering 200 (an unknown operation id gets the same security answer). A flow that refuses by its own
+   logic answers 200; skill `app-security` has the table of answers.
 
 Some refusals cannot be forged: a flow granted only to a scoped role, on an object that role can never
 read, has no object to pass. The isolation test is the proof there.
 
-Never add a button, widen access or lower security so a test can see a message. That makes the app
-worse to make a test easier; the stronger test is the button absent plus the server refusing the call.
+Never add a button, widen access or lower security so a test can see a message: the stronger test is the
+button absent plus the server refusing the call.
 
 ## The rules that keep a suite honest
 
 **Never edit a test to make it pass.** If the test is wrong, the criterion was wrong: say so, agree the
-new one, and change the test as its own visible step. Quietly relaxing an assertion turns a failing
-feature into a passing suite.
+new one, and change the test as its own visible step.
 
 **Never delete, skip or comment out a red test to finish.** A red test is work not done. Report it red.
 
 **A bug fix gets a test first**: red on the bug, then the fix, then green.
 
-**Assert content, not existence.** A widget that exists passes on an empty grid and on a page showing an
-error. Assert the text, the value and the row behind it.
+**Assert content, not existence**: the text, the value and the row behind it. A widget that exists passes
+on an empty grid and on an error page.
 
 **Count rows in the data, not in the grid.** A grid shows one page of rows, so "one order was added"
 read from its visible rows compares 20 with 20. Count with OQL, as a before and after inside the test,
@@ -223,7 +197,7 @@ by its own text, never by its time, and check a time on the page.
 
 ## What a test must not be
 
-A passing test that proves nothing is worse than none: it hides the gap. A test must not:
+A passing test that proves nothing hides the gap. A test must not:
 
 - make no assertion at all;
 - end on an action (a click, a fill, a navigation, a microflow run) with no assertion after it; a final

@@ -23,108 +23,48 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   and run only it and the ones after it, in a new script.
 - `conflict` means the person has unsaved edits in a document the statement touches: ask them to save
   (Ctrl/Cmd+S) and run it again. Nothing was written.
-- Read the model with `./mxcodr-live query "DESCRIBE ENTITY Module.Entity"` (or `SHOW ...`); it runs on a
-  copy of what Studio Pro saved. Check a script first with `./mxcodr-live check <script.mdl>`.
+- Reading the model: `.mxcodr/model/` has one file per document (`INDEX.tsv` lists them); never grep `mprcontents/`.
+  Find what you need with one `grep -rn` (several names in one pattern), then read only the lines around the hits (Read
+  with offset and limit, or `sed -n 40,90p` on several files in one command); a whole file only when you need all of
+  it. Use `./mxcodr-live query` (a copy of what Studio Pro saved) to read a document fresh before you change it, for
+  `search '<text>'`, `show references to M.Name`, `show context of M.Name` or a catalog select, and when `INDEX.tsv`'s
+  state line or `./mxcodr-live model status` says it lags. Several statements in one query, never a loop; never re-run
+  one to page it: read the `.mxcodr/out/` file it names. Check a script first with `./mxcodr-live check <script.mdl>`.
 - `./mxcodr-live status` says whether Studio Pro is connected, its version, the open editors, and how many
   files are uncommitted. When a command says it cannot reach Studio Pro, pass on its own instruction to the
   person word for word; do not add steps of your own.
 - What a turn changed (the person asks why files changed): `./mxcodr-live changes list` (the pane's turns, newest last)
   or `./mxcodr-live changes show --turn <id>`, never git (the app may not be a repository). Files with `"by":
   "studio-pro"` are actions Studio Pro regenerated when it built the app, not yours.
+- **The app's quality score is the Quality tab's.** When you report the app's quality (a score, best practices, a
+  quality report), run `./mxcodr-live quality` after your last model change and give its first line,
+  `Best practices N/100 (...)`: the number the person sees in the pane's Quality tab (the lines after it list the
+  findings). Never give the score of `./mxcli report`, the `assess-quality` skill or CLAUDE.md's
+  "Best Practices Report" as the app's score: it is another formula (every finding, info too, against 100 for the
+  whole app). Mention it only labelled as mxcli's own score.
 - After every exec that lands, run `./mxcodr-live problems`: Studio Pro's own error list, by document (exit 3
   on errors, 1 when the command itself failed; `--warnings` lists warnings too). Fix its errors before you run
-  the app; it is what Studio Pro will refuse to deploy.
-- CE0463 ("the definition of this widget has changed"): run `./mxcodr-live fix widgets`. It runs Studio Pro's own
-  App > Update all widgets in the open model and lists the problems again. Never `./mxcli fix widgets` while Studio
-  Pro has the app open (it writes the `.mpr`; what a skill says for it holds without Studio Pro only). Only when
-  `fix widgets` prints a PERSON ACTION line, stop and ask the person to choose App > Update all widgets in Studio
-  Pro and save, then run `./mxcodr-live problems` again.
-- CE6087 (design properties renamed in the theme; one error with no document, after almost every Atlas or
-  Marketplace update): run `./mxcodr-live fix design-properties` first. It runs Studio Pro's own "Update all renamed
-  design properties in project" in the open model, Marketplace modules included (Studio Pro's own fix is allowed
-  there; MDL edits are not), and lists the problems again. Never `./mxcli fix design-properties` while Studio Pro has
-  the app open. Only when it prints a PERSON ACTION line, ask the person to right-click the CE6087 error in Studio
-  Pro's Errors pane > Update all renamed design properties in project and save.
-- CE4899 (`Empty caption. [German, Switzerland]` and the like: a text empty in the default language) or CW0263 (one
-  missing in another language), or the person asks for the app in another language: you translate, Studio Pro's
-  Batch translate only copies. Run `./mxcodr-live translate status`, then `./mxcodr-live translate todo` (`--to
-  <lang>` for a language other than the default). Read the todo file it names, its rules first, write every
-  string's translation into the file it names, then `./mxcodr-live translate apply <that file>` and
-  `./mxcodr-live problems`. Keep placeholders, tags, spaces, line breaks and closing punctuation; fix what apply
-  refuses and apply again. `translate copy --from <lang>` (the source as it is) only when the person asks for a
-  copy. Texts written by `translate` are allowed in Marketplace modules (a default-language text must be in the
-  module itself): `marketplace update` compares the module without them and puts them back after the update,
-  and a `no map knows` line after it means the same steps for the new texts. Never write translations with
-  `exec`, `create translations` or `./mxcli` while Studio Pro has the app open. A PERSON ACTION line: ask the
-  person.
+  the app; it is what Studio Pro will refuse to deploy. Under the list it prints a fix line for the codes that need
+  one (CE0463, CE6087, CE4899, CE7247, ...): run what it names. Never `./mxcli fix ...` while Studio Pro has the app
+  open. A PERSON ACTION line, from any command: ask the person, in its words.
+- Texts in another language (CE4899, CW0263, or the person asks for the app in another language): you translate,
+  Studio Pro's Batch translate only copies. Run `./mxcodr-live translate status` and follow its `next:` lines.
+  Never write translations with `exec`, `create translations` or `./mxcli` while Studio Pro has the app open.
 - This replaces what `CLAUDE.md` says about `mx` (its "Mendix Validation Tool" section): never call `mx` by a
   path under `~/.mxcli/mxbuild/` or a glob of it (on a Mac with Studio Pro 11.16 mxcli uses Studio Pro's own
   mxbuild, so that folder has no `mx`, and another version's `mx` refuses this app). Errors and warnings come
   from `./mxcodr-live problems`; the full check is `./mxcodr-live mxcheck` (`mxcli docker check` on a copy of
   what Studio Pro saved, the right `mx` for the app's version).
-- A Marketplace module goes in with `./mxcodr-live marketplace install <id|name>` (find the id with
-  `./mxcodr-live marketplace search <words>`): Studio Pro imports it itself, with its widget and theme files
-  (no F4), then the command prints Studio Pro's error list (exit 3: it is in and the app has errors, often CE0463,
-  which `./mxcodr-live fix widgets` clears). Only publishers Mendix or Mendix Labs; it refuses
-  a module the app already has. A `needs <Module> (not in the app)` line after it names a module the package
-  calls that the app lacks: install that one next with the command the line gives. When it stops on a missing sign-in it says what the person must do (sign in
-  to Studio Pro, or run `./mxcli auth login` themselves): ask them and wait. The `download-marketplace-content`
-  skill's install and update steps write the `.mpr`: not here.
-- A newer version of a module the app has (one that fixes an error, such as CE4271 in WorkflowCommons):
-  `./mxcodr-live marketplace update <id|name> --plan-only` (`--to x.y.z` for a version other than the newest),
-  tell the person what it will move and re-apply and ask; after a yes, the same without `--plan-only`. It moves
-  the documents the app added to the module into the app's own module, has Studio Pro replace the module, runs
-  the app's edits again where the new version left them alone, and prints the error list. `Mode: three-way
-  (base read by mxcli from the package)` is three-way too: the installed version's package was read directly
-  because Studio Pro's importer refused it. When the plan says `Mode: TWO-WAY` (the package cannot be read at
-  all, or `--no-base`), nothing is run again, and a document only in the app's copy moves only on evidence that
-  it is the app's; the rest is saved under `kept/` and the update removes it. Tell the person the moves by type
-  and each one's reason, which documents are kept (and which of them the app uses: it must point at the new
-  version's equivalent after the update) and which were saved for review; after the update compare each file
-  under `.mxcodr/marketplace/<Module>/review/` with the new version before changing anything. `MOVE GUARD`: run
-  with `--accept-moves` only after the person's yes to that list. `BLOCKED`: the person moves those documents in
-  Studio Pro first. `needs <Module> (not in the app)` in the plan: the new version calls a module the app
-  lacks, and the update refuses until it is in: install it first with the command the line gives (tell the
-  person); `--accept-missing-modules` only when the person decided to update without it. `likely too old`: that
-  module's update is the next step after this one. When the moves stop part-way, run the `./mxcodr-live exec .../undo-moves.mdl` the message
-  names before anything else. Exit 4: pass on the
-  person's steps word for word, then `--resume`. Never add a document to an installed Marketplace module or
-  change one in it: an update deletes the one and undoes the other. The one exception: texts written by
-  `./mxcodr-live translate` (above).
-- Running an update (with or without `--plan-only`) takes minutes: start it as a background command where your
-  tool has one (Claude Code: the Bash tool's `run_in_background`) and wait for its completion notification; no
-  polling or sleep loops, no timeout of your own, and never a second update while one runs (it refuses). Until
-  the notification, run no other `./mxcodr-live` command that reads or changes the model (`query`, `check`,
-  `exec`, `mxcheck`): it waits for the update and gives up after 3 minutes. It prints progress lines with the time left, then counts, what was NOT done and the path of its `report.md`:
-  read `report.md` for the full lists before telling the person. The run after a yes reuses the plan while
-  nothing in it changed (it says so, or why it plans again). When the plan says `NEEDS --keep-in`, ask the
-  person which of the listed modules gets the app's additions and pass it with `--keep-in`.
-- Reviewing those files (two-way mode, an Atlas_Core update too): `report.md` says, per file, what differs from
-  the new version and the next step. A real app customisation in one (a changed layout,
-  menu, logo, extra region) goes into an app-owned copy in one of the app's own modules (a layout: in the app's
-  theme module or beside its own layouts, skill `write-layouts`) and the app's pages are repointed to that copy;
-  never re-apply it into the Marketplace module. The rest is template drift: accept the new version. Then
-  `./mxcodr-live fix design-properties`, `./mxcodr-live fix widgets` and `./mxcodr-live problems`.
-- After the app's Mendix version changed, or after a failed build, run `./mxcodr-live marketplace outdated`: the
-  modules not on the newest version for the app's Mendix version, `OLD` for one made for an older Mendix (its Java
-  or widgets likely broken). Update those as above (`--plan-only` first, then ask), `OLD` ones first.
-- CE7247 (`... of type 'Reference'`) on an association path in a Data grid 2 column of a Marketplace module's page
-  (such as `System.WorkflowUserTask_Assignees` in WorkflowCommons) usually means an old Data Widgets: Studio Pro
-  checks the column against `widgets/com.mendix.widget.web.Datagrid.mpk` (the version is in its `package.xml`),
-  which the Data Widgets module brings; Datagrid 2.22 allows no association there, 2.26 does. Run
-  `./mxcodr-live marketplace outdated` and update Data Widgets as above (`--plan-only` first, then ask). Never
-  edit the Marketplace module's page. A column's "A caption is required if 'Can hide' is ..." is listed as an
-  error but is the Data grid's own warning: not blocking; leave the Marketplace page alone and do not count it.
-- `widget not found` on a button of a legacy Data grid (DESCRIBE shows `-- Forms$DataGrid (gridN) ... NOT
-  re-executable`): mxcli cannot address the buttons in its control bar (its columns it can) and `SHOW WIDGETS` does
-  not list them; never guess a name. Either give the person one exact Studio Pro step (the page > the grid > its
-  control bar > the button by its caption > the property > the new value, such as On click: call microflow X with
-  parameter Y = current object) and say why in one line, or offer to replace the grid with a Data grid 2 in the
-  app's own module (`alter page ... replace gridN with { datagrid ... }`, every button and the default action kept):
-  a redesign, ask first. Never in a Marketplace module.
-- Finding a widget in `bson dump` output: read its whole object (its `Name` together with its `Action` and other
-  properties), never the `Name` line nearest a hit (the JSON's keys are sorted, so an object's `Action` comes
-  before its `Name`). Confirm it with `DESCRIBE` before any change.
+- Marketplace modules (publishers Mendix or Mendix Labs only): `./mxcodr-live marketplace install <id|name>`
+  (`marketplace search <words>` finds the id); a newer version with `./mxcodr-live marketplace update <id|name>
+  --plan-only` first: tell the person what the plan prints and ask; the real run only after their yes. After the
+  app's Mendix version changed, or after a failed build, `./mxcodr-live marketplace outdated`. Each prints its next
+  steps and the person's steps: follow them, and pass the person's on word for word. An update (`--plan-only` too)
+  takes minutes: run it as a background command (Claude Code: the Bash tool's `run_in_background`) and wait for its
+  completion notification: no polling, no second update, and no other `query`, `check`, `exec` or `mxcheck` until
+  then. Never add a document to an installed Marketplace module or change one in it: an update deletes the one and
+  undoes the other (the one exception: texts written by `./mxcodr-live translate`). The
+  `download-marketplace-content` skill's install and update steps write the `.mpr`: not here.
 - `MyFirstModule` is the person's: never drop or rename it without asking them first (the
   `module-structure` skill says how to tell the untouched starter from their own work). A module rename is
   theirs, in Studio Pro (right-click > Rename); never `rename module` through `./mxcodr-live exec`.
@@ -160,7 +100,7 @@ before you start. The pane shows the list as a step bar above the chat.
   port 8080. `run` refuses while the model has errors; on `failed`, Studio Pro shows the reason in a dialog
   only the person can close: tell them, do not run again. A failed build lists its Java errors by module. When
   they are in a Marketplace module's Java (`Java in Marketplace module ...`), update that module with the
-  `marketplace update` command the reason names (`--plan-only` first, then ask the person, as below); never edit a
+  `marketplace update` command the reason names (`--plan-only` first, then ask the person); never edit a
   Marketplace module's Java, the update overwrites it. Errors in the app's own modules: fix them in their Java.
 - **Starting the app is asked.** `app run` on a stopped app, `app restart`, and a test run (`tests run`, `affected`,
   `film`) that finds the app stopped show the person a card in the pane first and wait up to 10 minutes for it: give

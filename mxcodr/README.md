@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.18.7** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.20.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,60 @@ Bundle **2026.11.18.7** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.20.2 (2026-11-20): **read only the lines you need from `.mxcodr/model/`**. An A/B of the read changes
+  (bundle 2026.11.18.9 against 2026.11.20.1, CarFleet, three read-only tasks) found that Claude Code took the dump
+  route but its tokens did not fall: it read whole files with `cat`, so the same text reached the context as before.
+  `templates/live.md`'s read bullet (still 7 lines, before the quality bullet) now says: one `grep -rn` (several names
+  in one pattern), then only the lines around the hits (Read with offset and limit, or `sed -n 40,90p` on several
+  files in one command), a whole file only when all of it is needed; `INDEX.tsv` lists the files. `test/live.test.mjs`
+  pins it. Measured with the same setup (Claude Code, Sonnet, 3 tasks x 5 runs): no change. The median was 367k
+  input tokens against 350k, with 8 tool calls each and a 30/30 blind score. The agent still used `cat` on the files
+  (about 69 against 70 times). CarFleet's files are 1-5k characters, and the bill follows API turns times the re-sent
+  rules, not the model text. The bullet stays as the owner asked. Whether it saves context on a large app, where files
+  are long, was not measured. In the
+  extension (live.85) a read that finds no shadow copies once (`translator/src/sync.mjs` `syncForRead`).
+- 2026.11.20.1 (2026-11-20): **shorter harness text agents read** (an analysis of four sessions: the always-loaded
+  live rule, the gated skills and `tests/mx.ts` were 25-45% of tool output, the live rule re-sent on every call).
+  `templates/live.md` keeps one pointer per rare event (24.4k -> 16.9k characters); the steps for CE0463/CE6087/CE4899/
+  CE7247, the Marketplace update and review, the legacy Data grid and `bson dump` are printed by `./mxcodr-live problems`,
+  `exec`, `marketplace update` and `translate` themselves (translator). The seven gated skills carry no rule twice
+  (94.7k -> 83.9k characters, the kit table included). `tests/mx.ts` is the helper list (one typed re-export with a doc
+  line per helper, 23.2k -> 5.4k), the code is in the new `tests/mx-impl.ts` (`TEST_KIT`, `kit-shipped.json`, never
+  edited like `mx.ts`: `mxcodr.md`, `durable-tests`). The skill gate gains `reset`: a compaction clears the session's
+  read skills (Claude Code: SessionStart `compact` in `.claude/settings.local.json`; Codex: PreCompact in the
+  extension). In the extension (live.84): Pi refuses edits of the harness's files, and Codex names one fixed launcher
+  path, so its AGENTS.md no longer changes with the runtime.
+- 2026.11.19.1 (2026-11-19): **read the model from disk**. A Pi session on a large app (Windows VM, 3 h) spent 12 of
+  96 active minutes and a quarter of its context on model reads: 98 queries, 30 of them one DESCRIBE re-run to page
+  through it, 17 run in `for` loops, and 57 greps of binary `mprcontents/` files. The Studio Pro extension now keeps
+  the model as text in `.mxcodr/model/` (one file per document, `INDEX.tsv`; `spikes/studio-pro-ext/README.md`, "The
+  model on disk"). `templates/live.md`'s read bullet (one line before, 7 now, early in the file, before the quality
+  bullet: Codex cuts `AGENTS.md` at its size cap and the live block comes last) says: grep `.mxcodr/model/`
+  (`INDEX.tsv` first) and read the one file, never grep `mprcontents/`; `./mxcodr-live query` for a fresh read before
+  a change, for `search` / `show references to` / `show context of` / a catalog select, and when the dump lags;
+  several statements in one query, never a loop; never a query re-run to page it (read or grep the `.mxcodr/out/` file
+  it names); a refused read lists the valid forms. Live mode only; Codex and Pi read it in the `AGENTS.md` live block
+  (setup copies `mxcodr-live.md` there). `test/live.test.mjs` pins the bullet, its length and its place.
+- 2026.11.18.9 (2026-11-19): **build an anchor under exactly its name**. The owner's Windows test (Codex, AssetBench):
+  R2..R7 were built under other names than the plan's anchors (`Flota.ACT_WydajSamochod` planned,
+  `Flota.ACT_Samochod_Wydaj` built; `MojeSamochody` never built), so the Brain tab said "Not built" while their tagged
+  tests passed. `templates/brain.md`'s exception now reads "Except: build an anchor under exactly its name; if named
+  otherwise, or a finished requirement has none, run at once `./mxcli brain edit <id> -a @<the document you built>`
+  (id: `brain list`)." To make room: "1. A feature request not in the requirement list", "an odd mxbuild error or
+  Marketplace version", the panel block reflowed (one line saved). 26 lines, 2,447 characters; the size cap 2,400 ->
+  2,450 (`test/brain.test.mjs`). The Studio Pro extension's Brain tab now also counts a requirement done by its tagged
+  tests' last results (`spikes/studio-pro-ext/README.md`, "Brain progress also from tests").
+- 2026.11.18.8 (2026-11-19): **the app's quality score is the Quality tab's**. The owner's Windows test (Codex):
+  at the end of the build the agent reported "74/100" from `mxcli report` (mxcli's CLAUDE.md "Best Practices Report",
+  its `assess-quality` skill) while the pane's Quality tab showed Best practices 86/100, another formula (errors and
+  warnings per 100 documents of the app's own modules, info free; mxcli's counts every finding against 100).
+  `templates/live.md` gains one bullet (6 lines, early, before `problems`: Codex reads `AGENTS.md` only up to its
+  size cap, and the live block's end is past it in CarFleetCodexSol's 36 KB file): to report the app's quality, run `./mxcodr-live quality` after the
+  last model change and give its first line, `Best practices N/100 (...)`; never the score of `./mxcli report`, the
+  `assess-quality` skill or CLAUDE.md's "Best Practices Report", named only as mxcli's own score. Live mode only (file
+  mode has no Quality tab); Codex reads it in the `AGENTS.md` live block. `templates/mxcodr.md` and file mode are
+  unchanged. The command and the tab print one number (`spikes/studio-pro-ext/README.md`, "The agent reports the
+  tab's score").
 - 2026.11.18.7 (2026-11-19): **a plan's requirements name the document that builds them**. The owner's Windows
   test (Codex, AssetBench): the plan card's brain block showed "Progress cannot be tracked for this one yet." under
   each of R1-R13, because Codex wrote every `Requirement:` line without `| anchor`, which the rule allowed ("no anchor
@@ -610,7 +664,9 @@ has read the project skill for it whole; no verdict, no other refusals.
   every install since 2026.11.14.1, with coverage on or off.) Switched off on a reinstall: `tests/coverage.mjs` goes, the plain texts come back, `docs/brain/`
   stays. The choice is recorded in `installed.json` (`coverage`) once made, asked or by flag, and kept on a
   reinstall unless a flag changes it; an install that defaulted to off records nothing.
-- **The starter test kit** (`overlay/templates/tests/`): `tests/mx.ts` (sign-in and sign-out that never leak
+- **The starter test kit** (`overlay/templates/tests/`): since 2026.11.20.1 `tests/mx.ts` is the short list a spec
+  needs (one typed re-export per helper, its signature and a one-line doc comment) and `tests/mx-impl.ts` holds the
+  code; specs import from `./mx` only. The helpers (sign-in and sign-out that never leak
   a session, `test`/`expect` with a per-test session check that names the leaking test, `oql()` over `./mxcli oql --json`, `sessionsLeft`, grid rows, cells and filters, Combobox,
   inputs, dialogs, the menu, `apiContext`, recording and forging a button's call, `retrieveByIds`; each
   helper commented with the Mendix fact it relies on, no app names), `tests/mx.teardown.ts` (prints
@@ -622,7 +678,9 @@ has read the project skill for it whole; no verdict, no other refusals.
   when it has a `package.json` or Playwright config there (the installer prints the pin to add instead).
   When `tests/mx.ts` is the person's own (not in the last `installed.json` and not a text mx-codr shipped), the teardown
   and config, which import from it, are not written either; the installer says so (move `tests/mx.ts` aside and
-  install again to get the kit). A kept `tests/package.json` that pins another `@playwright/test` gets the pin
+  install again to get the kit), and no `tests/mx-impl.ts` unless that `mx.ts` imports `./mx-impl`. The thin
+  `tests/mx.ts` is written or updated only beside the kit's own `tests/mx-impl.ts` (a file of that name the kit did
+  not write holds it back, with a line). A kept `tests/package.json` that pins another `@playwright/test` gets the pin
   hint (`npm install -D -E @playwright/test@1.64.1` in `tests/`).
 - **The film recorder** (`overlay/templates/film.mjs`): `tests/film.mjs`, written on **every** install and
   reinstall (unlike the kit it is the bundle's, so an edit there is replaced; it is written also when the kit is
@@ -725,7 +783,7 @@ live mode changes in the texts (`overlay/lib/live.mjs`):
   asks the person for a password and never prints one (`./mxcodr-live exec` masks passwords in its output);
 - the starter test kit (`copyTestKit(..., { live: true })`, `KIT_EDITS`): `playwright.config.ts` also writes a JSON
   report and progress lines to `.mxcodr/tests/` (what the pane's Tests tab reads, so the agent's own runs show up there)
-  and a screenshot of a failed test; `mx.ts`'s sign-in failure says `./mxcodr-live app restart`. `tests/film.mjs`
+  and a screenshot of a failed test; `mx-impl.ts`'s sign-in failure says `./mxcodr-live app restart`. `tests/film.mjs`
   (`copyFilm(..., { live: true })`, `FILM_EDITS`): Studio Pro runs the app. Kit files are written when absent and
   replaced when unedited (a plain kit file becomes the live one); a
   `tests/playwright.config.ts` kept from before (the plain kit, or one with the person's edits) gets the json and

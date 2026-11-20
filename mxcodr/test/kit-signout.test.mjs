@@ -31,7 +31,7 @@ async function loadKit() {
   const dir = path.join(app, 'tests'); // the kit lives in <app>/tests/ and finds the one .mpr in <app>
   fs.mkdirSync(dir);
   fs.writeFileSync(path.join(dir, 'fakes.mjs'), FAKES);
-  const src = strip(fs.readFileSync(new URL('../overlay/templates/tests/mx.ts', import.meta.url), 'utf8'))
+  const src = strip(fs.readFileSync(new URL('../overlay/templates/tests/mx-impl.ts', import.meta.url), 'utf8'))
     .replace(/from '@playwright\/test'/, "from './fakes.mjs'")
     .replace(/from 'node:child_process'/, "from './fakes.mjs'");
   fs.writeFileSync(path.join(app, 'App.mpr'), '');

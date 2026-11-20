@@ -21,7 +21,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = path.join(repo, 'mxcodr', 'overlay', 'lib', 'kit-shipped.json');
-const KIT = ['mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'];
+const KIT = ['mx-impl.ts', 'mx.ts', 'mx.teardown.ts', 'playwright.config.ts', 'package.json'];
 const DIRS = ['mxcodr/overlay/templates/tests', 'mxcodr-v2/overlay/templates/tests'];
 const LIVE = ['mxcodr/overlay/lib/live.mjs', 'mxcodr-v2/overlay/lib/live.mjs'];
 const lf = t => t.replace(/\r\n/g, '\n');

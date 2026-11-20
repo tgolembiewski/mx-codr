@@ -5,11 +5,8 @@ description: "A Mendix app people sign in to: security at Production with strict
 
 # App security
 
-This skill is how this project does security in an app people sign in to. The syntax lives in mxcli's
-own skills: `manage-security` (roles, grants, demo users, guest access, the System-module ceiling),
-`xpath-constraints` (the constraint language), `system-module` (what `System.User`,
-`Administration.Account` and the workflow entities hold). Read those for the spelling; this page says
-which choices to make and how to prove them.
+Which security choices to make in an app people sign in to, and how to prove them. The syntax is in
+mxcli's `manage-security`, `xpath-constraints` and `system-module` skills.
 
 ## Security on is the whole login
 
@@ -153,19 +150,11 @@ end;
 
 ## Proving it from both sides
 
-Every rule above has two sides, and a test proves both: the permitted role succeeds, and the wrong
-role is refused by the server. Plant something only one user may see (an order number, a note such as
-`SECRET-NOTE-42`), sign in as another user of the same role and assert it never appears, on the page
-and in the data (mxcli's `verify-with-oql`); then sign in as its owner and assert it does. Prove a
-refusal by attempting the forbidden action as the wrong role: call the microflow from that role's
-browser session, open the page's URL, send the REST or OData request with that role's credentials, and
-assert the server refuses it (the refusal below, a 401 or 403, an unchanged row in the data). Then do the
-same action as the permitted role and assert it succeeds and changes what it should. Never weaken the app
-so that a test can see a message. In one run a rule that demanded every message be asserted on screen
-led the agent to show Approve and Reject to Employees and widen `ACT_Order_Approve` to Employee, then
-replace its stronger test with "click, read the refusal". The right test kept the buttons absent for
-Employees, sent a forged `ACT_Order_Approve` call from an Employee's session and asserted the server
-refused it, and approved the same order as the Manager.
+Every rule above has two sides, and a test proves both (skill `durable-tests`, "Proving a refusal"): the
+permitted role succeeds, and the wrong role is refused by the server. Plant something only one user may
+see (an order number, `SECRET-NOTE-42`), assert another user of the same role never sees it, on the page
+and in the data, and its owner does. Never weaken the app so that a test can see a message: keep a
+button absent for the role and forge its call instead.
 
 **What the runtime answers a forged microflow call** (a `runtimeOperation` POST to `/xas/`, measured on
 Mendix 11.12). HTTP 560 alone proves nothing: it is the runtime's answer to any exception.
@@ -178,29 +167,18 @@ Mendix 11.12). HTTP 560 alone proves nothing: it is the runtime's answer to any 
 | a permitted role, `validation feedback` | 200 | the message under `datavalidation[].errorFields` |
 | a parameter of the wrong entity (a server exception) | 560 | `{"result":560,"type":"exception"}`, no description; ERROR in the log |
 
-So a refusal test asserts the status and the security text, and replays the same recorded call as the
-permitted role to show the operation id is real:
-
-```ts
-const refused = await forgeOperation(employeePage, approve);   // the operation recorded as the Manager
-expect(refused.status).toBe(560);
-expect(refused.body).toContain('failed for security reasons');
-```
-
-Asserting `"type":"exception"` matches the crash as well. A missing object is no refusal either: the
-flow gets an empty parameter and answers 200 with its own message.
+So a refusal test asserts 560 and the security text (`"type":"exception"` matches the crash as well), and
+replays the same recorded call as the permitted role to show the operation id is real. A missing object is
+no refusal either: the flow gets an empty parameter and answers 200 with its own message.
 
 A checklist of what deserves such a test, when the app has it:
 
 - the security level and strict mode, read back from the model;
 - each row-scoped entity: own rows visible, another user's absent, for every role scoped on it;
 - each field a role may not read: absent from the page and from a forged request;
-- each action limited to a role: absent for the others, refused when forged, done by the permitted role.
-  Every such action gets one forged call by a role without the right (`captureOperation` as the permitted
-  role, `forgeOperation` as the other; assert 560 and `failed for security reasons`) and the same call by
-  the permitted role succeeding (200). Typical kinds: approve and reject, status changes, scheduled or
-  admin jobs run on demand, generating a document, editing a locked or finished record, reset and admin
-  actions. A refusal shown only in the UI (a hidden button) does not count as tested;
+- each action limited to a role (approve and reject, status changes, jobs run on demand, generating a
+  document, editing a locked record, admin actions): absent for the others, one forged call refused, the
+  same call by the permitted role succeeding. A hidden button alone does not count as tested;
 - each published REST or OData service: refused without sign-in, filtered per role, no hidden fields;
 - each workflow task: completed by a target user, refused for anyone else.
 
