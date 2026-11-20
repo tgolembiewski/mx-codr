@@ -142,8 +142,8 @@ export const KIT_EDITS = {
       "import { defineConfig } from '@playwright/test';\nimport * as fs from 'node:fs';\nimport * as path from 'node:path';\nimport { BASE } from './mx';\n\n// The mx-codr pane's Tests tab reads each run's report and progress from <app>/.mxcodr/tests/ (the extension's\n// folder, ignored by git). The progress reporter is the extension's, in its own copy in the person's user folder:\n// setup names it in .mxcodr/live-tool.json; without the extension there is no record and it is left out.\nconst MXCODR = path.join(__dirname, '..', '.mxcodr');\n" + PROGRESS_LINE],
     ["  reporter: [['list']],",
       "  reporter: [['list'], ['json', { outputFile: path.join(MXCODR, 'tests', 'report.json') }], ...(fs.existsSync(PROGRESS) ? [[PROGRESS] as [string]] : [])],"],
-    ["    actionTimeout: 20_000,\n  },",
-      "    actionTimeout: 20_000,\n    // what the Tests tab shows for a failed test (its own runs also keep the failed test's video)\n    screenshot: 'only-on-failure',\n" + TRACE_LINES + "  },"],
+    ["    actionTimeout: 10_000,\n  },",
+      "    actionTimeout: 10_000,\n    // what the Tests tab shows for a failed test (its own runs also keep the failed test's video)\n    screenshot: 'only-on-failure',\n" + TRACE_LINES + "  },"],
   ],
 };
 export const FILM_EDITS = [
@@ -204,12 +204,15 @@ function wireTrace(text) {
   return { text: `${text.slice(0, at)}\n${lines}${text.slice(at)}`, changed: true };
 }
 
+const SHOT_AT = /^(    actionTimeout: [\d_]+,\n)  \},/m;
 function wireReporters(text) {
   if (/\b(MXCODR|PROGRESS)\b/.test(text) || /^\s*(import|const|let|var)\b[^\n]*\b(fs|path)\b/m.test(text)) return { text, changed: false, reason: 'it already has its own fs, path, MXCODR or PROGRESS' };
   const [imp, rep, shot] = KIT_EDITS['playwright.config.ts'];
   if (text.includes(imp[0]) && text.split(rep[0]).length === 2) {
     let out = text.replace(imp[0], imp[1]).replace(rep[0], rep[1]);
-    if (out.includes(shot[0]) && !/\bscreenshot\s*:/.test(text)) out = out.replace(shot[0], shot[1]);
+    // the screenshot lines after the person's own actionTimeout too (the kit's was 20_000 before bundle 2026.11.20.6)
+    const at = out.match(SHOT_AT);
+    if (at && !/\bscreenshot\s*:/.test(text)) out = out.replace(at[0], at[1] + shot[1].slice(shot[0].length - '  },'.length));
     return { text: out, changed: true };
   }
   const reps = [...text.matchAll(/^([ \t]*)reporter\s*:\s*(.*?),?[ \t]*$/gm)];

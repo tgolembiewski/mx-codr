@@ -21,6 +21,7 @@ export default defineConfig({
     baseURL: BASE, // APP_URL from the environment or tests/.env, else http://127.0.0.1:8080
     headless: true,
     viewport: { width: 1440, height: 1000 },
-    actionTimeout: 20_000,
+    // a click or fill on an element that never appears fails in 10 s, not 20; a warm Mendix action takes well under 1 s
+    actionTimeout: 10_000,
   },
 });

@@ -241,6 +241,13 @@ test("a kept Playwright config gets the Tests tab's reporters (wireTestsTab): th
   assert.match(b.text, /workers: 2,/);
   assert.match(b.text, /timeout: 120_000,/);
   assert.match(b.text, /\['json', \{ outputFile: path\.join\(MXCODR, 'tests', 'report\.json'\) \}\]/);
+  // the person's own actionTimeout (the kit's 20_000 before bundle 2026.11.20.6): kept, the screenshot lines still come in
+  const slow = own.replace('actionTimeout: 10_000,', 'actionTimeout: 20_000,');
+  const s = wireTestsTab(slow);
+  assert.equal(s.changed, true);
+  assert.match(s.text, /actionTimeout: 20_000,\n    \/\/ what the Tests tab shows for a failed test[^\n]*\n    screenshot: 'only-on-failure',\n/);
+  assert.doesNotMatch(s.text, /actionTimeout: 10_000/);
+  assert.equal(s.text, b.text.replace('actionTimeout: 10_000,', 'actionTimeout: 20_000,'), 'the same wiring as with the kit\'s own value');
   // their own one-line reporter list: kept, ours appended; imports after their last import
   const theirs = own.replace("reporter: [['list']],", "reporter: [['list'], ['html', { open: 'never' }]],").replace("import { BASE } from './mx';", "import { BASE } from './mx';\nimport { OTHER } from './other';");
   const c = wireTestsTab(theirs);
