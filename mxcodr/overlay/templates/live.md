@@ -26,10 +26,15 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
 - Reading the model: `.mxcodr/model/` has one file per document (`INDEX.tsv` lists them); never grep `mprcontents/`.
   Find what you need with one `grep -rn` (several names in one pattern), then read only the lines around the hits (Read
   with offset and limit, or `sed -n 40,90p` on several files in one command); a whole file only when you need all of
-  it. Use `./mxcodr-live query` (a copy of what Studio Pro saved) to read a document fresh before you change it, for
+  it. It leaves out System, add-on modules (`modules/*.mxmodule`), image and icon collections, page templates and
+  building blocks: when a grep there finds nothing, `./mxcodr-live query "search '<text>'"` before you call it absent.
+  Use `./mxcodr-live query` (a copy of what Studio Pro saved) to read a document fresh before you change it, for
   `search '<text>'`, `show references to M.Name`, `show context of M.Name` or a catalog select, and when `INDEX.tsv`'s
   state line or `./mxcodr-live model status` says it lags. Several statements in one query, never a loop; never re-run
   one to page it: read the `.mxcodr/out/` file it names. Check a script first with `./mxcodr-live check <script.mdl>`.
+- Searching the project's files (tests, Java, theme): `grep -rn --exclude-dir={.mxcodr,.mxcodr-test,mprcontents,deployment,node_modules,.git,vendorlib,theme-cache,.mendix-cache} '<pattern>' .`,
+  never `grep -r ... . | grep -v ...`: the filter after the pipe does not stop the reading (100 s on a large app). The
+  `{...}` list needs bash or zsh; in PowerShell or sh give one `--exclude-dir=<name>` per folder.
 - `./mxcodr-live status` says whether Studio Pro is connected, its version, the open editors, and how many
   files are uncommitted. When a command says it cannot reach Studio Pro, pass on its own instruction to the
   person word for word; do not add steps of your own.

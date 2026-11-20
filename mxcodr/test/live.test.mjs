@@ -469,7 +469,18 @@ test('live mxcodr-live.md: reading the model is a grep -rn of .mxcodr/model/ and
   assert.match(b, /Several statements in one query, never a loop/);
   assert.match(b, /never re-run\s+one to page it: read the `\.mxcodr\/out\/` file it names/);
   assert.match(b, /Check a script first with `\.\/mxcodr-live check <script\.mdl>`/);
-  assert.ok(b.split('\n').length <= 7, `short: ${b.split('\n').length} lines`);
+  // 2026-11-20 (live.88): what the dump leaves out (model-dump.mjs SKIP; System and add-on modules are no units of the
+  // .mpr), and a search before calling something absent
+  assert.match(b, /It leaves out System, add-on modules \(`modules\/\*\.mxmodule`\), image and icon collections, page templates and\s+building blocks: when a grep there finds nothing, `\.\/mxcodr-live query "search '<text>'"` before you call it absent\./);
+  assert.ok(b.split('\n').length <= 9, `short: ${b.split('\n').length} lines`);
+  // 2026-11-20 (live.88, a large app on the Windows VM: `grep -rlniE ... . | grep -v ...` 100.7 s): the project's files are
+  // searched with the folders left out by grep itself, never a filter after a pipe; never git grep (it misses tests/.env)
+  const g = lr.slice(lr.indexOf("- Searching the project's files"), lr.indexOf('\n- ', lr.indexOf("- Searching the project's files") + 3));
+  assert.match(g, /`grep -rn --exclude-dir=\{\.mxcodr,\.mxcodr-test,mprcontents,deployment,node_modules,\.git,vendorlib,theme-cache,\.mendix-cache\} '<pattern>' \.`/);
+  assert.match(g, /never `grep -r \.\.\. \. \| grep -v \.\.\.`: the filter after the pipe does not stop the reading/);
+  assert.match(g, /The\s+`\{\.\.\.\}` list needs bash or zsh; in PowerShell or sh give one `--exclude-dir=<name>` per folder\./);
+  assert.ok(!/git grep/.test(g) && g.split('\n').length <= 3, g);
+  assert.ok(lr.indexOf("- Searching the project's files") === at + b.length + 1, 'right after the read bullet');
   assert.ok(!/DESCRIBE ENTITY Module\.Entity"` \(or `SHOW \.\.\.`\)/.test(lr), 'the old one-line read advice is gone');
   // before the bullets Codex's AGENTS.md size cap can cut (the live block comes last there)
   assert.ok(at < lr.indexOf("- **The app's quality score is the Quality tab's.**") && at < 4000, `early (at ${at})`);
