@@ -450,20 +450,24 @@ test('plan-first-agents.md: the plan rule without Claude Code\'s tools; its AGEN
 // translator, src/model-dump.mjs) is where the agent greps and reads; query is for a fresh read before a change, the
 // catalog and a dump that lags; several statements in one query; a long result is read from its file, never re-run.
 // One bullet in the live rule, which setup copies into AGENTS.md's live block for Codex and Pi: early, and short.
-test('live mxcodr-live.md: reading the model is a grep of .mxcodr/model/ and one file; query only for fresh reads and the catalog', () => {
+// 2026-11-20 (A/B of the read changes: Claude Code's tokens did not fall, it read whole files): one `grep -rn`, then
+// only the lines around the hits; a whole file only when all of it is needed.
+test('live mxcodr-live.md: reading the model is a grep -rn of .mxcodr/model/ and the lines around the hits; query only for fresh reads and the catalog', () => {
   const d = tmp();
   writeRules(d, ['claude', 'codex'], { live: true });
   const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
   const at = lr.indexOf('- Reading the model:');
   assert.ok(at > 0, 'the bullet is there');
   const b = lr.slice(at, lr.indexOf('\n- ', at + 3));
-  assert.match(b, /grep `\.mxcodr\/model\/` \(one file\s+per document, `INDEX\.tsv` first\) and read the one file/);
+  assert.match(b, /`\.mxcodr\/model\/` has one file per document \(`INDEX\.tsv` lists them\)/);
+  assert.match(b, /Find what you need with one `grep -rn` \(several names in one pattern\), then read only the lines around the hits/);
+  assert.match(b, /\(Read\s+with offset and limit, or `sed -n 40,90p` on several files in one command\); a whole file only when you need all of\s+it/);
   assert.match(b, /never grep `mprcontents\/`/);
   assert.match(b, /read a document fresh before you change it/);
   assert.match(b, /`search '<text>'`,\s+`show references to M\.Name`, `show context of M\.Name`/);
-  assert.match(b, /`INDEX\.tsv`'s state line or\s+`\.\/mxcodr-live model status` says it lags/);
-  assert.match(b, /several statements in one query[\s\S]*never a loop/);
-  assert.match(b, /never run a query again to page it: read or grep the `\.mxcodr\/out\/` file it names/);
+  assert.match(b, /`INDEX\.tsv`'s\s+state line or\s+`\.\/mxcodr-live model status` says it lags/);
+  assert.match(b, /Several statements in one query, never a loop/);
+  assert.match(b, /never re-run\s+one to page it: read the `\.mxcodr\/out\/` file it names/);
   assert.match(b, /Check a script first with `\.\/mxcodr-live check <script\.mdl>`/);
   assert.ok(b.split('\n').length <= 7, `short: ${b.split('\n').length} lines`);
   assert.ok(!/DESCRIBE ENTITY Module\.Entity"` \(or `SHOW \.\.\.`\)/.test(lr), 'the old one-line read advice is gone');

@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.20.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.20.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,18 @@ Bundle **2026.11.20.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.20.2 (2026-11-20): **read only the lines you need from `.mxcodr/model/`**. An A/B of the read changes
+  (bundle 2026.11.18.9 against 2026.11.20.1, CarFleet, three read-only tasks) found that Claude Code took the dump
+  route but its tokens did not fall: it read whole files with `cat`, so the same text reached the context as before.
+  `templates/live.md`'s read bullet (still 7 lines, before the quality bullet) now says: one `grep -rn` (several names
+  in one pattern), then only the lines around the hits (Read with offset and limit, or `sed -n 40,90p` on several
+  files in one command), a whole file only when all of it is needed; `INDEX.tsv` lists the files. `test/live.test.mjs`
+  pins it. Measured with the same setup (Claude Code, Sonnet, 3 tasks x 5 runs): no change. The median was 367k
+  input tokens against 350k, with 8 tool calls each and a 30/30 blind score. The agent still used `cat` on the files
+  (about 69 against 70 times). CarFleet's files are 1-5k characters, and the bill follows API turns times the re-sent
+  rules, not the model text. The bullet stays as the owner asked. Whether it saves context on a large app, where files
+  are long, was not measured. In the
+  extension (live.85) a read that finds no shadow copies once (`translator/src/sync.mjs` `syncForRead`).
 - 2026.11.20.1 (2026-11-20): **shorter harness text agents read** (an analysis of four sessions: the always-loaded
   live rule, the gated skills and `tests/mx.ts` were 25-45% of tool output, the live rule re-sent on every call).
   `templates/live.md` keeps one pointer per rare event (24.4k -> 16.9k characters); the steps for CE0463/CE6087/CE4899/

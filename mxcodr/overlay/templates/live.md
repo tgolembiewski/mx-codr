@@ -23,13 +23,13 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   and run only it and the ones after it, in a new script.
 - `conflict` means the person has unsaved edits in a document the statement touches: ask them to save
   (Ctrl/Cmd+S) and run it again. Nothing was written.
-- Reading the model: to find where something is used or what a document holds, grep `.mxcodr/model/` (one file
-  per document, `INDEX.tsv` first) and read the one file; never grep `mprcontents/`. Use `./mxcodr-live query`
-  (a copy of what Studio Pro saved) to read a document fresh before you change it, for `search '<text>'`,
-  `show references to M.Name`, `show context of M.Name` or a catalog select, and when `INDEX.tsv`'s state line or
-  `./mxcodr-live model status` says it lags. Put several statements in one query (`describe page M.A; describe
-  microflow M.B`), never a loop; never run a query again to page it: read or grep the `.mxcodr/out/` file it names.
-  A refused read lists the valid forms. Check a script first with `./mxcodr-live check <script.mdl>`.
+- Reading the model: `.mxcodr/model/` has one file per document (`INDEX.tsv` lists them); never grep `mprcontents/`.
+  Find what you need with one `grep -rn` (several names in one pattern), then read only the lines around the hits (Read
+  with offset and limit, or `sed -n 40,90p` on several files in one command); a whole file only when you need all of
+  it. Use `./mxcodr-live query` (a copy of what Studio Pro saved) to read a document fresh before you change it, for
+  `search '<text>'`, `show references to M.Name`, `show context of M.Name` or a catalog select, and when `INDEX.tsv`'s
+  state line or `./mxcodr-live model status` says it lags. Several statements in one query, never a loop; never re-run
+  one to page it: read the `.mxcodr/out/` file it names. Check a script first with `./mxcodr-live check <script.mdl>`.
 - `./mxcodr-live status` says whether Studio Pro is connected, its version, the open editors, and how many
   files are uncommitted. When a command says it cannot reach Studio Pro, pass on its own instruction to the
   person word for word; do not add steps of your own.
