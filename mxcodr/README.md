@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.20.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.20.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,12 @@ Bundle **2026.11.20.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.20.5 (2026-11-20): **no `FINDINGS.md` in live mode**. mxcli init's CLAUDE.md and AGENTS.md ("Finishing a
+  change", step 3) have agents append to `FINDINGS.md`; on a large app it grew to 13.5 KB in a day, read whole before
+  each append and by nobody else (setup git-ignores it). A 2-line bullet in `templates/live.md`, right after the `mx`
+  override (so in the AGENTS.md live block for Codex and Pi too): step 3 does not apply, the finding goes into the
+  answer, the brain takes only its rule's three triggers. mxcli's own section is untouched. The live rule grows by 230
+  bytes (17,828). `test/live.test.mjs` pins it. File mode is unchanged.
 - 2026.11.20.4 (2026-11-20): the project-files grep in `templates/live.md` also leaves out `.mxcli` (mxcli's own caches
   in the app folder: catalog.db, unit-contents.db, widget definitions). `test/live.test.mjs` pins it. In the extension
   (live.91) a read's copy now also follows `widgets/` and `modules/`, and a busy `.mpr` is waited for up to 5 s

@@ -141,6 +141,24 @@ test('live rule file overrides CLAUDE.md on mx: problems and mxcheck, never a ha
   assert.match(t, /never call `mx` by a\n  path under `~\/\.mxcli\/mxbuild\/` or a glob/);
 });
 
+// bundle 2026.11.20.5: mxcli init's CLAUDE.md/AGENTS.md "Finishing a change" step 3 has agents append to FINDINGS.md (a
+// large app: 13.5 KB in a day, read whole before each append, read by nobody; setup git-ignores it). In live mode the
+// finding goes into the answer, and the brain keeps only what its rule's three capture triggers name.
+test('live rule file overrides CLAUDE.md step 3: no FINDINGS.md, the finding goes into the answer; right after the mx bullet', () => {
+  const d = tmp();
+  writeRules(d, ['claude', 'codex'], { live: true });
+  const lr = fs.readFileSync(path.join(d, LIVE_RULE_FILE), 'utf8');
+  const at = lr.indexOf('- Step 3 of `CLAUDE.md`');
+  assert.ok(at > 0, 'the bullet is there');
+  const b = lr.slice(at, lr.indexOf('\n- ', at + 3));
+  assert.match(b, /Step 3 of `CLAUDE\.md`'s "Finishing a change" does not apply here: never write or read `FINDINGS\.md`\./);
+  assert.match(b, /Say what you\s+found and how you verified it in your answer; the project brain takes only what its rule's three triggers name\./);
+  assert.ok(b.split('\n').length <= 2, `short: ${b.split('\n').length} lines`);
+  assert.ok(lr.lastIndexOf('- This replaces what `CLAUDE.md` says about `mx`', at) > 0 && at < lr.indexOf('- Marketplace modules'), 'beside the other CLAUDE.md override');
+  // the brain rule it points at names exactly three triggers
+  assert.match(readTemplate('brain.md'), /Capture on three\ntriggers only/);
+});
+
 test('live.74 live rule file: what a turn changed comes from ./mxcodr-live changes, never git; Studio Pro\'s regenerated files are named', () => {
   const t = fs.readFileSync(new URL('../overlay/templates/live.md', import.meta.url), 'utf8');
   assert.match(t, /`\.\/mxcodr-live changes list`/);

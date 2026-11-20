@@ -60,6 +60,8 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   mxbuild, so that folder has no `mx`, and another version's `mx` refuses this app). Errors and warnings come
   from `./mxcodr-live problems`; the full check is `./mxcodr-live mxcheck` (`mxcli docker check` on a copy of
   what Studio Pro saved, the right `mx` for the app's version).
+- Step 3 of `CLAUDE.md`'s "Finishing a change" does not apply here: never write or read `FINDINGS.md`. Say what you
+  found and how you verified it in your answer; the project brain takes only what its rule's three triggers name.
 - Marketplace modules (publishers Mendix or Mendix Labs only): `./mxcodr-live marketplace install <id|name>`
   (`marketplace search <words>` finds the id); a newer version with `./mxcodr-live marketplace update <id|name>
   --plan-only` first: tell the person what the plan prints and ask; the real run only after their yes. After the
