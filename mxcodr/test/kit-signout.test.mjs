@@ -187,3 +187,40 @@ test('apiContext is a plain Basic-auth context: Basic auth creates no session (m
   assert.equal(typeof kit.test.fixtures.sessionCheck[0], 'function');
   assert.deepEqual(kit.test.fixtures.sessionCheck[1], { auto: true });
 });
+
+// A film sets MXCODR_FILM_HOLD_MS (tests/film.mjs's wrapper): signOut holds the screen before it leaves it, unless
+// the film held that page at its test's end already (the wrapper's set) or the page is blank; a normal run never waits.
+async function timedSignOut(page) {
+  const t = Date.now();
+  await kit.signOut(page);
+  return Date.now() - t;
+}
+test('a film: signOut holds the screen MXCODR_FILM_HOLD_MS before leaving it; a normal run does not wait', { skip }, async () => {
+  const before = process.env.MXCODR_FILM_HOLD_MS;
+  try {
+    delete process.env.MXCODR_FILM_HOLD_MS;
+    let page = fakePage();
+    await kit.signIn(page, 'u', '.home', 'p');
+    assert.ok(await timedSignOut(page) < 150, 'no variable: no wait');
+    process.env.MXCODR_FILM_HOLD_MS = '400';
+    page = fakePage();
+    await kit.signIn(page, 'u', '.home', 'p');
+    assert.ok(await timedSignOut(page) >= 390, 'held before leaving');
+    assert.deepEqual(page.calls, ['goto about:blank', 'POST /xas/ logout T-signin'], 'then signed out as always');
+    // held by the film at the test's end already: not again
+    page = fakePage();
+    await kit.signIn(page, 'u', '.home', 'p');
+    (globalThis[Symbol.for('mxcodr.film.held')] ??= new WeakSet()).add(page);
+    assert.ok(await timedSignOut(page) < 150, 'held once');
+    // a page already on about:blank has nothing to show
+    page = fakePage();
+    await kit.signIn(page, 'u', '.home', 'p');
+    await page.goto('about:blank');
+    assert.ok(await timedSignOut(page) < 150, 'a blank page is not held');
+    // never signed in: returns at once as before
+    page = fakePage({ app: false, cookie: false });
+    assert.ok(await timedSignOut(page) < 150);
+  } finally {
+    if (before === undefined) delete process.env.MXCODR_FILM_HOLD_MS; else process.env.MXCODR_FILM_HOLD_MS = before;
+  }
+});

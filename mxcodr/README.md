@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.20.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,23 @@ Bundle **2026.11.20.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.1 (2026-11-21): **a film holds the screen a test ends on**. The result screen of a filmed test (passed,
+  or where it failed) vanished at once: Playwright runs `afterEach` hooks innermost first, and the spec's import in
+  film.mjs's wrapper is evaluated before the wrapper's own hooks, so the kit's `signOut` (a describe's or the file's
+  `afterEach`) left the page before the wrapper's 2 s pause, which then filmed `about:blank` (measured on a fake app:
+  0 s of the passed screen, 0.5 s of the failed one). Now `wrapperText` sets `MXCODR_FILM_HOLD_MS` and its
+  `beforeEach` adds the hold to the callbacks Playwright awaits right after the test function and before any
+  `afterEach` (`testInfo._onDidFinishTestFunctionCallbacks`, the set its own `screenshot: 'only-on-failure'` uses;
+  internal, feature-detected, checked against the pinned 1.64.1 by `test/film.test.mjs`). The kit's `signOut`
+  (`mx-impl.ts`) holds as long before it leaves a page, for a sign-out inside the test (a role switch too) and a
+  Playwright without that set; a page held once, or on `about:blank`, is not held again, and a normal run (no
+  variable) never waits. The hold is `max(5500, 2 × pace)` ms on every film, `--pace 0` included (a 5000 ms hold
+  showed 4.9 s on the video): measured at 5.4-6.0 s of the result screen before the sign-out, describe- and
+  file-level, passed and failed, pace 1000 and 0, and with the internal set switched off. A plain timer, so no step
+  in the report or the trace. The `--all` estimate counts the hold. An app's unedited shipped `mx-impl.ts`/`mx.ts`
+  becomes the new one on the next install or setup (`overlay/lib/kit-shipped.json` regenerated); an edited one is
+  the person's and keeps its `signOut`, and its films still hold through the wrapper unless that `signOut` runs
+  inside the test body. `tests/film.mjs` is rewritten on every install.
 - 2026.11.20.6 (2026-11-20): **a click on a missing element fails in 10 s**. The kit's `playwright.config.ts` has
   `actionTimeout: 10_000` (was 20_000), with a comment saying why: a click or fill on an element that never appears (a
   wrong widget name, a dialog not open yet) waited 20 s per failure, and an agent iterating on a spec lost minutes; a
@@ -893,7 +910,8 @@ films on its own.
 
 The film is the test as it is, slowed: a title card names the test for three seconds, an animated pointer
 travels to each element before it is clicked or filled, each action waits 1000 ms, and the test's title
-stays in a small label at the bottom. Typed values never show as captions (Playwright's action callouts are
+stays in a small label at the bottom. The screen the test ends on, passed or failed, stays at least 5 s before
+its sign-out (also at `--pace 0`). Typed values never show as captions (Playwright's action callouts are
 off). By hand, in the app folder, with the app running:
 
     node tests/film.mjs --list                # every test, numbered, with file:line
@@ -908,7 +926,9 @@ its film, which shows where it stopped.
 Normal runs are unaffected: `tests/playwright.config.ts` has no video or slow-down. While it films,
 `film.mjs` writes a temporary `.film.config.ts` beside the app's config (spreading it and adding only
 `use.video` with `show.actions` and `show.test`) and one wrapper per spec in `.film/` (a `beforeEach` that
-shows the title card, then the spec imported unchanged), and removes both afterwards.
+shows the title card and holds the last screen, then the spec imported unchanged), and removes both afterwards.
+The hold runs right after the test function, before any `afterEach`; the kit's `signOut` holds too when
+`MXCODR_FILM_HOLD_MS` is set (only in a film) and the page was not held yet.
 
 ## Change the look later
 

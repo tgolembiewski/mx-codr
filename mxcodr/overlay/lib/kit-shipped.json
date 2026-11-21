@@ -3,6 +3,8 @@
   "files": {
     "tests/mx-impl.ts": {
       "69b47e6c9d66d7524fbad4d53732e228ea9f3c6a1b85c127d82ab67076acf05e": "working tree plain",
+      "d42458223aae5c9e2b87c92fbf9a746b91c15bcf7c34d9c22e512f14f17151cf": "working tree plain",
+      "f3adf83b87e45451ed17999f80f008ab762002857620fcdc8b580b2cb2d9069f": "working tree live",
       "f7c5b4a659e383b9892355ee9edec05aabbca1e72be1ad98ab79aefb833d8e9f": "working tree live"
     },
     "tests/mx.ts": {
@@ -18,6 +20,7 @@
       "9ad295ec1f959d88c0b0727bf5074aee626f4f7a6d6d05c43701eb2b6f21850f": "96d3ecfc 2026-11-05 live",
       "b69b8264721169638ba3cdbe416e93f90e9770362ead55199902e1af60fc2264": "e725b1d0 2026-11-01 plain",
       "bcb53e68496b88644219d8625df1b47738b533bdf8b48c356f965dffdfb687c2": "52b5f71d 2026-11-08 live",
+      "c2fd55bd49ca06c1254702ad8e8accd7e80a903064e572b0d92d988340fe88a1": "working tree plain",
       "c5014beabf73519b89309cb97624928d75b4714a9d8ae990ba15d60f0e54e8b0": "4ea32df8 2026-11-01 plain",
       "cad0baae4d628543f920624d7813c5c1763f03a7fc0fa7c59d09f53bd34d96d5": "438baac1 2026-11-01 plain",
       "d04558a9bba3c48e8f4c094a6e5c0f1605eb85fc09d9d675d1192fd646b64ade": "working tree plain",

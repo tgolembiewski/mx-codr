@@ -13,7 +13,9 @@ annotations. On the film:
 - a **title card** names the test (and its file) for three seconds before it starts;
 - an animated **pointer** travels to each element before it is clicked or filled;
 - every action is **paced** (1000 ms by default), so a person can follow it;
-- the test's title stays in a small label at the bottom while it runs.
+- the test's title stays in a small label at the bottom while it runs;
+- the screen the test ends on, passed or where it failed, stays at least five
+  seconds before the test signs out.
 
 Typed values never appear as captions (Playwright's action callouts are switched
 off); a password field shows dots, as it does on screen.

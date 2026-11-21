@@ -13,7 +13,8 @@
 // The film lands in .mxcli/films/<title>.mp4 (with ffmpeg) or .webm (open that in Chrome or Firefox). The test
 // runs unchanged: a temporary config spreads the app's Playwright config and adds only video recording with
 // Playwright's own annotations (an animated pointer travels to each element, each action is paced, the action
-// callouts are hidden so no typed value shows) and a title card naming the test before it starts. The app's
+// callouts are hidden so no typed value shows), a title card naming the test before it starts, and the screen it
+// ends on (passed, or where it failed) held at least 5 s before its sign-out (holdMs, wrapperText). The app's
 // playwright.config.ts is never edited, so a normal `npx playwright test` records nothing and is not slowed.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,8 +23,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_PACE = 1000;
-// what one slowed test takes on average (b2b-full so7, pace 1000): for the --all estimate
-export const SECONDS_PER_TEST = 40;
+// what one slowed test takes on average (b2b-full so7, pace 1000), without the hold at its end: for the --all estimate
+export const SECONDS_PER_TEST = 38;
+// The screen a filmed test ends on (passed, or where it failed) stays this long on the film before any afterEach
+// hook (the kit's signOut) leaves it: at least 5 s, also at --pace 0, and two actions' time at a slower pace. The
+// video shows a screen a little after the page has it: a 5000 ms hold at --pace 0 showed 4.9 s on the film
+// (measured 2026-11-21), so the hold is half a second longer.
+export const MIN_HOLD_MS = 5500;
+export const holdMs = pace => Math.max(MIN_HOLD_MS, 2 * pace);
 const USAGE = 'node tests/film.mjs --list | <number | words from the title | file.spec.ts[:line]> | --all | --status | --stop  [--pace <ms>]';
 
 // argv -> { cmd: 'help' | 'list' | 'one' | 'all' | 'all-run' | 'status' | 'stop', pace, query } or { error }
@@ -131,16 +138,33 @@ export default defineConfig({
 }
 
 // One wrapper per filmed spec, named like it (the on-screen title shows the spec's own name): a title card
-// before each test, then the spec itself, imported unchanged.
+// before each test, the hold at its end, then the spec itself, imported unchanged. The hold: Playwright runs the
+// afterEach hooks innermost first, and the spec's import is evaluated before the wrapper's own hooks are registered,
+// so no afterEach of the wrapper can run before the spec's sign-out. The wrapper's beforeEach adds the hold to the
+// callbacks Playwright awaits right after the test function ends, passed or failed, before any afterEach (the set
+// its own screenshot: 'only-on-failure' uses; internal to Playwright, measured on 1.64.1, so looked for first).
+// MXCODR_FILM_HOLD_MS tells the kit's signOut (tests/mx-impl.ts) to hold the same time before it leaves the page,
+// for a sign-out inside the test and a Playwright without that set; a page held once at its end, or already on
+// about:blank, is not held again. A plain timer, not page.waitForTimeout: no step in the report or the trace.
 export function wrapperText(importPath, pace) {
+  const hold = holdMs(pace);
   return `// written by tests/film.mjs for one film and removed after it
 import { test } from '@playwright/test';
+process.env.MXCODR_FILM_HOLD_MS = '${hold}';
+const held = globalThis[Symbol.for('mxcodr.film.held')] ??= new WeakSet();
+const hold = async page => {
+  if (held.has(page) || page.isClosed() || page.url() === 'about:blank') return;
+  held.add(page);
+  await new Promise(resolve => setTimeout(resolve, ${hold}));
+};
 test.beforeEach(async ({ page }, testInfo) => {
   await page.screencast.showChapter(testInfo.title, { description: testInfo.titlePath.slice(0, -1).join(' › '), duration: ${pace > 0 ? 3000 : 1500} });
+  const atEnd = testInfo._onDidFinishTestFunctionCallbacks;
+  if (atEnd && typeof atEnd.add === 'function') atEnd.add(() => hold(page));
 });
-${pace > 0 ? `// the last screen stays a moment; a file-level afterEach of the spec (sign-out) runs after this one, one inside a describe before it
-test.afterEach(async ({ page }) => { await page.waitForTimeout(${2 * pace}); });
-` : ''}import ${JSON.stringify(importPath)};
+// a Playwright without that set (or a beforeEach of the spec that failed before this one): the screen still there
+test.afterEach(async ({ page }) => { await hold(page); });
+import ${JSON.stringify(importPath)};
 `;
 }
 
@@ -327,7 +351,7 @@ async function main() {
     const child = spawn(process.execPath, [self, '--pace', String(opt.pace), '--all-run'], { cwd: where.app, detached: true, stdio: ['ignore', log, log], windowsHide: true });
     fs.writeFileSync(pidFile(where), String(child.pid));
     child.unref();
-    const minutes = Math.ceil(filmable.length * SECONDS_PER_TEST * Math.max(opt.pace, 250) / DEFAULT_PACE / 60);
+    const minutes = Math.ceil(filmable.length * (SECONDS_PER_TEST * Math.max(opt.pace, 250) / DEFAULT_PACE + holdMs(opt.pace) / 1000) / 60);
     say(`Filming ${filmable.length} tests in the background: about ${minutes} minutes.`);
     say(`  progress: node tests/film.mjs --status      log: ${path.relative(where.app, logFile(where))}`);
     say('  stop:     node tests/film.mjs --stop');

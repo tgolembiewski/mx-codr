@@ -1,10 +1,16 @@
-// tests/film.mjs (overlay/templates/film.mjs): the pure parts of the film recorder. The recording itself (Playwright,
-// a running app) is proven by the smoke run on a real app, not here. fixtures/film-list.json is the output of
+// tests/film.mjs (overlay/templates/film.mjs): the pure parts of the film recorder, and the hold at a test's end in a
+// real Playwright run (without a video; skipped without the pinned Playwright). The recording itself (a running app)
+// is proven by the smoke run on a real app, not here. fixtures/film-list.json is the output of
 // `npx playwright test --list --reporter=json` on b2b-full so7 (2026-11-02), trimmed to three files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { parseArgs, testsFromList, needsBrowser, pick, slug, grepFor, filmConfigText, wrapperText, collectResults, DEFAULT_PACE } from '../overlay/templates/film.mjs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { parseArgs, testsFromList, needsBrowser, pick, slug, grepFor, filmConfigText, wrapperText, collectResults, DEFAULT_PACE, MIN_HOLD_MS, holdMs } from '../overlay/templates/film.mjs';
 
 const list = JSON.parse(fs.readFileSync(new URL('./fixtures/film-list.json', import.meta.url), 'utf8'));
 const tests = testsFromList(list);
@@ -87,8 +93,67 @@ test('the film config spreads the app\'s config and adds only the video: pointer
   assert.match(w, /page\.screencast\.showChapter\(testInfo\.title, \{ description: testInfo\.titlePath\.slice\(0, -1\)\.join\(' › '\), duration: 3000 \}\)/);
   assert.match(w, /^import "\.\.\/orders\.spec";$/m);
   assert.ok(w.indexOf('beforeEach') < w.indexOf('import "../orders.spec"'), 'the hook is registered before the spec\'s tests');
-  assert.match(w, /test\.afterEach\(async \(\{ page \}\) => \{ await page\.waitForTimeout\(2000\); \}\);/, 'the last screen is held');
-  assert.doesNotMatch(wrapperText('../orders.spec', 0), /afterEach/, 'pace 0: no hold');
+  assert.match(w, /^import \{ test \} from '@playwright\/test';$/m, 'the line the pane\'s films.mjs rewrites, byte for byte');
+  assert.match(w, /^process\.env\.MXCODR_FILM_HOLD_MS = '5500';$/m, 'the kit\'s signOut holds as long');
+  assert.match(w, /testInfo\._onDidFinishTestFunctionCallbacks;\n  if \(atEnd && typeof atEnd\.add === 'function'\) atEnd\.add\(\(\) => hold\(page\)\);/, 'held right after the test function, before any afterEach');
+  assert.match(w, /setTimeout\(resolve, 5500\)/);
+  assert.match(w, /test\.afterEach\(async \(\{ page \}\) => \{ await hold\(page\); \}\);/, 'the fallback');
+  assert.match(w, /if \(held\.has\(page\) \|\| page\.isClosed\(\) \|\| page\.url\(\) === 'about:blank'\) return;/, 'held once, never a blank page');
+  assert.doesNotMatch(w, /waitForTimeout/, 'a plain timer: no step in the report or the trace');
+  assert.equal(MIN_HOLD_MS, 5500);
+  assert.equal(holdMs(0), 5500, 'pace 0 holds too: at least 5 s on every film');
+  assert.equal(holdMs(1000), 5500);
+  assert.equal(holdMs(4000), 8000, 'two actions\' time at a slow pace');
+  assert.match(wrapperText('../orders.spec', 0), /setTimeout\(resolve, 5500\)/);
+});
+
+test('the kit\'s signOut and the wrapper share the held pages and the variable', () => {
+  const impl = fs.readFileSync(new URL('../overlay/templates/tests/mx-impl.ts', import.meta.url), 'utf8');
+  assert.match(impl, /Symbol\.for\('mxcodr\.film\.held'\)/);
+  assert.match(wrapperText('x', 0), /Symbol\.for\('mxcodr\.film\.held'\)/);
+  assert.match(impl, /process\.env\.MXCODR_FILM_HOLD_MS/);
+  assert.match(impl, /await filmHold\(page\);\n  await page\.goto\('about:blank'\);/, 'held before signOut leaves the screen');
+});
+
+// The pinned Playwright (the extension's payload copy, or MXCODR_TEST_PW): its worker awaits the callbacks the
+// wrapper adds to after the test function and before the afterEach hooks (internal; a pin bump that drops it fails here).
+const PW = process.env.MXCODR_TEST_PW || fileURLToPath(new URL('../../spikes/studio-pro-ext/setup/playwright/node_modules', import.meta.url));
+const hasPw = fs.existsSync(path.join(PW, '@playwright/test/cli.js'));
+const hasBrowser = (() => { try { return hasPw && fs.existsSync(createRequire(path.join(PW, 'x.js'))('playwright-core').chromium.executablePath()); } catch { return false; } })();
+
+test('the pinned Playwright awaits the end-of-test callbacks before the afterEach hooks', { skip: !hasPw && 'no Playwright at ' + PW }, () => {
+  const worker = fs.readFileSync(path.join(PW, 'playwright/lib/worker/workerProcessEntry.js'), 'utf8');
+  assert.match(worker, /for \(const cb of this\._onDidFinishTestFunctionCallbacks\)\s+await cb\(\);/);
+  const finish = worker.indexOf('testInfo._didFinishTestFunction())');
+  const after = worker.indexOf('_runEachHooksForSuites(reversedSuites, "afterEach"', finish);
+  assert.ok(finish > 0 && after > finish, 'the callbacks run before the afterEach hooks');
+});
+
+test('a filmed test holds its last screen before a describe-level afterEach leaves it, passed and failed', { skip: !hasBrowser && 'needs the pinned Playwright and its Chromium', timeout: 120_000 }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'film-hold-'));
+  try {
+    fs.mkdirSync(path.join(dir, '.film'));
+    fs.symlinkSync(PW, path.join(dir, 'node_modules'), process.platform === 'win32' ? 'junction' : undefined);
+    fs.writeFileSync(path.join(dir, 'package.json'), '{ "private": true }\n');
+    fs.writeFileSync(path.join(dir, 'h.spec.ts'), `import { test, expect } from '@playwright/test';
+test.afterEach(async ({ page }) => { console.log('FILELEVEL ' + Date.now()); });
+test.describe('hold', () => {
+  test.afterEach(async ({ page }) => { console.log('SIGNOUT ' + Date.now()); await page.goto('about:blank'); });
+  test('passes', async ({ page }) => { await page.goto('data:text/html,<p>done</p>'); console.log('END ' + Date.now()); });
+  test('fails', async ({ page }) => { await page.goto('data:text/html,<p>no</p>'); console.log('END ' + Date.now()); expect(1).toBe(2); });
+});
+`);
+    fs.writeFileSync(path.join(dir, '.film', 'h.spec.ts'), wrapperText('../h.spec', 0));
+    fs.writeFileSync(path.join(dir, 'c.config.ts'), "export default { testDir: './.film', testMatch: '**/*', workers: 1, reporter: 'list', use: { headless: true } };\n");
+    const r = spawnSync(process.execPath, [path.join(PW, '@playwright/test/cli.js'), 'test', '-c', 'c.config.ts'], { cwd: dir, encoding: 'utf8', timeout: 110_000 });
+    const out = r.stdout + r.stderr;
+    const ts = [...out.matchAll(/^(END|SIGNOUT|FILELEVEL) (\d+)$/gm)].map(m => [m[1], Number(m[2])]);
+    assert.deepEqual(ts.map(t => t[0]), ['END', 'SIGNOUT', 'FILELEVEL', 'END', 'SIGNOUT', 'FILELEVEL'], out);
+    for (const i of [0, 3]) assert.ok(ts[i + 1][1] - ts[i][1] >= MIN_HOLD_MS - 50, `held ${ts[i + 1][1] - ts[i][1]} ms before the sign-out\n${out}`);
+    for (const i of [1, 4]) assert.ok(ts[i + 1][1] - ts[i][1] < 1000, 'held once: not again after the sign-out');
+    assert.match(out, /1 failed/);
+    assert.match(out, /1 passed/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('the kit\'s own config records nothing and is not slowed: only film.mjs films', () => {
