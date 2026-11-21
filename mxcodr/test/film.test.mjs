@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, testsFromList, needsBrowser, pick, slug, grepFor, grepForAll, filmConfigText, wrapperText, collectResults, DEFAULT_PACE, MIN_HOLD_MS, holdMs,
-  LIVE_PACE, LIVE_HOLD_MS, HOLD_PICK_S, CARD_MS, CARD_LIVE_MS, MID_HOLD_MS, livePace, videoText, TIMELINE_REPORTER, timelineOf, filmPlan, filmSecond, filmTime, filterText, sumTree, ffmpegArgs, makeFilm, isTest, LAG_S } from '../overlay/templates/film.mjs';
+  LIVE_PACE, LIVE_HOLD_MS, HOLD_PICK_S, CARD_MS, CARD_LIVE_MS, MID_HOLD_MS, livePace, videoText, TIMELINE_REPORTER, timelineOf, filmPlan, filmSecond, filmTime, filterText, sumTree, ffmpegArgs, makeFilm, isTest, LAG_S, onPath, taskkillPath } from '../overlay/templates/film.mjs';
 
 const list = JSON.parse(fs.readFileSync(new URL('./fixtures/film-list.json', import.meta.url), 'utf8'));
 const tests = testsFromList(list);
@@ -343,6 +343,20 @@ test('the kit\'s own config records nothing and is not slowed: only film.mjs fil
   assert.doesNotMatch(kit, /video|slowMo|launchOptions|screencast/);
   const film = fs.readFileSync(new URL('../overlay/templates/film.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(film, /writeFileSync\([^)]*playwright\.config/, 'film.mjs never writes the app\'s config');
+});
+
+test('bundle 2026.11.21.4 (red-team H1): ffmpeg by its full path, never from the app folder or a relative PATH entry; Windows\' own taskkill', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-film-h1-'));
+  const app = path.join(root, 'app'), bin = path.join(root, 'bin');
+  for (const d of [path.join(app, 'tools'), bin]) fs.mkdirSync(d, { recursive: true });
+  for (const d of [path.join(app, 'tools'), bin]) fs.writeFileSync(path.join(d, 'ffmpeg'), '');
+  const env = { PATH: ['.', 'tools', path.join(app, 'tools'), bin].join(':') };
+  assert.equal(onPath('ffmpeg', { env, platform: 'darwin', notUnder: app }), path.join(bin, 'ffmpeg'), 'the app\'s own and the relative entries are skipped');
+  assert.equal(onPath('ffmpeg', { env: { PATH: path.join(app, 'tools') }, platform: 'darwin', notUnder: app }), null);
+  assert.equal(taskkillPath({ SystemRoot: 'C:\\Windows' }), 'C:\\Windows\\System32\\taskkill.exe');
+  const src = fs.readFileSync(new URL('../overlay/templates/film.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /spawnSync\('(ffmpeg|taskkill)'/, 'no bare program names');
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('the film run\'s JSON report gives each test\'s status and video', () => {

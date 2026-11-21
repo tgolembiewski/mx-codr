@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.21.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,13 @@ Bundle **2026.11.21.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.4 (2026-11-21, extension live.104, red-team H1): **`tests/film.mjs` runs ffmpeg and taskkill by their
+  full paths**. It ran `ffmpeg` and `taskkill` by their bare names; on Windows a bare name runs a file of that name in
+  the current folder (the app) first, so an `ffmpeg.exe` committed to the app ran with `node tests/film.mjs` (by hand
+  or by an agent; the pane's own films already used full paths, live.60). Now `onPath` takes ffmpeg from the PATH's
+  absolute folders, none inside the app, and `taskkillPath` is `%SystemRoot%\System32\taskkill.exe`. The test kit is
+  unchanged (`kit-shipped.json` too). Test: `test/film.test.mjs` (a planted `ffmpeg` in the app and in relative PATH
+  entries is skipped; no bare program name left in the file).
 - 2026.11.21.3 (2026-11-21): **the copies in the app are split into parts; nothing they do changes** (round 2 of the
   readability refactor). `tests/film.mjs` keeps its header (its `--help`), the running of a film and `FILM_EDITS`'
   three anchors; its parts are in `tests/film/` (`timing.mjs`, `pick.mjs`, `run-texts.mjs`, `slowing.mjs`, from

@@ -90,7 +90,22 @@ async function appUp(where) {
 }
 
 const filmsDir = where => path.join(where.app, '.mxcli', 'films');
-const ffmpegPath = () => (spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0 ? 'ffmpeg' : null);
+// bundle 2026.11.21.4 (red-team H1, as the pane's own films do since live.60): ffmpeg by its full path from the PATH
+// (absolute folders only, none inside the app), and Windows' own taskkill from System32: a bare name on Windows runs
+// a file of that name in the current folder (the app) first
+export function onPath(name, { env = process.env, platform = process.platform, notUnder = null } = {}) {
+  const P = platform === 'win32' ? path.win32 : path.posix;
+  const exts = platform === 'win32' ? (env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';').filter(Boolean) : [''];
+  const fold = p => (platform === 'win32' ? p.toLowerCase() : p);
+  const under = d => notUnder && (fold(P.resolve(d)) + P.sep).startsWith(fold(P.resolve(notUnder)) + P.sep);
+  for (const d of (env.PATH ?? env.Path ?? '').split(platform === 'win32' ? ';' : ':')) {
+    if (!d || !P.isAbsolute(d) || under(d)) continue;
+    for (const e of exts) { const f = P.join(d, name + e); try { if (fs.statSync(f).isFile()) return f; } catch { } }
+  }
+  return null;
+}
+export const taskkillPath = (env = process.env) => path.win32.join(env.SystemRoot ?? env.windir ?? 'C:\\Windows', 'System32', 'taskkill.exe');
+const ffmpegPath = where => { const f = onPath('ffmpeg', { notUnder: where?.app }); return f && spawnSync(f, ['-version'], { stdio: 'ignore' }).status === 0 ? f : null; };
 const readLines = f => { try { return fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return {}; } }); } catch { return []; } };
 
 // One film run's folders and files: the work folder (cleared) in .mxcli/films/, and the wrappers' folder (cleared) and
@@ -130,7 +145,7 @@ function writeRunFiles(where, tests, pace, { work, wrapDir, configFile, timeline
  */
 async function filmTests(where, tests, pace, { numbered = false, url } = {}) {
   const { films, work, wrapDir, configFile, timeline, marks, reporter } = runFolders(where);
-  const ffmpeg = ffmpegPath();
+  const ffmpeg = ffmpegPath(where);
   let passed = 0, failed = 0;
   const done = new Set();
   let child = null, stoppedWhy = null;
@@ -217,7 +232,7 @@ async function stopAll(where) {
   if (!pid) { say('nothing is recording in the background'); return; }
   // the background run leads its own process group (detached): its playwright and browser end with it; on
   // Windows taskkill /T ends that one pid's tree
-  if (process.platform === 'win32') spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' });
+  if (process.platform === 'win32') spawnSync(taskkillPath(), ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' });
   else try { process.kill(-pid, 'SIGTERM'); } catch { process.kill(pid, 'SIGTERM'); }
   fs.rmSync(pidFile(where), { force: true });
   await new Promise(r => setTimeout(r, 1000));
