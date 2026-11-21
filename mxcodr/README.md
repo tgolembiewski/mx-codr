@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.21.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,18 @@ Bundle **2026.11.21.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.3 (2026-11-21): **the copies in the app are split into parts; nothing they do changes** (round 2 of the
+  readability refactor). `tests/film.mjs` keeps its header (its `--help`), the running of a film and `FILM_EDITS`'
+  three anchors; its parts are in `tests/film/` (`timing.mjs`, `pick.mjs`, `run-texts.mjs`, `slowing.mjs`, from
+  `overlay/templates/film/`). `.mxcodr/skill-gate.mjs` keeps the hook (`runHook`); its parts are in
+  `.mxcodr/skill-gate/` (`needs.mjs`, `reads.mjs`, `decide.mjs`, `codex.mjs`, `hooks.mjs`, `common.mjs`, from
+  `overlay/lib/skill-gate/`). Both scripts re-export everything they exported. `copyFilm` and `installSkillGate`
+  write the parts first and replace the folder whole (a link there is removed, never written through); the folder
+  goes when Claude Code is deselected, and the extension's setup removes `.mxcodr/skill-gate/` with the file-mode
+  copy and git-ignores `/tests/film/` beside `/tests/film.mjs`. Proof: every export and constant of both scripts the
+  same as at c478827d, and their runs in an app (`film.mjs` help and refusals, the gate's deny, read, reset and
+  fail-open) the same (`test/parity.test.mjs`); the rest of an install byte for byte the same. The kit
+  (`templates/tests/`) is not split (`mx-impl.ts` is 378 lines, no function over 60): `kit-shipped.json` is unchanged.
 - 2026.11.21.2 (2026-11-21): **a film records at almost the test's own speed; the slowing is done on the video**.
   Measured on a Mendix app (MxCodrTMasterMind, 20 tests without OQL, plain run 33.6 s): one test of 9 actions took
   20.9 s to film against a 2.2 s plain run (3.4 s title card, 9.4 s of 1 s pace, 5.5 s end hold, 0.5 s ffmpeg, the
@@ -659,7 +671,8 @@ has read the project skill for it whole; no verdict, no other refusals.
                                    free: the --boot smoke boot's port check),
                                    theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs),
                                    skill-gate.mjs (Claude Code's skill gate; copied into the app as
-                                   .mxcodr/skill-gate.mjs, its hooks in .claude/settings.local.json),
+                                   .mxcodr/skill-gate.mjs, its hooks in .claude/settings.local.json) and
+                                   skill-gate/ (its parts, copied as .mxcodr/skill-gate/),
                                    ui.mjs (what the installer prints: v1's banner, bar, marks, summary)
     overlay/themes/                catalog.json, per theme <name>.css (tokens) and <name>.skin.scss (frame),
                                    logos/<name>/, the preview page and its screenshots
@@ -671,7 +684,8 @@ has read the project skill for it whole; no verdict, no other refusals.
     overlay/templates/tests/       the starter test kit
     overlay/lib/kit-shipped.json   sha256 of every kit version shipped (an unedited one is replaced)
     tools/kit-shipped.mjs          writes kit-shipped.json from git history; rerun after a kit change
-    overlay/templates/film.mjs     the film recorder, installed as tests/film.mjs
+    overlay/templates/film.mjs     the film recorder, installed as tests/film.mjs; its parts in
+                                   overlay/templates/film/, installed as tests/film/
     overlay/templates/coverage.mjs the coverage check, installed as tests/coverage.mjs (coverage on), with
                                    coverage-done.md and coverage-durable-tests.md, the two texts it swaps in
     overlay/skills/                our skills

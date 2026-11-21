@@ -17,6 +17,8 @@ import { installerSource } from './installer-source.mjs';
 // the hooks prefer CLAUDE_PROJECT_DIR (set when this suite runs inside Claude Code): never another folder from here
 delete process.env.CLAUDE_PROJECT_DIR;
 const GATE = fileURLToPath(new URL('../overlay/lib/skill-gate.mjs', import.meta.url));
+// the gate as file mode installs it: the script, and its parts beside it (bundle 2026.11.21.3)
+const putGate = d => { put(d, SKILL_GATE, fs.readFileSync(GATE, 'utf8')); fs.cpSync(path.join(path.dirname(GATE), 'skill-gate'), path.join(path.dirname(path.join(d, SKILL_GATE)), 'skill-gate'), { recursive: true }); };
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-gate-')));
 const put = (d, rel, text) => { fs.mkdirSync(path.dirname(path.join(d, rel)), { recursive: true }); fs.writeFileSync(path.join(d, rel), text); };
 const SKILL = s => `.claude/skills/${s}/SKILL.md`;
@@ -170,7 +172,7 @@ test('the state: one file per session under .mxcodr/state/ (ignored by git), a s
 
 test('Reads that run in parallel (the deny\'s files in one batch) are all recorded', async () => {
   const d = app();
-  put(d, SKILL_GATE, fs.readFileSync(GATE, 'utf8'));
+  putGate(d);
   const { spawn } = await import('node:child_process');
   const one = s => new Promise(res => {
     const c = spawn(process.execPath, [path.join(d, SKILL_GATE), 'post'], { env: { PATH: process.env.PATH }, cwd: d });
@@ -185,7 +187,7 @@ test('Reads that run in parallel (the deny\'s files in one batch) are all record
 test('the hook as Claude Code runs it (file mode): sh, node on PATH, stdin in, exit 2 and the reason out; 0 once read', () => {
   const d = app();
   put(d, 'mdlsource/sec.mdl', 'CREATE MODULE ROLE Fleet.Manager;\nGRANT EXECUTE ON MICROFLOW Fleet.ACT_Save TO Fleet.Manager;\n');
-  put(d, SKILL_GATE, fs.readFileSync(GATE, 'utf8'));
+  putGate(d);
   const env = { PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH}`, CLAUDE_PROJECT_DIR: d, HOME: os.homedir() };
   const run = (mode, input) => spawnSync('sh', ['-c', fileModeCommand(mode)], { input, encoding: 'utf8', env, cwd: d });
   const call = JSON.stringify(bash(d, './mxcodr-live exec mdlsource/sec.mdl'));
@@ -284,7 +286,7 @@ test('reset fails open: bad input, no session, no state yet, a link, MXCODR_SKIL
   runHook('reset', JSON.stringify({ session_id: 's1', cwd: d, hook_event_name: 'SessionStart', source: 'compact' }), { MXCODR_SKILL_GATE: '0' });
   assert.deepEqual(readSkills(d, 's1'), ['app-security']);
   // as Claude Code runs it: sh, node, stdin; exit 0 and nothing printed, also for garbage
-  put(d, SKILL_GATE, fs.readFileSync(GATE, 'utf8'));
+  putGate(d);
   const env = { PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH}`, CLAUDE_PROJECT_DIR: d, HOME: os.homedir() };
   for (const input of ['garbage', JSON.stringify({ session_id: 's1', cwd: d, hook_event_name: 'SessionStart', source: 'compact' })]) {
     const r = spawnSync('sh', ['-c', fileModeCommand('reset')], { input, encoding: 'utf8', env, cwd: d });

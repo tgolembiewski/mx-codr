@@ -1,6 +1,6 @@
 // The mxcli release this bundle is pinned to, and the bundle's own version (YYYY.MM.DD.N).
 export const PIN = '0.32.0';
-export const BUNDLE = '2026.11.21.2';
+export const BUNDLE = '2026.11.21.3';
 // sha256 of each release asset of PIN (GitHub's asset digests, mendixlabs/mxcli v0.32.0). The Studio Pro extension's
 // setup downloads mxcli itself and checks it against this table; the file-mode installer does not read it yet.
 export const PIN_SHA256 = {
