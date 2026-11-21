@@ -143,10 +143,13 @@ test('harness round 2: install.mjs end to end (a stand-in mxcli): the same outpu
   const { PIN } = await imp(BUNDLE_DIR, 'overlay/lib/mx.mjs');
   const bin = stub(PIN);
   if (!bin) return; // no C compiler here: the step-by-step test above still runs
+  const request = path.join(tmp('mxcodr-par-req-'), 'request.md');
+  fs.writeFileSync(request, '# A request\n\nWord for word.\n');
   const runs = [
     ['--db', 'hsqldb', '--yes'],
     ['--db', 'hsqldb', '--yes', '--agent', 'cursor,codex', '--coverage'],
-    ['--yes', '--remove-agent', 'codex', '--no-coverage'],
+    ['--yes', '--remove-agent', 'codex', '--no-coverage', '--request', request, '--boot'],
+    ['--yes', '--db', 'nosuch'],
   ];
   const [a, b] = [oldApp(), oldApp()];
   for (const args of runs) {

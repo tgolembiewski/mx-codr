@@ -58,6 +58,27 @@ export { migrateBin, ensureLocalMxcli, replaceShim } from './install/mxcli.mjs';
 
 async function main() {
   const argv = process.argv.slice(2);
+  const { app, opt, run, live, mprsHere, newApp, foot, prev } = start(argv);
+  const { db, picked, cov, choice } = await takeChoices({ argv, opt, app, prev });
+  const { agents } = picked;
+
+  // the bar's steps, counted up front (v1: a plan one short pushed the bar past 100%)
+  ui.plan(15 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
+  const warnings = [];
+  const warn = s => { ui.note(s); warnings.push(s); };
+  const lastLine = r => `${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
+  const { found, mxcli, mpr, dbName } = await mxcliAndApp({ app, prev, foot, live, newApp, mprsHere });
+  const themeResult = showChoices({ app, mpr, db, dbName, agents, picked, choice, run, mxcli, warn });
+  await cacheMendix({ live, mxcli, mpr, db, dbName, warn, lastLine });
+  const { ruleTargets, skills, skillDirs, kit, brain } = installFiles({ app, agents, cov, prev, mpr, run, mxcli, warn });
+  await refreshMxcliSkills({ live, mxcli, warn, lastLine });
+  const { request } = await recordInstall({ app, opt, foot, mxcli, db, dbName, agents, skills, cov, kit, themeResult, prev });
+  await smokeBoot({ argv, db, dbName, live, run, mxcli, mpr, lastLine });
+  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked, coverage: cov.on, brain });
+}
+
+// The folder, the tools runner and the last install's record: what every later phase reads.
+function start(argv) {
   const app = argv[0] && !argv[0].startsWith('--') ? path.resolve(argv.shift()) : die('usage: node install.mjs <app folder> [--db hsqldb|postgres] [--agent claude] [--remove-agent <name>] [--coverage | --no-coverage] [--theme <name>] [--yes] [--boot] [--request <file>] [--no-app]');
   const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const env = { ...process.env, MXCLI_QUIET: '1' };
@@ -81,7 +102,10 @@ async function main() {
   // an upgrade from the v2 gate: its installed.json and downloaded mxcli move into .mxcodr/ first
   const prev = readJson(path.join(foot, 'installed.json'), null) || readJson(path.join(app, '.mxgate', 'installed.json'), {});
   migrateBin(app, prev);
+  return { app, opt, run, live, mprsHere, newApp, foot, prev };
+}
 
+async function takeChoices({ argv, opt, app, prev }) {
   // the choices first, as v1 asked its questions before the bar: database (kept from the last install unless
   // given), agents, then the app's look: --theme, else the last install's (its frame refreshed), else
   // asked once on a terminal; with no terminal or --yes nothing is applied (the look mxcli new gave it stays)
@@ -107,14 +131,10 @@ async function main() {
     if (choice.how === 'ask') choice = { name: await askTheme({ rl, write, plain: Boolean(process.env.NO_COLOR) }), how: 'flag' };
     rl.close();
   }
-  const { agents } = picked;
+  return { db, picked, cov, choice };
+}
 
-  // the bar's steps, counted up front (v1: a plan one short pushed the bar past 100%)
-  ui.plan(15 + (newApp ? 1 : 0) + (cov.on ? 1 : 0) + (opt('--request') ? 1 : 0) + (argv.includes('--boot') ? 1 : 0));
-  const warnings = [];
-  const warn = s => { ui.note(s); warnings.push(s); };
-  const lastLine = r => `${r.stderr || ''}\n${r.stdout || ''}`.trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
-
+async function mxcliAndApp({ app, prev, foot, live, newApp, mprsHere }) {
   // 1. mxcli: a found binary of the pinned version, else download it into .mxcodr/bin; ./mxcli is that binary
   ui.begin('finding mxcli');
   const found = findMxcli(app, prev);
@@ -135,7 +155,10 @@ async function main() {
   // after a new app: its scaffold's ./mxcli (a Linux build on macOS, or a link that broke in the move) is replaced
   const local = ensureLocalMxcli(app, mxcli);
   if (local) ui.note(local);
+  return { found, mxcli, mpr, dbName };
+}
 
+function showChoices({ app, mpr, db, dbName, agents, picked, choice, run, mxcli, warn }) {
   // 2. database and agents
   ui.begin('choosing the database');
   ui.done('database', db === 'postgres' ? `postgres (${dbName})` : 'hsqldb');
@@ -150,7 +173,10 @@ async function main() {
   if (!themeResult.line) ui.done('theme', 'none chosen, the app keeps its look (--theme <name> or node .mxcodr/theme.mjs)');
   else if (themeResult.ok) ui.done('theme', themeResult.line.replace(/^theme /, ''));
   else { ui.done('theme', 'not applied'); warn(themeResult.line); }
+  return themeResult;
+}
 
+async function cacheMendix({ live, mxcli, mpr, db, dbName, warn, lastLine }) {
   // 3. MxBuild and the runtime, so the agent's first boot does not pay for them
   ui.begin('caching MxBuild');
   const mxb = await live(mxcli, ['setup', 'mxbuild', '-p', mpr]);
@@ -160,7 +186,9 @@ async function main() {
   const setup = await live(mxcli, ['run', '--local', '--setup', ...(db === 'hsqldb' ? ['--db-type', 'hsqldb'] : ['--ensure-db', '--db-name', dbName]), '-p', mpr], { timeout: 1800000 });
   if (setup.status !== 0) die(`mxcli run --local --setup failed: ${`${setup.stderr || ''}\n${setup.stdout || ''}`.trim().split('\n').slice(-2).join(' ')}`, db === 'postgres' ? 'or install with --db hsqldb' : '');
   ui.done('runtime', `cached (${db})`);
+}
 
+function installFiles({ app, agents, cov, prev, mpr, run, mxcli, warn }) {
   // 4-6. the earlier bundles' files out, then our rule file and skills in
   for (const line of upgradeCleanup(app)) ui.note(`removed ${line}`);
   ui.begin('installing the session rule');
@@ -201,13 +229,19 @@ async function main() {
   }
   ui.begin('installing the theme tool');
   ui.done('theme tool', `${ui.i.arrow} ${installThemeTool(app)}`);
+  return { ruleTargets, skills, skillDirs, kit, brain };
+}
+
+async function refreshMxcliSkills({ live, mxcli, warn, lastLine }) {
   // mxcli's own skills and its section of CLAUDE.md/AGENTS.md, after writeRules: an AGENTS.md that had no mxcli
   // section has its markers now, and this fills them (it leaves our block, outside them, as it is)
   ui.begin("refreshing mxcli's own skills");
   const sync = await live(mxcli, ['init', '--sync-skills', '.']);
   if (sync.status === 0) ui.done('mxcli skills', `current for ${PIN}`);
   else { ui.done('mxcli skills', 'not refreshed'); warn(`mxcli init --sync-skills failed: ${lastLine(sync)}`); }
+}
 
+async function recordInstall({ app, opt, foot, mxcli, db, dbName, agents, skills, cov, kit, themeResult, prev }) {
   // installed.json: what a later person-run report or gate would read, nothing else
   const inst = { bundle: BUNDLE, mxcli: { path: mxcli, version: PIN }, db, ...(db === 'postgres' ? { dbName } : {}), agents, skills, ...coverageRecord(cov), testKit: kit.ours, ...(kit.edited.length ? { testKitEdited: kit.edited } : {}), theme: themeResult.theme, requests: prev.requests || {} };
   let request = null;
@@ -222,7 +256,10 @@ async function main() {
   ui.begin('recording the install');
   writeAtomic(path.join(foot, 'installed.json'), inst);
   ui.done('install record', `${ui.i.arrow} ${FOOTPRINT}/installed.json (bundle ${BUNDLE})`);
+  return { request };
+}
 
+async function smokeBoot({ argv, db, dbName, live, run, mxcli, mpr, lastLine }) {
   // 7. a smoke boot when asked: the app boots and answers, then stops again
   if (argv.includes('--boot')) {
     ui.begin('booting the app once');
@@ -238,7 +275,6 @@ async function main() {
     if (w.status !== 0) die(`the app is not ready: ${lastLine(w)}`, 'see .mxcli/run.log');
     ui.done('smoke boot', `the app boots (${(st.stdout || '').trim().split('\n').pop()}); stopped again`);
   }
-  summary({ app, mpr, newApp, mxcli, downloaded: !found, ruleTargets, skillDirs, kit, theme: themeResult.theme, db, dbName, request, warnings, agents, picked, coverage: cov.on, brain });
 }
 
 export function parseAgents(s) {
