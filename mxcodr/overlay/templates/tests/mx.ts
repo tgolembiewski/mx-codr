@@ -22,7 +22,8 @@ export const BASE: string = kit.BASE;
  * a failure names the sessions alive on the server. Keeps the CSRF token for signOut; a second signIn on a page signs out first. */
 export const signIn: (page: Page, user: string, homeMarker: string, password?: string) => Promise<void> = kit.signIn;
 /** Ends the session on the server (clearing cookies or closing the page leaves it alive), also from a refused page that
- * shows the login form; leaves the app for about:blank first. Throws, naming the page, when it cannot. Call it in test.afterEach. */
+ * shows the login form; leaves the app for about:blank first. Throws, naming the page, when it cannot. Call it in test.afterEach.
+ * In a film it holds the screen at least 5 s before leaving it (MXCODR_FILM_HOLD_MS); a normal run does not wait. */
 export const signOut: (page: Page) => Promise<void> = kit.signOut;
 /** Sessions alive on the server (System.Session); mx.teardown.ts prints `sessions left: N` after every run and fails it when N > 0. */
 export const sessionsLeft: () => number = kit.sessionsLeft;

@@ -21,6 +21,20 @@ const padEnd = (s, w) => s + ' '.repeat(Math.max(0, w - len(s)));
 const padStart = (s, w) => ' '.repeat(Math.max(0, w - len(s))) + s;
 
 export function makeUi({ out = process.stdout, err = process.stderr, env = process.env, isTTY = Boolean(out.isTTY), columns, clock = () => Date.now() } = {}) {
+  const { tty, unicode, c, i, cols } = terminal({ out, env, isTTY, columns });
+  const w = s => out.write(s);
+  const ui = {
+    tty, unicode, c, i,
+    ...opening({ w, c, i, unicode, cols }),
+  };
+  // the bar and the lines of the steps, then the summary's parts, on the same object (they call each other through ui)
+  Object.assign(ui, progress(ui, { w, tty, c, i, cols, clock }), failAndLive(ui, { err, tty, c, i }), summaryParts({ w, c }));
+  return ui;
+}
+
+// Colours and the bar only on a terminal (not with NO_COLOR or TERM=dumb), Unicode icons only with a UTF-8 locale, and
+// the width.
+function terminal({ out, env, isTTY, columns }) {
   const tty = Boolean(isTTY) && !env.NO_COLOR && (env.TERM || 'dumb') !== 'dumb'
     // Windows consoles have no TERM; Node's own isTTY is the test there (v1 ran in Git Bash, which sets one)
     || (Boolean(isTTY) && !env.NO_COLOR && !env.TERM && process.platform === 'win32');
@@ -36,13 +50,12 @@ export function makeUi({ out = process.stdout, err = process.stderr, env = proce
     : { ok: '+', warn: '!', fail: 'x', dot: '-', arrow: '->', play: '>', box: '*', full: '#', empty: '.' };
   let cols = Number(columns || env.COLUMNS || out.columns || 80); // v1: $COLUMNS, else tput cols
   if (!(cols >= 40)) cols = 80;
+  return { tty, unicode, c, i, cols };
+}
 
-  const w = s => out.write(s);
-  let total = 1, step = 0, label = '', subSeen = 0, began = clock(), timer = null;
-
-  const ui = {
-    tty, unicode, c, i,
-
+// The banner and the target line, printed before the bar.
+function opening({ w, c, i, unicode, cols }) {
+  return {
     banner(version) {
       // terminals narrower than 62 columns get plain words instead of the wordmark
       if (unicode && cols >= 62) {
@@ -57,7 +70,14 @@ export function makeUi({ out = process.stdout, err = process.stderr, env = proce
 
     // ▪ target <folder>  (what the install will do there)
     target(app, state) { w(`  ${c.grey}${i.box} target${c.reset} ${app}  ${c.grey}(${state})${c.reset}\n\n`); },
+  };
+}
 
+// The numbered bar over the steps and the lines each step prints; its state is the step count and the current label.
+function progress(ui, { w, tty, c, i, cols, clock }) {
+  let total = 1, step = 0, label = '', subSeen = 0, began = clock();
+
+  return {
     plan(n) { total = Math.max(1, n); },
 
     // done steps plus sub-progress, capped at 90% of the current step
@@ -114,7 +134,14 @@ export function makeUi({ out = process.stdout, err = process.stderr, env = proce
       w(`  ${c.yellow}${i.warn}${c.reset} ${text}\n`);
       ui.bar();
     },
+  };
+}
 
+// The failure lines on stderr, the bar's redraw while a slow tool runs, and the tool's lines read for the bar.
+function failAndLive(ui, { err, tty, c, i }) {
+  let timer = null;
+
+  return {
     // the first line in bold after a red cross, every other line indented below it; on stderr
     fail(first, ...rest) {
       ui.stop();
@@ -137,11 +164,14 @@ export function makeUi({ out = process.stdout, err = process.stderr, env = proce
       const m = /^Executing step '(.*)'$/.exec(line.trim());
       if (m) ui.sub(m[1]); else if (/\.\.\.\s*$/.test(line)) ui.tick();
     },
+  };
+}
 
-    // the summary's parts
+// The summary's parts.
+function summaryParts({ w, c }) {
+  return {
     head(icon, title) { w(`\n  ${c.bold}${icon} ${title}${c.reset}\n`); },
     row(what, count, where) { w(`     ${c.cyan}${padEnd(what, 10)}${c.reset} ${c.bold}${padStart(String(count), 3)}${c.reset}  ${where}\n`); },
     line(text = '') { w(`${text}\n`); },
   };
-  return ui;
 }

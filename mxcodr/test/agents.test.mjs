@@ -13,8 +13,9 @@ import { makeUi } from '../overlay/lib/ui.mjs';
 import { INSTALLED_SKILLS } from '../overlay/lib/skills.mjs';
 import { START, AGENTS as RULE_AGENTS } from '../overlay/lib/rules.mjs';
 import { AGENTS } from '../overlay/lib/agents.mjs';
+import { installerSource } from './installer-source.mjs';
 
-const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+const src = installerSource();
 
 test('the question is asked only on a terminal, without --agent, --remove-agent or --yes', () => {
   assert.equal(decideAgents({ tty: true }).how, 'ask');

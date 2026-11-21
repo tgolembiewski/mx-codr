@@ -12,6 +12,7 @@ import { writeRules, copySkills, copyTestKit, copyFilm, copyCoverage, coverageOf
 import { INSTALLED_SKILLS, skillsFor } from '../overlay/lib/skills.mjs';
 import { readTemplate, ruleText, parseRule, bodyLines, SKILLS_DIR, START, END } from '../overlay/lib/rules.mjs';
 import { makeUi } from '../overlay/lib/ui.mjs';
+import { installerSource } from './installer-source.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-cov-inst-'));
 const put = (root, rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
@@ -19,7 +20,7 @@ const get = (root, rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const exists = (root, rel) => { try { fs.lstatSync(path.join(root, rel)); return true; } catch { return false; } };
 const walk = (root, d = root, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); e.isDirectory() ? walk(root, p, out) : out.push(path.relative(root, p)); } return out.sort(); };
 const tree = root => Object.fromEntries(walk(root).map(f => [f, get(root, f)]));
-const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+const src = installerSource();
 const bundleSkill = rel => fs.readFileSync(new URL(`../overlay/skills/${rel}`, import.meta.url), 'utf8');
 const ALL = ['claude', 'cursor', 'codex', 'opencode', 'pi'];
 const DIRS = ['.claude/skills', '.cursor/skills', '.agents/skills', '.opencode/skills'];

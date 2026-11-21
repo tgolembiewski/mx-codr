@@ -1,4 +1,4 @@
-import { readTemplate } from './rules.mjs';
+import { readTemplate } from './templates.mjs';
 
 // Which of overlay/skills/ the installer copies into the app. To switch an optional skill on,
 // move its name from OPTIONAL_SKILLS to INSTALLED_SKILLS (one place; the tests follow).

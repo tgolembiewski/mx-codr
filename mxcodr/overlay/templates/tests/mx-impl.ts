@@ -216,6 +216,8 @@ export async function signIn(page: Page, user: string, homeMarker: string, passw
 // off, or a guest role) starts a new anonymous session at once (measured on Mendix 11.12: every test left one).
 // It returns quietly only when the page has no session cookie or this helper signed it out and no app page opened
 // since, and otherwise throws, naming the page. Call it in test.afterEach, and before a second signIn in the same test.
+// In a film (tests/film.mjs, the pane's Tests tab: they set MXCODR_FILM_HOLD_MS) the screen stays that long on the
+// film before signOut leaves it, unless the film already held it at the end of the test; a normal run never waits.
 export async function signOut(page: Page) {
   const kept = csrf.get(page);
   csrf.delete(page);
@@ -233,9 +235,20 @@ export async function signOut(page: Page) {
   }).catch(() => undefined);
   const token = mxToken ?? kept ?? await readToken(page.request);
   if (!token) throw new Error(`signOut: could not end the session of the page at ${page.url()}: no window.mx and no CSRF token to log out with`);
+  await filmHold(page);
   await page.goto('about:blank'); // the app's client stops here: nothing reloads and opens another session
   await postLogout(page.request, token);
   signedOut.add(page);
+}
+
+// The film's hold before a sign-out leaves the screen: the pages the film held at their test's end are in the same
+// set its wrapper keeps (a page there, or one on about:blank, is not held again). A plain timer: no step in the report.
+async function filmHold(page: Page) {
+  const ms = Number(process.env.MXCODR_FILM_HOLD_MS) || 0;
+  if (ms <= 0) return;
+  const held: WeakSet<Page> | undefined = (globalThis as any)[Symbol.for('mxcodr.film.held')];
+  if (held?.has(page) || page.url() === 'about:blank') return;
+  await new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Published REST and OData services take Basic authentication with the user's name and password. Such a call

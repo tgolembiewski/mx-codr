@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.20.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,79 @@ Bundle **2026.11.20.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.6 (2026-11-21, extension live.106, measured owner session): **`no change` is what the app's files have,
+  not what Studio Pro has**. Studio Pro's open model lost an access rule exec had landed (the app's files kept it); a
+  second exec said `no change` and the agent told the person the rule "already exists in the model". The extension now
+  reads Studio Pro for such a statement (`no change (Studio Pro agrees)`, or a new `drift` verdict) and has a read-only
+  `./mxcodr-live verify`. `templates/live.md`: `drift` joins the verdict list, and one bullet after `conflict`: say "the
+  app's files already have it" on `no change`, never "already in Studio Pro / in the model"; on `drift` never ask the
+  person to save that document; run `./mxcodr-live verify` when the person says they do not see a change. The live
+  rule grows by 420 bytes (18,356); `test/live.test.mjs` pins the bullet.
+- 2026.11.21.5 (2026-11-21, extension live.105, owner request): **the live rule points to the pane's unsaved-changes
+  bar**. The extension's Chat now shows a bar above the message box while Studio Pro has documents with unsaved
+  changes, with Save all. `templates/live.md`'s two places that ask the person to save name it: the `conflict` bullet
+  ("Ctrl/Cmd+S, or Save all on the pane's unsaved-changes bar") and the `./mxcodr-live save` bullet ("ask them before
+  you run it, or point them to Save all on the pane's unsaved-changes bar"). A pointer only: nothing else changes in
+  what the agent does or says. The live rule grows by 108 bytes (17,936); `test/live.test.mjs` pins both sentences.
+- 2026.11.21.4 (2026-11-21, extension live.104, red-team H1): **`tests/film.mjs` runs ffmpeg and taskkill by their
+  full paths**. It ran `ffmpeg` and `taskkill` by their bare names; on Windows a bare name runs a file of that name in
+  the current folder (the app) first, so an `ffmpeg.exe` committed to the app ran with `node tests/film.mjs` (by hand
+  or by an agent; the pane's own films already used full paths, live.60). Now `onPath` takes ffmpeg from the PATH's
+  absolute folders, none inside the app, and `taskkillPath` is `%SystemRoot%\System32\taskkill.exe`. The test kit is
+  unchanged (`kit-shipped.json` too). Test: `test/film.test.mjs` (a planted `ffmpeg` in the app and in relative PATH
+  entries is skipped; no bare program name left in the file).
+- 2026.11.21.3 (2026-11-21): **the copies in the app are split into parts; nothing they do changes** (round 2 of the
+  readability refactor). `tests/film.mjs` keeps its header (its `--help`), the running of a film and `FILM_EDITS`'
+  three anchors; its parts are in `tests/film/` (`timing.mjs`, `pick.mjs`, `run-texts.mjs`, `slowing.mjs`, from
+  `overlay/templates/film/`). `.mxcodr/skill-gate.mjs` keeps the hook (`runHook`); its parts are in
+  `.mxcodr/skill-gate/` (`needs.mjs`, `reads.mjs`, `decide.mjs`, `codex.mjs`, `hooks.mjs`, `common.mjs`, from
+  `overlay/lib/skill-gate/`). Both scripts re-export everything they exported. `copyFilm` and `installSkillGate`
+  write the parts first: the film's one by one (a file of the person's in `tests/film/` stays), the gate's folder
+  replaced whole; a link at either is removed, never written through; the gate's folder goes when Claude Code is
+  deselected, and the extension's setup removes `.mxcodr/skill-gate/` with the file-mode
+  copy and git-ignores `/tests/film/` beside `/tests/film.mjs`. Proof: every export and constant of both scripts the
+  same as at c478827d, and their runs in an app (`film.mjs` help and refusals, the gate's deny, read, reset and
+  fail-open) the same (`test/parity.test.mjs`); the rest of an install byte for byte the same. The kit
+  (`templates/tests/`) is not split (`mx-impl.ts` is 378 lines, no function over 60): `kit-shipped.json` is unchanged.
+- 2026.11.21.2 (2026-11-21): **a film records at almost the test's own speed; the slowing is done on the video**.
+  Measured on a Mendix app (MxCodrTMasterMind, 20 tests without OQL, plain run 33.6 s): one test of 9 actions took
+  20.9 s to film against a 2.2 s plain run (3.4 s title card, 9.4 s of 1 s pace, 5.5 s end hold, 0.5 s ffmpeg, the
+  rest start-up and the app), `--all` 394 s (a Playwright process per test). Now the run shows each action's pointer
+  and an orange frame round its element for `LIVE_PACE` (150 ms), the card 0.7 s and the end 0.4 s
+  (`MXCODR_FILM_HOLD_MS`, the same variable the kit's `signOut` already reads: no kit change), and a timeline
+  reporter and the wrapper's marks (the card, each sign-out to `about:blank`, the test function's end) give the
+  times. `filmPlan` (pure) turns them into the film: the blank start cut, the card held 2.5 s, each action
+  (its annotation and 0.1 s of what it did) in slow motion for `--pace` ms (default 1000), a wait over 1.5 s
+  three times faster beyond that, a sign-out inside the test held 1.5 s, the end screen (passed or failed) held
+  `max(5000, 2 × pace)` ms; `makeFilm` does it in one ffmpeg pass (a `setpts` sum, 25 fps, x264 veryfast,
+  0.15-0.8 s a film). The video's zero is "Create page" with `LAG_S` -0.07 s (16 colour changes on a fake app,
+  ±0.02 s); held frames are taken in the middle of the short live holds. `--all` is one Playwright run (one worker,
+  one browser) and each film is made while the next test records. After: the same test 5.9 s, `--all` 90 s; every
+  film had each action on screen at least 1.0 s and its end screen 5.0 s (frames sampled). Without ffmpeg the raw
+  `.webm` stays (the test's own speed) and `film.mjs` says so; a film whose timeline is missing is converted as
+it is with its last frame held. The new frame times are one `setpts` sum summed as a balanced tree: ffmpeg's
+expression parser refuses a flat sum of about 100 terms (ffmpeg 9.0.2: 90 parse, 100 do not), which a test of about
+50 actions reaches; a long filter goes in a file (`-/vf`, else `-filter_script:v`). Also fixed: `--all` stopped after a few tests with
+  "the app stopped answering" while it answered (a kept-alive connection the app had closed failed the first
+  fetch); `answers` tries three times. `tests/film.mjs` is rewritten on every install; the Tests tab's films use
+  the same functions (LIVE 102).
+- 2026.11.21.1 (2026-11-21): **a film holds the screen a test ends on**. The result screen of a filmed test (passed,
+  or where it failed) vanished at once: Playwright runs `afterEach` hooks innermost first, and the spec's import in
+  film.mjs's wrapper is evaluated before the wrapper's own hooks, so the kit's `signOut` (a describe's or the file's
+  `afterEach`) left the page before the wrapper's 2 s pause, which then filmed `about:blank` (measured on a fake app:
+  0 s of the passed screen, 0.5 s of the failed one). Now `wrapperText` sets `MXCODR_FILM_HOLD_MS` and its
+  `beforeEach` adds the hold to the callbacks Playwright awaits right after the test function and before any
+  `afterEach` (`testInfo._onDidFinishTestFunctionCallbacks`, the set its own `screenshot: 'only-on-failure'` uses;
+  internal, feature-detected, checked against the pinned 1.64.1 by `test/film.test.mjs`). The kit's `signOut`
+  (`mx-impl.ts`) holds as long before it leaves a page, for a sign-out inside the test (a role switch too) and a
+  Playwright without that set; a page held once, or on `about:blank`, is not held again, and a normal run (no
+  variable) never waits. The hold is `max(5500, 2 × pace)` ms on every film, `--pace 0` included (a 5000 ms hold
+  showed 4.9 s on the video): measured at 5.4-6.0 s of the result screen before the sign-out, describe- and
+  file-level, passed and failed, pace 1000 and 0, and with the internal set switched off. A plain timer, so no step
+  in the report or the trace. The `--all` estimate counts the hold. An app's unedited shipped `mx-impl.ts`/`mx.ts`
+  becomes the new one on the next install or setup (`overlay/lib/kit-shipped.json` regenerated); an edited one is
+  the person's and keeps its `signOut`, and its films still hold through the wrapper unless that `signOut` runs
+  inside the test body. `tests/film.mjs` is rewritten on every install.
 - 2026.11.20.6 (2026-11-20): **a click on a missing element fails in 10 s**. The kit's `playwright.config.ts` has
   `actionTimeout: 10_000` (was 20_000), with a comment saying why: a click or fill on an element that never appears (a
   wrong widget name, a dialog not open yet) waited 20 s per failure, and an agent iterating on a spec lost minutes; a
@@ -608,14 +681,20 @@ has read the project skill for it whole; no verdict, no other refusals.
 ## What is in the bundle
 
     install.sh                     checks Node >= 20, then runs overlay/install.mjs
-    overlay/install.mjs            the installer
+    overlay/install.mjs            the installer: main() and a re-export of every step
+    overlay/install/               its steps, one file per section: new-app.mjs and merge.mjs (0), mxcli.mjs (1),
+                                   rules-file.mjs (4), skills-copy.mjs (5), skill-gate-install.mjs (5a),
+                                   test-kit.mjs (5b), film-copy.mjs (5c), coverage-copy.mjs (5d), brain.mjs,
+                                   upgrade.mjs (6), probe.mjs (ports), run-live.mjs, summary.mjs; common.mjs and
+                                   screen.mjs (the one ui and die) are what they share
     overlay/lib/                   mx.mjs (PIN, BUNDLE), rules.mjs (rule file text and its format check),
-                                   skills.mjs (which skills are installed), coverage.mjs (the coverage
+                                   templates.mjs (reads overlay/templates/ by name), skills.mjs (which skills are installed), coverage.mjs (the coverage
                                    question and choice), requests.mjs, cache.mjs, ports.mjs (is a port
                                    free: the --boot smoke boot's port check),
                                    theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs),
                                    skill-gate.mjs (Claude Code's skill gate; copied into the app as
-                                   .mxcodr/skill-gate.mjs, its hooks in .claude/settings.local.json),
+                                   .mxcodr/skill-gate.mjs, its hooks in .claude/settings.local.json) and
+                                   skill-gate/ (its parts, copied as .mxcodr/skill-gate/),
                                    ui.mjs (what the installer prints: v1's banner, bar, marks, summary)
     overlay/themes/                catalog.json, per theme <name>.css (tokens) and <name>.skin.scss (frame),
                                    logos/<name>/, the preview page and its screenshots
@@ -627,7 +706,8 @@ has read the project skill for it whole; no verdict, no other refusals.
     overlay/templates/tests/       the starter test kit
     overlay/lib/kit-shipped.json   sha256 of every kit version shipped (an unedited one is replaced)
     tools/kit-shipped.mjs          writes kit-shipped.json from git history; rerun after a kit change
-    overlay/templates/film.mjs     the film recorder, installed as tests/film.mjs
+    overlay/templates/film.mjs     the film recorder, installed as tests/film.mjs; its parts in
+                                   overlay/templates/film/, installed as tests/film/
     overlay/templates/coverage.mjs the coverage check, installed as tests/coverage.mjs (coverage on), with
                                    coverage-done.md and coverage-durable-tests.md, the two texts it swaps in
     overlay/skills/                our skills
@@ -718,7 +798,8 @@ has read the project skill for it whole; no verdict, no other refusals.
   hint (`npm install -D -E @playwright/test@1.64.1` in `tests/`).
 - **The film recorder** (`overlay/templates/film.mjs`): `tests/film.mjs`, written on **every** install and
   reinstall (unlike the kit it is the bundle's, so an edit there is replaced; it is written also when the kit is
-  the app's own). v1's `tests/film.sh` is removed on upgrade.
+  the app's own). v1's `tests/film.sh` is removed on upgrade. Since 2026.11.21.3 its parts are in `tests/film/`
+  (from `overlay/templates/film/`): each written the same way, and a file of the person's beside them stays.
 - **`.mxcodr/`** holds `installed.json` (bundle, mxcli path and version, db, agents, skills, `coverage` when chosen, the kit files
   that are the kit's, written now or kept from before, `theme`, requests), `theme.mjs` and `themes/` (to
   change the look later), `bin/mxcli` when mxcli had to be downloaded, and `install.log` (the paths a new app
@@ -774,7 +855,8 @@ in step 2, no theme question without a terminal or with `--yes`. On Windows, run
    `mxcli init --sync-skills .`, so mxcli's own skills and its sections of `CLAUDE.md`/`AGENTS.md` match the
    pinned binary (after our files: it fills the mxcli markers step 6 may have written). Then
    `.mxcodr/theme.mjs` and `.mxcodr/themes/`. With Claude Code among the agents, the skill gate:
-   `.mxcodr/skill-gate.mjs` and its two hooks in `.claude/settings.local.json` (earlier ones replaced, the person's
+   `.mxcodr/skill-gate.mjs` (its parts in `.mxcodr/skill-gate/` since 2026.11.21.3, the folder replaced whole) and its
+   two hooks in `.claude/settings.local.json` (earlier ones replaced, the person's
    settings kept; without Claude Code both go; a settings file that is not JSON is left alone and said).
 7. **`--request <file>`**: the request saved word for word as `docs/requests/NN.md`.
 8. **`--boot`**: `mxcli run --local --detach` (Mendix's default ports when free, else three free ones from
@@ -891,24 +973,30 @@ how the customer test works", "record all the tests". The `film-tests` skill has
 (`node tests/film.mjs --list`), ask which one unless the request names it, and film it. The agent never
 films on its own.
 
-The film is the test as it is, slowed: a title card names the test for three seconds, an animated pointer
-travels to each element before it is clicked or filled, each action waits 1000 ms, and the test's title
-stays in a small label at the bottom. Typed values never show as captions (Playwright's action callouts are
-off). By hand, in the app folder, with the app running:
+The film is the test as it is, slowed afterwards: the test records at almost its own speed (each action's pointer
+and an orange frame round its element shown 150 ms, a short title card and end), and ffmpeg then makes the
+film: a title card names the test for 2.5 s, each action plays in slow motion for 1000 ms (`--pace`), a wait over
+1.5 s plays faster, and the test's title stays in a small label at the bottom. The screen the test ends on, passed
+or failed, stays at least 5 s (also at `--pace 0`, which slows no action). Typed values never show as captions
+(Playwright's action callouts are off). Recording takes about the test's own time plus a few seconds; `--all`
+films every test in one Playwright run. By hand, in the app folder, with the app running:
 
     node tests/film.mjs --list                # every test, numbered, with file:line
     node tests/film.mjs 7                     # test 7; or words of its title, or orders.spec.ts:57
-    node tests/film.mjs --pace 1500 7         # slower (ms per action; 0 = the test's own speed)
+    node tests/film.mjs --pace 1500 7         # slower film (ms per action; 0 = the test's own speed)
     node tests/film.mjs --all                 # every test with a browser, in the background (--status, --stop)
 
-The video lands in `.mxcli/films/<title>.mp4` (ffmpeg converts it; without ffmpeg there is only the `.webm`,
-which opens in Chrome or Firefox, not QuickTime). `.mxcli/` is in mxcli's `.gitignore`. A failing test keeps
+The video lands in `.mxcli/films/<title>.mp4` (ffmpeg slows and converts it; without ffmpeg there is only the
+raw `.webm` at the test's own speed, which opens in Chrome or Firefox, not QuickTime). `.mxcli/` is in mxcli's `.gitignore`. A failing test keeps
 its film, which shows where it stopped.
 
 Normal runs are unaffected: `tests/playwright.config.ts` has no video or slow-down. While it films,
 `film.mjs` writes a temporary `.film.config.ts` beside the app's config (spreading it and adding only
-`use.video` with `show.actions` and `show.test`) and one wrapper per spec in `.film/` (a `beforeEach` that
-shows the title card, then the spec imported unchanged), and removes both afterwards.
+`use.video` with `show.actions` and `show.test`, and its timeline reporter) and one wrapper per spec in `.film/`
+(a `beforeEach` that shows the title card and marks the card, the sign-outs and the test's end, then the spec
+imported unchanged), and removes both afterwards. The short end hold runs right after the test function, before
+any `afterEach`; the kit's `signOut` holds as briefly when `MXCODR_FILM_HOLD_MS` is set (only in a film) and the
+page was not held yet. `filmPlan` and `makeFilm` then slow the raw video into the film.
 
 ## Change the look later
 
