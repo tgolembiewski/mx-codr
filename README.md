@@ -9,7 +9,7 @@ starter Playwright test kit. One thing runs while the agent builds, in Claude Co
 has read the project skill for it whole (since 2026.11.18.6 the gate script also understands Codex, which the Studio Pro extension wires up). `MXCODR_SKILL_GATE=0` switches it off. There is no other gate and
 no other refusal.
 
-The bundle is **2026.11.21.1**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.32.0.
+The bundle is **2026.11.21.2**, pinned to [mxcli](https://github.com/mendixlabs/mxcli) 0.32.0.
 
 ## What you get
 
