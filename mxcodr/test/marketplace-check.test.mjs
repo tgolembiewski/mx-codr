@@ -235,7 +235,7 @@ test('live mode: a newer version through ./mxcodr-live marketplace update (bundl
 // bundle 2026.11.17.15: ./mxcodr-live translate writes the default-language texts CE4899 needs into Marketplace modules
 // (the text must be in the module's own documents). marketplace diff then reads those documents as changed (DESCRIBE
 // prints the default language's text: measured on WorkflowCommons.TaskDashboard after a de_CH fill). The map below is
-// the translator's own format (src/translations.mjs updateMaps), the contract between the two.
+// the translator's own format (src/translations-maps.mjs updateMaps), the contract between the two.
 const MAP = { format: 1, module: 'Administration', lang: 'de_CH', marketplace: true, updatedAt: '2026-11-17T23:00:00.000Z',
   note: 'Written by ./mxcodr-live translate', entries: [{ src: 'Accounts', from: 'en_US', ctx: 'page title', to: 'Konten' }],
   elements: ['PAGE Account_Overview', 'SNIPPET ReadMe'] };
