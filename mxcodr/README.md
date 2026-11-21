@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.21.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,25 @@ Bundle **2026.11.21.1** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.2 (2026-11-21): **a film records at almost the test's own speed; the slowing is done on the video**.
+  Measured on a Mendix app (MxCodrTMasterMind, 20 tests without OQL, plain run 33.6 s): one test of 9 actions took
+  20.9 s to film against a 2.2 s plain run (3.4 s title card, 9.4 s of 1 s pace, 5.5 s end hold, 0.5 s ffmpeg, the
+  rest start-up and the app), `--all` 394 s (a Playwright process per test). Now the run shows each action's pointer
+  and an orange frame round its element for `LIVE_PACE` (150 ms), the card 0.7 s and the end 0.4 s
+  (`MXCODR_FILM_HOLD_MS`, the same variable the kit's `signOut` already reads: no kit change), and a timeline
+  reporter and the wrapper's marks (the card, each sign-out to `about:blank`, the test function's end) give the
+  times. `filmPlan` (pure) turns them into the film: the blank start cut, the card held 2.5 s, each action
+  (its annotation and 0.1 s of what it did) in slow motion for `--pace` ms (default 1000), a wait over 1.5 s
+  three times faster beyond that, a sign-out inside the test held 1.5 s, the end screen (passed or failed) held
+  `max(5000, 2 × pace)` ms; `makeFilm` does it in one ffmpeg pass (a `setpts` sum, 25 fps, x264 veryfast,
+  0.15-0.8 s a film). The video's zero is "Create page" with `LAG_S` -0.07 s (16 colour changes on a fake app,
+  ±0.02 s); held frames are taken in the middle of the short live holds. `--all` is one Playwright run (one worker,
+  one browser) and each film is made while the next test records. After: the same test 5.9 s, `--all` 90 s; every
+  film had each action on screen at least 1.0 s and its end screen 5.0 s (frames sampled). Without ffmpeg the raw
+  `.webm` stays (the test's own speed) and `film.mjs` says so. Also fixed: `--all` stopped after a few tests with
+  "the app stopped answering" while it answered (a kept-alive connection the app had closed failed the first
+  fetch); `answers` tries three times. `tests/film.mjs` is rewritten on every install; the Tests tab's films use
+  the same functions (LIVE 102).
 - 2026.11.21.1 (2026-11-21): **a film holds the screen a test ends on**. The result screen of a filmed test (passed,
   or where it failed) vanished at once: Playwright runs `afterEach` hooks innermost first, and the spec's import in
   film.mjs's wrapper is evaluated before the wrapper's own hooks, so the kit's `signOut` (a describe's or the file's
@@ -908,27 +927,30 @@ how the customer test works", "record all the tests". The `film-tests` skill has
 (`node tests/film.mjs --list`), ask which one unless the request names it, and film it. The agent never
 films on its own.
 
-The film is the test as it is, slowed: a title card names the test for three seconds, an animated pointer
-travels to each element before it is clicked or filled, each action waits 1000 ms, and the test's title
-stays in a small label at the bottom. The screen the test ends on, passed or failed, stays at least 5 s before
-its sign-out (also at `--pace 0`). Typed values never show as captions (Playwright's action callouts are
-off). By hand, in the app folder, with the app running:
+The film is the test as it is, slowed afterwards: the test records at almost its own speed (each action's pointer
+and an orange frame round its element shown 150 ms, a short title card and end), and ffmpeg then makes the
+film: a title card names the test for 2.5 s, each action plays in slow motion for 1000 ms (`--pace`), a wait over
+1.5 s plays faster, and the test's title stays in a small label at the bottom. The screen the test ends on, passed
+or failed, stays at least 5 s (also at `--pace 0`, which slows no action). Typed values never show as captions
+(Playwright's action callouts are off). Recording takes about the test's own time plus a few seconds; `--all`
+films every test in one Playwright run. By hand, in the app folder, with the app running:
 
     node tests/film.mjs --list                # every test, numbered, with file:line
     node tests/film.mjs 7                     # test 7; or words of its title, or orders.spec.ts:57
-    node tests/film.mjs --pace 1500 7         # slower (ms per action; 0 = the test's own speed)
+    node tests/film.mjs --pace 1500 7         # slower film (ms per action; 0 = the test's own speed)
     node tests/film.mjs --all                 # every test with a browser, in the background (--status, --stop)
 
-The video lands in `.mxcli/films/<title>.mp4` (ffmpeg converts it; without ffmpeg there is only the `.webm`,
-which opens in Chrome or Firefox, not QuickTime). `.mxcli/` is in mxcli's `.gitignore`. A failing test keeps
+The video lands in `.mxcli/films/<title>.mp4` (ffmpeg slows and converts it; without ffmpeg there is only the
+raw `.webm` at the test's own speed, which opens in Chrome or Firefox, not QuickTime). `.mxcli/` is in mxcli's `.gitignore`. A failing test keeps
 its film, which shows where it stopped.
 
 Normal runs are unaffected: `tests/playwright.config.ts` has no video or slow-down. While it films,
 `film.mjs` writes a temporary `.film.config.ts` beside the app's config (spreading it and adding only
-`use.video` with `show.actions` and `show.test`) and one wrapper per spec in `.film/` (a `beforeEach` that
-shows the title card and holds the last screen, then the spec imported unchanged), and removes both afterwards.
-The hold runs right after the test function, before any `afterEach`; the kit's `signOut` holds too when
-`MXCODR_FILM_HOLD_MS` is set (only in a film) and the page was not held yet.
+`use.video` with `show.actions` and `show.test`, and its timeline reporter) and one wrapper per spec in `.film/`
+(a `beforeEach` that shows the title card and marks the card, the sign-outs and the test's end, then the spec
+imported unchanged), and removes both afterwards. The short end hold runs right after the test function, before
+any `afterEach`; the kit's `signOut` holds as briefly when `MXCODR_FILM_HOLD_MS` is set (only in a film) and the
+page was not held yet. `filmPlan` and `makeFilm` then slow the raw video into the film.
 
 ## Change the look later
 

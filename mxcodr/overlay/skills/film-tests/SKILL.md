@@ -1,18 +1,22 @@
 ---
 name: film-tests
-description: "Record a video of a browser test's run, one test or all of them in the background, slowed so a person can follow it: a pointer travels to each element, each action is paced, and a title card names the test. Lists every test first so the person can choose. Use when someone asks to see, film, record or show a test, how a test works, or how the app works. Never film on your own initiative."
+description: "Record a video of a browser test's run, one test or all of them in the background, slowed so a person can follow it: a pointer travels to each element, each action is shown in slow motion, and a title card names the test. Lists every test first so the person can choose. Use when someone asks to see, film, record or show a test, how a test works, or how the app works. Never film on your own initiative."
 ---
 
 # Film a test
 
 `tests/film.mjs` records the browser while a test runs. The test itself is
-unchanged: a temporary Playwright config spreads the app's own
-`playwright.config.ts` and adds only video recording with Playwright's own
-annotations. On the film:
+unchanged and runs at almost its own speed: a temporary Playwright config
+spreads the app's own `playwright.config.ts` and adds only video recording with
+Playwright's own annotations. The slowing is done on the video afterwards
+(ffmpeg), so a film takes about as long to record as the test takes to run. On
+the film:
 
-- a **title card** names the test (and its file) for three seconds before it starts;
-- an animated **pointer** travels to each element before it is clicked or filled;
-- every action is **paced** (1000 ms by default), so a person can follow it;
+- a **title card** names the test (and its file) for 2.5 seconds before it starts;
+- an animated **pointer** travels to each element and a frame marks it before it
+  is clicked or filled;
+- every action is shown in **slow motion** (1000 ms by default), so a person can
+  follow it; a long wait (a page loading) plays faster;
 - the test's title stays in a small label at the bottom while it runs;
 - the screen the test ends on, passed or where it failed, stays at least five
   seconds before the test signs out.
@@ -40,7 +44,7 @@ slowed, because the app's config is never edited. Only `tests/film.mjs` films.
    node tests/film.mjs 7                     # number 7 of the list
    node tests/film.mjs order approval        # the one test whose title holds these words
    node tests/film.mjs orders.spec.ts:57     # the test at that line
-   node tests/film.mjs --pace 1500 7         # slower (ms per action; 0 = the test's own speed)
+   node tests/film.mjs --pace 1500 7         # slower film (ms per action; 0 = the test's own speed)
    node tests/film.mjs --all                 # every test with a browser, in the background
    ```
 
@@ -50,13 +54,15 @@ slowed, because the app's config is never edited. Only `tests/film.mjs` films.
    installed, else `.mxcli/films/<title>.webm`. On a Mac `open <file>` plays the
    `.mp4`; a `.webm` opens in Chrome or Firefox (QuickTime cannot play it), or
    `brew install ffmpeg` and film again for an `.mp4`. A failing test keeps its
-   film, which shows where it stopped: say that it failed.
+   film, which shows where it stopped: say that it failed. Without ffmpeg the
+   `.webm` is the raw recording at the test's own speed (`film.mjs` says so).
 
 ## All of them: say how long it takes, and let it run in the background
 
-A whole suite, slowed to be watched, takes about 40 s a test (20 tests: about
-14 minutes). `node tests/film.mjs --all` returns at once and prints the
-estimate: **tell the person that number** and that it records in the
+A whole suite takes a few seconds a test more than its normal run (20 tests:
+about 2 minutes): one Playwright run films every test, and each film is made
+while the next test records. `node tests/film.mjs --all` returns at once and
+prints the estimate: **tell the person that number** and that it records in the
 background, one film per test. Then:
 
 - `node tests/film.mjs --status` shows how far it is (`filming 4/17 ...`,
