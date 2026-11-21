@@ -310,3 +310,12 @@ test('live mxcodr-live.md: reading the model is a grep -rn of .mxcodr/model/ and
   // before the bullets Codex's AGENTS.md size cap can cut (the live block comes last there)
   assert.ok(at < lr.indexOf("- **The app's quality score is the Quality tab's.**") && at < 4000, `early (at ${at})`);
 });
+
+// bundle 2026.11.21.5 (live.105, owner request): the pane's unsaved-changes bar tells the person what Studio Pro has not
+// saved; the live rule points to it where it names Ctrl/Cmd+S, and the agent's summary need not carry the reminder
+test('live.md: the unsaved-changes bar, where the rule asks the person to save', () => {
+  const lr = readTemplate('live.md');
+  assert.match(lr, /ask them to save\n  \(Ctrl\/Cmd\+S, or Save all on the pane's unsaved-changes bar\) and run it again\. Nothing was written\./);
+  assert.match(lr, /ask them before you run it\. After your turn the pane's unsaved-changes bar lists the documents Studio Pro\n  has not saved, with Save all: your summary need not tell them to save\./);
+  assert.equal((lr.match(/unsaved-changes bar/g) || []).length, 2, 'two mentions, no more');
+});

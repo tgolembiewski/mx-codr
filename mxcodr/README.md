@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.21.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,12 @@ Bundle **2026.11.21.4** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.5 (2026-11-21, extension live.105, owner request): **the live rule points to the pane's unsaved-changes
+  bar**. The extension's Chat now shows a bar above the message box while Studio Pro has documents with unsaved
+  changes, with Save all. `templates/live.md`'s two places that ask the person to save name it: the `conflict` bullet
+  ("Ctrl/Cmd+S, or Save all on the pane's unsaved-changes bar") and the `./mxcodr-live save` bullet (after the turn the
+  bar lists what Studio Pro has not saved: the agent's summary need not tell the person to save). Nothing else changes
+  in what the agent does. The live rule grows by 198 bytes (18,026); `test/live.test.mjs` pins both sentences.
 - 2026.11.21.4 (2026-11-21, extension live.104, red-team H1): **`tests/film.mjs` runs ffmpeg and taskkill by their
   full paths**. It ran `ffmpeg` and `taskkill` by their bare names; on Windows a bare name runs a file of that name in
   the current folder (the app) first, so an `ffmpeg.exe` committed to the app ran with `node tests/film.mjs` (by hand

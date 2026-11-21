@@ -22,7 +22,7 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   statement that does not land. The statements before it are already in Studio Pro: fix the failing one
   and run only it and the ones after it, in a new script.
 - `conflict` means the person has unsaved edits in a document the statement touches: ask them to save
-  (Ctrl/Cmd+S) and run it again. Nothing was written.
+  (Ctrl/Cmd+S, or Save all on the pane's unsaved-changes bar) and run it again. Nothing was written.
 - Reading the model: `.mxcodr/model/` has one file per document (`INDEX.tsv` lists them); never grep `mprcontents/`.
   Find what you need with one `grep -rn` (several names in one pattern), then read only the lines around the hits (Read
   with offset and limit, or `sed -n 40,90p` on several files in one command); a whole file only when you need all of
@@ -77,7 +77,8 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   theirs, in Studio Pro (right-click > Rename); never `rename module` through `./mxcodr-live exec`.
 - `./mxcodr-live open Module.Document` opens a document in Studio Pro (`Module` alone: its domain model), to
   show the person what you changed. `./mxcodr-live save` saves every open editor, the person's unsaved edits
-  included: ask them before you run it.
+  included: ask them before you run it. After your turn the pane's unsaved-changes bar lists the documents Studio Pro
+  has not saved, with Save all: your summary need not tell them to save.
 - `./mxcodr-live open <file>[:line]` (a path with a `/` or a file extension) opens a file of the app, such as
   `tests/order.spec.ts:42`, in an editor tab inside Studio Pro, to show the person a test or a script. The
   person may edit it there: when they save, the file on disk changes, so read it again before you change it.
