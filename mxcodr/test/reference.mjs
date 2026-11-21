@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 // by their full paths)
 // live.105: moved to the unsaved-changes bar's commit (bundle 2026.11.21.5: the live rule's conflict and save bullets),
 // then to its follow-up (91a36b84: the save bullet a pointer only)
-export const REF_COMMIT = '91a36b84';
+// live.106: moved to the drift commit (bundle 2026.11.21.6: the live rule's no change / drift / verify bullet)
+export const REF_COMMIT = 'a843e353';
 export const BUNDLE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let made;
