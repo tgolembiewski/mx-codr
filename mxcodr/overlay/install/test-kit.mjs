@@ -35,6 +35,9 @@ export const kitHash = t => crypto.createHash('sha256').update(lfText(t), 'utf8'
 export function kitShipped(file = path.join(OVERLAY, 'lib', 'kit-shipped.json')) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')).files || {}; } catch { return {}; }
 }
+// the kit's mx.ts imports ./mx-impl: written or updated only when tests/mx-impl.ts is (or becomes) the kit's, never over
+// a file of that name the kit did not write
+const IMPL = 'tests/mx-impl.ts';
 // live: the Studio Pro extension's kit (lib/live.mjs KIT_EDITS), compared and written as edited; file mode copies.
 // shipped: the hashes to replace (tests pass their own).
 export function copyTestKit(app, prevKit = [], src = path.join(OVERLAY, 'templates', 'tests'), { live = false, shipped = kitShipped() } = {}) {
@@ -60,9 +63,6 @@ export function copyTestKit(app, prevKit = [], src = path.join(OVERLAY, 'templat
     .flatMap(m => m[1].split(',').map(n => n.trim().split(/\s+as\s+/)[0]).filter(Boolean))
     .filter(n => !new RegExp(`export\\s+(?:async\\s+)?(?:function|const|let|var|type|interface|class)\\s+${n}\\b|export\\s*\\{[^}]*\\b${n}\\b`).test(mxOwn));
   const skipped = [], held = [], heldRel = [];
-  // the kit's mx.ts imports ./mx-impl: written or updated only when tests/mx-impl.ts is (or becomes) the kit's, never over
-  // a file of that name the kit did not write
-  const IMPL = 'tests/mx-impl.ts';
   const implTheirs = isThere(path.join(app, IMPL)) && stateOf(IMPL) === 'own' && !prevKit.includes(IMPL);
   for (const rel of TEST_KIT) {
     const f = path.join(app, rel);
@@ -99,6 +99,13 @@ export function copyTestKit(app, prevKit = [], src = path.join(OVERLAY, 'templat
     written.push(rel);
     ours.push(rel);
   }
+  reportKit(app, { written, updated, kept, edited, held, heldRel, skipped, lines });
+  ours.sort((x, y) => TEST_KIT.indexOf(x) - TEST_KIT.indexOf(y));
+  return { written, updated, kept, edited, ours, lines };
+}
+// The kit's lines for the person, after the files: what was written, updated, kept, yours, held or skipped, and the
+// pin hint for a kept tests/package.json. Pushed onto lines.
+function reportKit(app, { written, updated, kept, edited, held, heldRel, skipped, lines }) {
   const current = kept.filter(r => !edited.includes(r) && !heldRel.includes(r));
   if (written.length) lines.push(`test kit -> ${written.join(', ')}`);
   if (updated.length) lines.push(`test kit: updated ${updated.join(', ')} to the current kit (unchanged since an earlier mx-codr wrote them)`);
@@ -110,8 +117,6 @@ export function copyTestKit(app, prevKit = [], src = path.join(OVERLAY, 'templat
     const pin = playwrightPin(path.join(app, 'tests/package.json'));
     if (pin !== PLAYWRIGHT) lines.push(`test kit: tests/package.json ${pin ? `pins @playwright/test ${pin}` : 'does not pin @playwright/test'}; the finish condition needs --shuffle, so pin it in tests/: npm install -D -E @playwright/test@${PLAYWRIGHT}`);
   }
-  ours.sort((x, y) => TEST_KIT.indexOf(x) - TEST_KIT.indexOf(y));
-  return { written, updated, kept, edited, ours, lines };
 }
 // The @playwright/test version a package.json names (dev or plain dependency), or null.
 function playwrightPin(f) {
