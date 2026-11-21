@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 // the readability refactor's round 2, harness area: the bundle at its start (c478827d), moved to 8efe6368 after the
 // step that split tests/film.mjs and the skill gate into parts (bundle 2026.11.21.3, the app's file set changed)
-export const REF_COMMIT = '8efe6368';
+// live.104: moved to the last commit of the red-team fixes (bundle 2026.11.21.4: tests/film.mjs runs ffmpeg and taskkill
+// by their full paths)
+export const REF_COMMIT = 'f4170b08';
 export const BUNDLE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let made;
