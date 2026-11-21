@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.20.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.20.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,16 @@ Bundle **2026.11.20.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.20.6 (2026-11-20): **a click on a missing element fails in 10 s**. The kit's `playwright.config.ts` has
+  `actionTimeout: 10_000` (was 20_000), with a comment saying why: a click or fill on an element that never appears (a
+  wrong widget name, a dialog not open yet) waited 20 s per failure, and an agent iterating on a spec lost minutes; a
+  warm Mendix action takes well under 1 s. `expect: { timeout: 15_000 }` (a cold runtime's render) and the test
+  `timeout: 90_000` stay. `KIT_EDITS`' screenshot edit anchors on the new value; setup's `wireTestsTab` puts the
+  screenshot and trace lines after a kept config's own `actionTimeout` whatever its value, and keeps that value (a
+  config the person edited stays at 20 s). An app whose config is an unedited shipped kit gets the new one on the next
+  install or setup (`overlay/lib/kit-shipped.json` regenerated). A bare click or fill as a spec's first step after
+  `goto` on a cold runtime, with no `expect` before it, can now time out: wait for the page with `expect` first.
+  `test/test-kit.test.mjs` and `test/live.test.mjs` pin it.
 - 2026.11.20.5 (2026-11-20): **no `FINDINGS.md` in live mode**. mxcli init's CLAUDE.md and AGENTS.md ("Finishing a
   change", step 3) have agents append to `FINDINGS.md`; on a large app it grew to 13.5 KB in a day, read whole before
   each append and by nobody else (setup git-ignores it). A 2-line bullet in `templates/live.md`, right after the `mx`

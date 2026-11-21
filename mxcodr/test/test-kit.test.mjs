@@ -18,7 +18,7 @@ test('the kit is five files: mx.ts and its code in mx-impl.ts, its teardown, a c
   assert.match(cfg, /workers: 1,/);
   assert.match(cfg, /fullyParallel: false/);
   assert.match(cfg, /expect: \{ timeout: 15_000 \}/);
-  assert.match(cfg, /actionTimeout: 20_000/);
+  assert.match(cfg, /actionTimeout: 10_000,/);
   assert.match(read('mx.teardown.ts'), /sessions left: \$\{n\}/);
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.devDependencies['@playwright/test'], '1.64.1', 'exact pin: 1.64.1 has --shuffle');
