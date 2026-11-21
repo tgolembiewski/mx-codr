@@ -31,7 +31,8 @@ Bundle **2026.11.20.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   templates, building blocks) and says to run `./mxcodr-live query "search '<text>'"` before calling something absent.
   `test/live.test.mjs` pins both. In the extension (live.88) the shadow and the model dump's source copy moved out of
   the app into the person's app-state folder (`spikes/studio-pro-ext/README.md`, "The copies live in the person's
-  folder"). Measured on a copy of a large app on a Mac (BSD grep, warm cache): the piped form 16.8 s before the move and
+  folder"); since live.93 the model dump reads the app itself, guarded against Studio Pro's saves, and only the shadow
+  remains (same README, "Copies checked against their own .mpr ... (live.93)"). Measured on a copy of a large app on a Mac (BSD grep, warm cache): the piped form 16.8 s before the move and
   7.2 s after; the `--exclude-dir` form 2.6 s after; `.mxcodr/model/` alone 0.1 s.
 - 2026.11.20.2 (2026-11-20): **read only the lines you need from `.mxcodr/model/`**. An A/B of the read changes
   (bundle 2026.11.18.9 against 2026.11.20.1, CarFleet, three read-only tasks) found that Claude Code took the dump
