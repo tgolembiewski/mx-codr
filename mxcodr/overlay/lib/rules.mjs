@@ -5,14 +5,11 @@
 //   Codex, opencode, Pi  a block in AGENTS.md, between <!-- mxcodr:start --> and <!-- mxcodr:end -->
 // Only the skills folder named in the text changes per agent. "(beside mxcli's)" is true only where
 // mxcli writes its own skills (.claude/skills/, .opencode/skills/); elsewhere it is dropped.
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { liveRuleText, liveKeepTests } from './live.mjs';
 import { ruleWithoutSkills, SKILLS_HEADING } from './skilloff.mjs';
+import { readTemplate } from './templates.mjs';
 
-const templates = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
-export const readTemplate = name => fs.readFileSync(path.join(templates, name), 'utf8');
+export { readTemplate };
 
 // The skills folder each agent reads; mxcli writes its own skills only into the first two.
 export const SKILLS_DIR = { claude: '.claude/skills', opencode: '.opencode/skills', cursor: '.cursor/skills', codex: '.agents/skills', pi: '.agents/skills' };

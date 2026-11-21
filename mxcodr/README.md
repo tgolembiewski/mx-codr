@@ -649,7 +649,7 @@ has read the project skill for it whole; no verdict, no other refusals.
     install.sh                     checks Node >= 20, then runs overlay/install.mjs
     overlay/install.mjs            the installer
     overlay/lib/                   mx.mjs (PIN, BUNDLE), rules.mjs (rule file text and its format check),
-                                   skills.mjs (which skills are installed), coverage.mjs (the coverage
+                                   templates.mjs (reads overlay/templates/ by name), skills.mjs (which skills are installed), coverage.mjs (the coverage
                                    question and choice), requests.mjs, cache.mjs, ports.mjs (is a port
                                    free: the --boot smoke boot's port check),
                                    theme.mjs (the looks; copied into the app as .mxcodr/theme.mjs),

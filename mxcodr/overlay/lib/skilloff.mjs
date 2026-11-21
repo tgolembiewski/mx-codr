@@ -5,8 +5,9 @@
 // byte for byte what it did.
 import { INSTALLED_SKILLS, OPTIONAL_SKILLS } from './skills.mjs';
 
-// Our skills: the only ones that can be switched off (never mxcli's own). A function: skills.mjs imports rules.mjs,
-// which imports this file, so the lists are read when called, not when this module loads.
+// Our skills: the only ones that can be switched off (never mxcli's own). A function: skills.mjs imported rules.mjs,
+// which imports this file, so the lists are read when called, not when this module loads (round 2 of the readability
+// refactor broke that cycle: skills.mjs reads templates through templates.mjs; the function stays, an export's kind).
 export const switchable = () => [...INSTALLED_SKILLS, ...OPTIONAL_SKILLS];
 export const SKILLS_OFF_DIR = '.mxcodr/skills-off';
 export const offList = list => [...new Set((Array.isArray(list) ? list : []).filter(s => switchable().includes(s)))];
