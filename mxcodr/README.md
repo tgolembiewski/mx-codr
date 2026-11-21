@@ -776,7 +776,8 @@ has read the project skill for it whole; no verdict, no other refusals.
   hint (`npm install -D -E @playwright/test@1.64.1` in `tests/`).
 - **The film recorder** (`overlay/templates/film.mjs`): `tests/film.mjs`, written on **every** install and
   reinstall (unlike the kit it is the bundle's, so an edit there is replaced; it is written also when the kit is
-  the app's own). v1's `tests/film.sh` is removed on upgrade.
+  the app's own). v1's `tests/film.sh` is removed on upgrade. Since 2026.11.21.3 its parts are in `tests/film/`
+  (from `overlay/templates/film/`): each written the same way, and a file of the person's beside them stays.
 - **`.mxcodr/`** holds `installed.json` (bundle, mxcli path and version, db, agents, skills, `coverage` when chosen, the kit files
   that are the kit's, written now or kept from before, `theme`, requests), `theme.mjs` and `themes/` (to
   change the look later), `bin/mxcli` when mxcli had to be downloaded, and `install.log` (the paths a new app
@@ -832,7 +833,8 @@ in step 2, no theme question without a terminal or with `--yes`. On Windows, run
    `mxcli init --sync-skills .`, so mxcli's own skills and its sections of `CLAUDE.md`/`AGENTS.md` match the
    pinned binary (after our files: it fills the mxcli markers step 6 may have written). Then
    `.mxcodr/theme.mjs` and `.mxcodr/themes/`. With Claude Code among the agents, the skill gate:
-   `.mxcodr/skill-gate.mjs` and its two hooks in `.claude/settings.local.json` (earlier ones replaced, the person's
+   `.mxcodr/skill-gate.mjs` (its parts in `.mxcodr/skill-gate/` since 2026.11.21.3, the folder replaced whole) and its
+   two hooks in `.claude/settings.local.json` (earlier ones replaced, the person's
    settings kept; without Claude Code both go; a settings file that is not JSON is left alone and said).
 7. **`--request <file>`**: the request saved word for word as `docs/requests/NN.md`.
 8. **`--boot`**: `mxcli run --local --detach` (Mendix's default ports when free, else three free ones from

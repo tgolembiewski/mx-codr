@@ -3,7 +3,7 @@
 // (names, kinds, constant values), what the installer's steps write into an app for several option sets (each file's
 // text, and what each step returns), what the installer prints and writes end to end with a stand-in mxcli, and what
 // the copies it leaves in the app (tests/film.mjs, the skill gate) print when they run. No list of intended changes:
-// a commit that changes the bundle's behaviour moves REF_COMMIT.
+// a commit that changes the bundle's behaviour moves REF_COMMIT (a raise of BUNDLE alone does not need to).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +17,10 @@ const ref = reference();
 const skip = !ref && 'needs git and the round 2 reference commit';
 const imp = (root, rel) => import(pathToFileURL(path.join(root, rel)).href);
 const tmp = p => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), p)));
-const where = s => [ref, BUNDLE_DIR, fs.realpathSync(BUNDLE_DIR)].reduce((t, r) => t.split(r).join('<B>'), s);
+// each copy's folder as <B>, and each copy's BUNDLE (a raise of the number alone is not a change of behaviour) as <BUNDLE>
+const bundleOf = root => /BUNDLE = '([^']+)'/.exec(fs.readFileSync(path.join(root, 'overlay', 'lib', 'mx.mjs'), 'utf8'))[1];
+const BUNDLES = ref ? [...new Set([bundleOf(ref), bundleOf(BUNDLE_DIR)])] : [];
+const where = s => BUNDLES.reduce((t, b) => t.split(b).join('<BUNDLE>'), [ref, BUNDLE_DIR, fs.realpathSync(BUNDLE_DIR)].reduce((t, r) => t.split(r).join('<B>'), s));
 
 const shape = m => Object.keys(m).sort().map(k => `${k}:${typeof m[k]}`);
 const values = m => Object.keys(m).sort().filter(k => typeof m[k] !== 'function').map(k => [k, m[k] instanceof Map || m[k] instanceof Set ? [...m[k]] : m[k] instanceof RegExp ? String(m[k]) : m[k]]);

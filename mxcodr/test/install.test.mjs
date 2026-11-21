@@ -354,9 +354,13 @@ test('film: a reinstall writes tests/film.mjs again over an edited copy, also wh
   put(d, 'tests/mx.ts', 'export const mine = 1;\n'); // the person's own mx.ts: the kit's config and teardown are skipped
   put(d, 'playwright.config.ts', 'export default {};\n');
   put(d, 'tests/film.mjs', '// edited by hand\n');
+  put(d, 'tests/film/pick.mjs', '// edited by hand\n');
+  put(d, 'tests/film/mine.mjs', '// the person\'s\n');
   copyTestKit(d);
   copyFilm(d);
   assert.equal(get(d, 'tests/film.mjs'), filmSource());
+  assert.equal(get(d, 'tests/film/pick.mjs'), fs.readFileSync(new URL('../overlay/templates/film/pick.mjs', import.meta.url), 'utf8'), 'bundle 2026.11.21.3: its parts too');
+  assert.equal(get(d, 'tests/film/mine.mjs'), '// the person\'s\n', 'a file of the person\'s beside the parts stays');
   put(d, '.claude/skills/film-tests/SKILL.md', 'stale');
   install(d, ['claude']);
   assert.equal(get(d, '.claude/skills/film-tests/SKILL.md').split('\n')[1], 'name: film-tests', 'the skill is refreshed, not left stale or removed');
