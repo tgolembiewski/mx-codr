@@ -16,8 +16,9 @@ Bundle **2026.11.21.3** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   `overlay/templates/film/`). `.mxcodr/skill-gate.mjs` keeps the hook (`runHook`); its parts are in
   `.mxcodr/skill-gate/` (`needs.mjs`, `reads.mjs`, `decide.mjs`, `codex.mjs`, `hooks.mjs`, `common.mjs`, from
   `overlay/lib/skill-gate/`). Both scripts re-export everything they exported. `copyFilm` and `installSkillGate`
-  write the parts first and replace the folder whole (a link there is removed, never written through); the folder
-  goes when Claude Code is deselected, and the extension's setup removes `.mxcodr/skill-gate/` with the file-mode
+  write the parts first: the film's one by one (a file of the person's in `tests/film/` stays), the gate's folder
+  replaced whole; a link at either is removed, never written through; the gate's folder goes when Claude Code is
+  deselected, and the extension's setup removes `.mxcodr/skill-gate/` with the file-mode
   copy and git-ignores `/tests/film/` beside `/tests/film.mjs`. Proof: every export and constant of both scripts the
   same as at c478827d, and their runs in an app (`film.mjs` help and refusals, the gate's deny, read, reset and
   fail-open) the same (`test/parity.test.mjs`); the rest of an install byte for byte the same. The kit
