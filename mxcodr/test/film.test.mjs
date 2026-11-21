@@ -284,7 +284,10 @@ test('the kit\'s signOut and the wrapper share the held pages and the variable (
 
 // The pinned Playwright (the extension's payload copy, or MXCODR_TEST_PW): its worker awaits the callbacks the
 // wrapper adds to after the test function and before the afterEach hooks (internal; a pin bump that drops it fails here).
-const PW = process.env.MXCODR_TEST_PW || fileURLToPath(new URL('../../spikes/studio-pro-ext/setup/playwright/node_modules', import.meta.url));
+// The extension is spikes/studio-pro-ext/ in this repository and extension/ in mx-codr-live (tools/sync renames the
+// folders, the bundle is harness/ there): the first of the two that has it, else the first (the skip names it).
+const PW_DIRS = ['../../spikes/studio-pro-ext/setup/playwright/node_modules', '../../extension/setup/playwright/node_modules'].map(u => fileURLToPath(new URL(u, import.meta.url)));
+const PW = process.env.MXCODR_TEST_PW || PW_DIRS.find(d => fs.existsSync(path.join(d, '@playwright/test/cli.js'))) || PW_DIRS[0];
 const hasPw = fs.existsSync(path.join(PW, '@playwright/test/cli.js'));
 const hasBrowser = (() => { try { return hasPw && fs.existsSync(createRequire(path.join(PW, 'x.js'))('playwright-core').chromium.executablePath()); } catch { return false; } })();
 
