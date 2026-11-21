@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, testsFromList, needsBrowser, pick, slug, grepFor, grepForAll, filmConfigText, wrapperText, collectResults, DEFAULT_PACE, MIN_HOLD_MS, holdMs,
-  LIVE_PACE, LIVE_HOLD_MS, HOLD_PICK_S, CARD_MS, CARD_LIVE_MS, MID_HOLD_MS, livePace, videoText, TIMELINE_REPORTER, timelineOf, filmPlan, filmSecond, filmTime, filterText, ffmpegArgs, makeFilm, isTest, LAG_S } from '../overlay/templates/film.mjs';
+  LIVE_PACE, LIVE_HOLD_MS, HOLD_PICK_S, CARD_MS, CARD_LIVE_MS, MID_HOLD_MS, livePace, videoText, TIMELINE_REPORTER, timelineOf, filmPlan, filmSecond, filmTime, filterText, sumTree, ffmpegArgs, makeFilm, isTest, LAG_S } from '../overlay/templates/film.mjs';
 
 const list = JSON.parse(fs.readFileSync(new URL('./fixtures/film-list.json', import.meta.url), 'utf8'));
 const tests = testsFromList(list);
@@ -207,9 +207,13 @@ test('the plan\'s end: a test that signed out itself ends on the screen before i
   assert.ok(Math.abs(noEnd.cut - (v(21_500) - 0.1)) < 1e-9, 'no end mark: before the context closed');
 });
 
-test('ffmpeg\'s filter and arguments: one term per piece, the film\'s frame rate, cut at the plan\'s length; a long filter in a file', () => {
+test('ffmpeg\'s filter and arguments: one term per piece, summed as a balanced tree, the film\'s frame rate, cut at the plan\'s length; a long filter in a file', () => {
+  assert.equal(sumTree(['a']), 'a');
+  assert.equal(sumTree(['a', 'b', 'c', 'd']), '((a+b)+(c+d))');
+  const depth = x => { let d = 0, m = 0; for (const c of x) { if (c === '(') m = Math.max(m, ++d); if (c === ')') d--; } return m; };
+  assert.ok(depth(sumTree(Array.from({ length: 1000 }, (_, i) => `t${i}`))) <= 10, 'a thousand terms nest ten deep');
   const plan = { pieces: [{ a: 0, b: 1, out: 0 }, { a: 1, b: 2, out: 1 }, { a: 2, b: 2, out: 3 }, { a: 2, b: 2.5, out: 2 }], total: 6, cut: 2.5 };
-  assert.equal(filterText(plan), "setpts='(1*clip((T-1)/1,0,1)+3*gte(T,2)+2*clip((T-2)/0.5,0,1))/TB',fps=25,tpad=stop_mode=clone:stop_duration=6,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p");
+  assert.equal(filterText(plan), "setpts='(1*clip((T-1)/1,0,1)+(3*gte(T,2)+2*clip((T-2)/0.5,0,1)))/TB',fps=25,tpad=stop_mode=clone:stop_duration=6,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p");
   const a = ffmpegArgs('r.webm', 'f.mp4', plan);
   assert.deepEqual(a.slice(a.indexOf('-t'), a.indexOf('-t') + 2), ['-t', '6']);
   assert.equal(a[a.indexOf('-vf') + 1], filterText(plan));
@@ -250,7 +254,23 @@ test('the slowing on a real video: held frames and slow motion where the plan sa
     const made = await makeFilm({ raw, out: path.join(dir, 'x.mp4'), tl, pace: 1000, ffmpeg: 'ffmpeg', work: dir });
     assert.ok(made.slowed && made.file.endsWith('x.mp4') && fs.existsSync(made.file) && !fs.existsSync(raw));
     const plain = await makeFilm({ raw: path.join(dir, 'raw2.webm'), out: path.join(dir, 'y.mp4'), tl, pace: 1000, ffmpeg: null, work: dir });
-    assert.deepEqual([plain.slowed, path.basename(plain.file)], [false, 'y.webm']);
+    assert.deepEqual([plain.slowed, plain.converted, path.basename(plain.file)], [false, false, 'y.webm']);
+    // no timeline: the recording as it is (6 s), its last frame held 5 s; not a 5 s still
+    fs.copyFileSync(plain.file, path.join(dir, 'raw3.webm'));
+    const none = await makeFilm({ raw: path.join(dir, 'raw3.webm'), out: path.join(dir, 'z.mp4'), tl: null, pace: 1000, ffmpeg: 'ffmpeg', work: dir });
+    assert.deepEqual([none.slowed, none.converted, none.plan], [false, true, null]);
+    const zdur = Number(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', none.file], { encoding: 'utf8' }).stdout);
+    assert.ok(Math.abs(zdur - 11) < 0.2, `6 s and the 5 s hold: ${zdur}`);
+    // a long test's filter (300 pieces) goes in a file (-/vf, or -filter_script:v on an older ffmpeg) and still works
+    assert.equal(spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=gray:s=64x48:r=25:d=30', '-c:v', 'libvpx', '-b:v', '100k', path.join(dir, 'raw4.webm')]).status, 0);
+    const many = { zero: 0, card: 50, actions: Array.from({ length: 100 }, (_, i) => ({ start: 500 + i * 290, end: 650 + i * 290 })), end: { at: 29_500, blank: false }, blanks: [], close: 29_900 };
+    const longPlan = filmPlan(many, { pace: 100 });
+    assert.ok(filterText(longPlan).length > 6000, `${filterText(longPlan).length} characters`);
+    const big = await makeFilm({ raw: path.join(dir, 'raw4.webm'), out: path.join(dir, 'l.mp4'), tl: many, pace: 100, ffmpeg: 'ffmpeg', work: dir });
+    assert.ok(big.slowed, 'made through the filter file');
+    const ldur = Number(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', big.file], { encoding: 'utf8' }).stdout);
+    assert.ok(Math.abs(ldur - big.plan.total) < 0.15, `${ldur} s against the plan's ${big.plan.total}`);
+    assert.ok(!fs.readdirSync(dir).some(f => f.startsWith('filter-')), 'the filter file is removed');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

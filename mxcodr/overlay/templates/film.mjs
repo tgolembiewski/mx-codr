@@ -344,6 +344,10 @@ export function filmSecond(plan, t) {
 export const filmTime = (plan, tl, ms, lag = LAG_S) => (tl && Number.isFinite(tl.zero) ? filmSecond(plan, Math.max(0, (ms - tl.zero) / 1000 + lag)) : Math.max(0, (ms - (tl?.zero ?? ms)) / 1000));
 
 const num = x => String(Math.round(x * 10000) / 10000);
+// A sum as a balanced tree, ((a+b)+(c+d)): ffmpeg's expression parser refuses a flat a+b+c+... of about 100 terms
+// ("Error while parsing expression", ffmpeg 9.0.2: 90 terms parse, 100 do not; a tree of 3000 does), which a test of
+// about 50 actions reaches.
+export const sumTree = t => (t.length === 1 ? t[0] : `(${sumTree(t.slice(0, t.length >> 1))}+${sumTree(t.slice(t.length >> 1))})`);
 /** The ffmpeg filter of a plan: every frame's new time (a sum over the pieces), the film's frame rate, the last
  * frame held past the end (cut at plan.total by -t). */
 export function filterText(plan, fps = FPS) {
@@ -353,7 +357,7 @@ export function filterText(plan, fps = FPS) {
     if (p.a === p.b) terms.push(`${num(p.out)}*gte(T,${num(p.a)})`);
     else terms.push(`${num(p.out)}*clip((T-${num(p.a)})/${num(p.b - p.a)},0,1)`);
   }
-  return `setpts='(${terms.join('+') || '0'})/TB',fps=${fps},tpad=stop_mode=clone:stop_duration=${num(holdMs(0) / 1000 + 1)},scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`;
+  return `setpts='${terms.length ? sumTree(terms) : '0'}/TB',fps=${fps},tpad=stop_mode=clone:stop_duration=${num(holdMs(0) / 1000 + 1)},scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`;
 }
 
 // ffmpeg's arguments for a film (H.264 in an mp4 that starts playing before it is all loaded). A long filter goes in a
@@ -375,15 +379,23 @@ function run(cmd, args, onChild) {
   });
 }
 
+// No timeline (the test's marks or calls were not found): the recording converted as it is, its last frame held.
+export const plainArgs = (raw, mp4) => ['-v', 'error', '-y', '-i', raw, '-vf', `tpad=stop_mode=clone:stop_duration=${num(MIN_HOLD_MS / 1000)},scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`, '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4];
+
 /**
  * The raw video -> the film: the plan's slowing with ffmpeg (`ffmpeg`: its path, or null when there is none), into
- * `out` (.mp4). -> { file, plan, slowed } — file is the .mp4, or the raw .webm moved to `out`'s name when there is no
- * ffmpeg or it failed (then slowed is false and plan is the raw video's own timeline).
+ * `out` (.mp4). -> { file, plan, slowed, converted } — file is the slowed .mp4 (slowed, plan: its plan); without a
+ * timeline the .mp4 of the recording as it is (converted, plan null); else (no ffmpeg, or it failed) the raw .webm
+ * moved to `out`'s name. Without a plan the steps keep the raw video's times.
  */
 export async function makeFilm({ raw, out, tl, pace, ffmpeg, work, onChild }) {
   const webm = out.replace(/\.mp4$/, '.webm');
   for (const f of [out, webm]) fs.rmSync(f, { force: true });
-  if (ffmpeg) {
+  if (ffmpeg && !(tl && Number.isFinite(tl.zero))) {
+    const r = await run(ffmpeg, plainArgs(raw, out), onChild);
+    if (r.status === 0 && fs.existsSync(out)) { fs.rmSync(raw, { force: true }); return { file: out, plan: null, slowed: false, converted: true }; }
+    fs.rmSync(out, { force: true });
+  } else if (ffmpeg) {
     const plan = filmPlan(tl, { pace });
     const text = filterText(plan);
     const long = text.length > 6000;
@@ -396,7 +408,7 @@ export async function makeFilm({ raw, out, tl, pace, ffmpeg, work, onChild }) {
     fs.rmSync(out, { force: true });
   }
   fs.renameSync(raw, webm);
-  return { file: webm, plan: null, slowed: false };
+  return { file: webm, plan: null, slowed: false, converted: false };
 }
 
 // ---- running it ----------------------------------------------------------------------------------------------
@@ -510,7 +522,7 @@ async function filmTests(where, tests, pace, { numbered = false, url } = {}) {
       const out = path.join(films, `${slug(t)}.mp4`);
       const made = await makeFilm({ raw: endLine.video, out, tl, pace, ffmpeg, work });
       const shown = path.relative(where.app, made.file).split(path.sep).join('/');
-      const note = made.slowed ? '' : ffmpeg ? ' (ffmpeg could not convert it: the raw recording, at the test\'s own speed)' : ' (no ffmpeg: the raw recording, at the test\'s own speed; install ffmpeg for the slowed film)';
+      const note = made.slowed ? '' : made.converted ? ' (its timeline was not found: at the test\'s own speed)' : ffmpeg ? ' (ffmpeg could not convert it: the raw recording, at the test\'s own speed)' : ' (no ffmpeg: the raw recording, at the test\'s own speed; install ffmpeg for the slowed film)';
       if (verdict === 'PASS') passed++; else failed++;
       say(verdict === 'PASS' ? `PASS  ${t.full} -> ${shown}${note}` : `FAIL  ${t.full} -> ${shown} (the film shows where it stopped)${note}`);
     };

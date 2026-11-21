@@ -25,7 +25,10 @@ Bundle **2026.11.21.2** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   ±0.02 s); held frames are taken in the middle of the short live holds. `--all` is one Playwright run (one worker,
   one browser) and each film is made while the next test records. After: the same test 5.9 s, `--all` 90 s; every
   film had each action on screen at least 1.0 s and its end screen 5.0 s (frames sampled). Without ffmpeg the raw
-  `.webm` stays (the test's own speed) and `film.mjs` says so. Also fixed: `--all` stopped after a few tests with
+  `.webm` stays (the test's own speed) and `film.mjs` says so; a film whose timeline is missing is converted as
+it is with its last frame held. The new frame times are one `setpts` sum summed as a balanced tree: ffmpeg's
+expression parser refuses a flat sum of about 100 terms (ffmpeg 9.0.2: 90 parse, 100 do not), which a test of about
+50 actions reaches; a long filter goes in a file (`-/vf`, else `-filter_script:v`). Also fixed: `--all` stopped after a few tests with
   "the app stopped answering" while it answered (a kept-alive connection the app had closed failed the first
   fetch); `answers` tries three times. `tests/film.mjs` is rewritten on every install; the Tests tab's films use
   the same functions (LIVE 102).
