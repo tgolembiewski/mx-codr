@@ -1,6 +1,6 @@
 # mx-codr harness (v2, skills only)
 
-Bundle **2026.11.21.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
+Bundle **2026.11.21.6** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32.0** (`PIN`). The design is
 `docs/plans/open/plan-harness-v2-skills-only.md` (owner decision 2026-10-31: the gate goes).
 
 - Live mode (2026-11-05, same bundle 2026.11.05.2, nothing changes for file mode): the Studio Pro extension
@@ -10,6 +10,14 @@ Bundle **2026.11.21.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
   (the release digests of the pinned mxcli, which the extension's setup checks its download against). A file-mode install
   writes byte for byte what it did: 321 files over 12 agent and coverage combinations (rule files, skills, test kit, film recorder, coverage check; re-measured for stage 4, and again for stage 4c's films) compared with the committed
   bundle, 0 differ. See *Live mode* below.
+- 2026.11.21.6 (2026-11-21, extension live.106, measured owner session): **`no change` is what the app's files have,
+  not what Studio Pro has**. Studio Pro's open model lost an access rule exec had landed (the app's files kept it); a
+  second exec said `no change` and the agent told the person the rule "already exists in the model". The extension now
+  reads Studio Pro for such a statement (`no change (Studio Pro agrees)`, or a new `drift` verdict) and has a read-only
+  `./mxcodr-live verify`. `templates/live.md`: `drift` joins the verdict list, and one bullet after `conflict`: say "the
+  app's files already have it" on `no change`, never "already in Studio Pro / in the model"; on `drift` never ask the
+  person to save that document; run `./mxcodr-live verify` when the person says they do not see a change. The live
+  rule grows by 420 bytes (18,356); `test/live.test.mjs` pins the bullet.
 - 2026.11.21.5 (2026-11-21, extension live.105, owner request): **the live rule points to the pane's unsaved-changes
   bar**. The extension's Chat now shows a bar above the message box while Studio Pro has documents with unsaved
   changes, with Save all. `templates/live.md`'s two places that ask the person to save name it: the `conflict` bullet

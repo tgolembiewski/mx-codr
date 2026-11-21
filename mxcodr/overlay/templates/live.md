@@ -18,11 +18,15 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
 - Run each `./mxcodr-live` command as a command of its own: no `|`, `&&`, `;` or `| tail` around it. Chained
   with anything else it runs inside Claude Code's sandbox, which cannot reach Studio Pro; the error then says so.
 - `exec` prints one line per statement: `landed`, `landed*` (Studio Pro stored it slightly differently),
-  `no change`, `refused by mxcli`, `refused`, `Studio Pro error` or `conflict`, and stops at the first
+  `no change`, `refused by mxcli`, `refused`, `Studio Pro error`, `conflict` or `drift`, and stops at the first
   statement that does not land. The statements before it are already in Studio Pro: fix the failing one
   and run only it and the ones after it, in a new script.
 - `conflict` means the person has unsaved edits in a document the statement touches: ask them to save
   (Ctrl/Cmd+S, or Save all on the pane's unsaved-changes bar) and run it again. Nothing was written.
+- `no change` means the app's files already have it: say that, never "it is already in Studio Pro" or "in the
+  model" (`no change (Studio Pro agrees)` is the only proof of that). `drift` means Studio Pro's open model lost
+  it: follow its line and never ask the person to save that document. When the person says they do not see a
+  change in Studio Pro, run `./mxcodr-live verify` and tell them what it says.
 - Reading the model: `.mxcodr/model/` has one file per document (`INDEX.tsv` lists them); never grep `mprcontents/`.
   Find what you need with one `grep -rn` (several names in one pattern), then read only the lines around the hits (Read
   with offset and limit, or `sed -n 40,90p` on several files in one command); a whole file only when you need all of

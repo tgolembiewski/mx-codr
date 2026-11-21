@@ -320,3 +320,12 @@ test('live.md: the unsaved-changes bar, where the rule asks the person to save',
   assert.doesNotMatch(lr, /summary need not/, 'a pointer only: what the agent says is unchanged');
   assert.equal((lr.match(/unsaved-changes bar/g) || []).length, 2, 'two mentions, no more');
 });
+
+// bundle 2026.11.21.6 (live.106, measured owner session): "no change" is what the app's files have; Studio Pro's open
+// model may have lost it (drift): the agent never claims more, never asks to save a drifted document, and runs verify
+test('live.md: no change is the app\'s files; drift; verify when the person does not see a change', () => {
+  const lr = readTemplate('live.md');
+  assert.match(lr, /`no change`, `refused by mxcli`, `refused`, `Studio Pro error`, `conflict` or `drift`, and stops at the first/);
+  assert.match(lr, /- `no change` means the app's files already have it: say that, never "it is already in Studio Pro" or "in the\n  model" \(`no change \(Studio Pro agrees\)` is the only proof of that\)\. `drift` means Studio Pro's open model lost\n  it: follow its line and never ask the person to save that document\. When the person says they do not see a\n  change in Studio Pro, run `\.\/mxcodr-live verify` and tell them what it says\./);
+  assert.ok(lr.indexOf('- `no change` means') > lr.indexOf('- `conflict` means'), 'right after the conflict bullet');
+});
