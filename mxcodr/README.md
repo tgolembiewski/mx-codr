@@ -13,9 +13,9 @@ Bundle **2026.11.21.5** (`overlay/lib/mx.mjs`, `BUNDLE`), pinned to mxcli **0.32
 - 2026.11.21.5 (2026-11-21, extension live.105, owner request): **the live rule points to the pane's unsaved-changes
   bar**. The extension's Chat now shows a bar above the message box while Studio Pro has documents with unsaved
   changes, with Save all. `templates/live.md`'s two places that ask the person to save name it: the `conflict` bullet
-  ("Ctrl/Cmd+S, or Save all on the pane's unsaved-changes bar") and the `./mxcodr-live save` bullet (after the turn the
-  bar lists what Studio Pro has not saved: the agent's summary need not tell the person to save). Nothing else changes
-  in what the agent does. The live rule grows by 198 bytes (18,026); `test/live.test.mjs` pins both sentences.
+  ("Ctrl/Cmd+S, or Save all on the pane's unsaved-changes bar") and the `./mxcodr-live save` bullet ("ask them before
+  you run it, or point them to Save all on the pane's unsaved-changes bar"). A pointer only: nothing else changes in
+  what the agent does or says. The live rule grows by 108 bytes (17,936); `test/live.test.mjs` pins both sentences.
 - 2026.11.21.4 (2026-11-21, extension live.104, red-team H1): **`tests/film.mjs` runs ffmpeg and taskkill by their
   full paths**. It ran `ffmpeg` and `taskkill` by their bare names; on Windows a bare name runs a file of that name in
   the current folder (the app) first, so an `ffmpeg.exe` committed to the app ran with `node tests/film.mjs` (by hand

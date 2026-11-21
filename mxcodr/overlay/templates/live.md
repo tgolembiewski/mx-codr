@@ -77,8 +77,7 @@ You work in the mx-codr pane inside Studio Pro (`MXCODR_TERMINAL=1`), or a `*.mp
   theirs, in Studio Pro (right-click > Rename); never `rename module` through `./mxcodr-live exec`.
 - `./mxcodr-live open Module.Document` opens a document in Studio Pro (`Module` alone: its domain model), to
   show the person what you changed. `./mxcodr-live save` saves every open editor, the person's unsaved edits
-  included: ask them before you run it. After your turn the pane's unsaved-changes bar lists the documents Studio Pro
-  has not saved, with Save all: your summary need not tell them to save.
+  included: ask them before you run it, or point them to Save all on the pane's unsaved-changes bar.
 - `./mxcodr-live open <file>[:line]` (a path with a `/` or a file extension) opens a file of the app, such as
   `tests/order.spec.ts:42`, in an editor tab inside Studio Pro, to show the person a test or a script. The
   person may edit it there: when they save, the file on disk changes, so read it again before you change it.
