@@ -9,6 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { catalog, resolveTheme, decideTheme, activeFrameTheme, applyTheme, writeFrame, listLines, askTheme, installThemeTool, THEMES_DIR, AS_IS } from '../overlay/lib/theme.mjs';
+import { installerSource } from './installer-source.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-theme-'));
 const put = (root, rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
@@ -195,7 +196,7 @@ test('the change-it-later command: .mxcodr/theme.mjs and .mxcodr/themes/ in the 
 });
 
 test('the installer takes --theme and --yes, records the theme, and installs the change-it-later command', () => {
-  const src = fs.readFileSync(fileURLToPath(new URL('../overlay/install.mjs', import.meta.url)), 'utf8');
+  const src = installerSource();
   assert.match(src, /opt\('--theme'\)/);
   assert.match(src, /argv\.includes\('--yes'\)/);
   assert.match(src, /theme: themeResult\.theme/);

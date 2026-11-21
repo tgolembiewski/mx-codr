@@ -11,6 +11,7 @@ import { INSTALLED_SKILLS } from '../overlay/lib/skills.mjs';
 import { readRequests, saveRequest, sha1 } from '../overlay/lib/requests.mjs';
 import { writeAtomic, readJson } from '../overlay/lib/cache.mjs';
 import { PIN } from '../overlay/lib/mx.mjs';
+import { installerSource } from './installer-source.mjs';
 
 const tmp = (p = 'mxcodr-') => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const put = (root, rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
@@ -185,7 +186,7 @@ test('AGENTS.md fence: appended once, replaced in place, the rest kept; unfence 
 });
 
 test('installed.json holds bundle, mxcli, db, agents, skills, the coverage choice and requests; no ports, manifest, hook or permission', () => {
-  const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+  const src = installerSource();
   for (const k of ['bundle: BUNDLE', 'mxcli: { path', 'db,', 'agents,', 'skills, ...coverageRecord(cov)', 'const skills = skillsFor({ coverage: cov.on })', 'testKit: kit.ours', 'requests:']) assert.ok(src.includes(k), k);
   const inst = src.split('\n').find(l => l.includes('const inst = {'));
   assert.doesNotMatch(inst, /\bports\b|manifest|points/, 'installed.json carries no ports, manifest or points');
@@ -363,7 +364,7 @@ test('film: a reinstall writes tests/film.mjs again over an edited copy, also wh
 });
 
 test('film: the installer always writes the recorder, and v1\'s tests/film.sh goes on upgrade while tests/film.mjs stays', () => {
-  const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+  const src = installerSource();
   assert.match(src, /ui\.done\('film recorder', `.*\$\{copyFilm\(app\)\}/);
   const d = stubApp();
   put(d, 'tests/film.sh', '#!/usr/bin/env bash\n');

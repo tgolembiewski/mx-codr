@@ -647,7 +647,12 @@ has read the project skill for it whole; no verdict, no other refusals.
 ## What is in the bundle
 
     install.sh                     checks Node >= 20, then runs overlay/install.mjs
-    overlay/install.mjs            the installer
+    overlay/install.mjs            the installer: main() and a re-export of every step
+    overlay/install/               its steps, one file per section: new-app.mjs and merge.mjs (0), mxcli.mjs (1),
+                                   rules-file.mjs (4), skills-copy.mjs (5), skill-gate-install.mjs (5a),
+                                   test-kit.mjs (5b), film-copy.mjs (5c), coverage-copy.mjs (5d), brain.mjs,
+                                   upgrade.mjs (6), probe.mjs (ports), run-live.mjs, summary.mjs; common.mjs and
+                                   screen.mjs (the one ui and die) are what they share
     overlay/lib/                   mx.mjs (PIN, BUNDLE), rules.mjs (rule file text and its format check),
                                    templates.mjs (reads overlay/templates/ by name), skills.mjs (which skills are installed), coverage.mjs (the coverage
                                    question and choice), requests.mjs, cache.mjs, ports.mjs (is a port

@@ -12,6 +12,7 @@ import {
   withGateHooks, withoutGateHooks, fileModeCommand, PRE_MATCHER, POST_MATCHER, RESET_EVENT, RESET_MATCHER, clearReads, isCompaction,
 } from '../overlay/lib/skill-gate.mjs';
 import { installSkillGate, SKILL_GATE } from '../overlay/install.mjs';
+import { installerSource } from './installer-source.mjs';
 
 // the hooks prefer CLAUDE_PROJECT_DIR (set when this suite runs inside Claude Code): never another folder from here
 delete process.env.CLAUDE_PROJECT_DIR;
@@ -228,7 +229,7 @@ test('installSkillGate: the script in .mxcodr/, two hooks in settings.local.json
 });
 
 test('the installer wires it: one bar step, the summary says what runs while the agent builds', () => {
-  const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+  const src = installerSource();
   assert.match(src, /ui\.begin\('installing the skill gate'\);\n\s*let gate = null, gateErr = null;\n\s*try \{ gate = installSkillGate\(app, agents\); \}/);
   assert.doesNotMatch(src, /no hooks, no gate/);
   assert.match(src, /MXCODR_SKILL_GATE=0/);

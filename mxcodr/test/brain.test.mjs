@@ -10,11 +10,12 @@ import path from 'node:path';
 import { writeRules, summary } from '../overlay/install.mjs';
 import { readTemplate, ruleText, mdcText, parseRule, checkRule, SKILLS_DIR, AGENTS, START, END, BRAIN_RULE } from '../overlay/lib/rules.mjs';
 import { makeUi } from '../overlay/lib/ui.mjs';
+import { installerSource } from './installer-source.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mxcodr-brain-'));
 const put = (root, rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
 const get = (root, rel) => fs.readFileSync(path.join(root, rel), 'utf8');
-const src = fs.readFileSync(new URL('../overlay/install.mjs', import.meta.url), 'utf8');
+const src = installerSource();
 const brain = () => readTemplate(BRAIN_RULE);
 const interview = () => fs.readFileSync(new URL('../overlay/skills/requirements-interview/SKILL.md', import.meta.url), 'utf8');
 
