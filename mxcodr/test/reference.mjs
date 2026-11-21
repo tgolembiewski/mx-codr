@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 // step that split tests/film.mjs and the skill gate into parts (bundle 2026.11.21.3, the app's file set changed)
 // live.104: moved to the last commit of the red-team fixes (bundle 2026.11.21.4: tests/film.mjs runs ffmpeg and taskkill
 // by their full paths)
-export const REF_COMMIT = 'f4170b08';
+// live.105: moved to the unsaved-changes bar's commit (bundle 2026.11.21.5: the live rule's conflict and save bullets)
+export const REF_COMMIT = 'b3638c4a';
 export const BUNDLE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let made;
