@@ -8,8 +8,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-// the readability refactor's round 2, harness area: the bundle at its start
-export const REF_COMMIT = 'c478827d';
+// the readability refactor's round 2, harness area: the bundle at its start (c478827d), moved to 8efe6368 after the
+// step that split tests/film.mjs and the skill gate into parts (bundle 2026.11.21.3, the app's file set changed)
+export const REF_COMMIT = '8efe6368';
 export const BUNDLE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let made;
